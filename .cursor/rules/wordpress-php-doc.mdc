@@ -1,0 +1,37 @@
+---
+description: 
+globs: *.php
+alwaysApply: false
+---
+Description: PHP inline documentation standards.
+wordpress_phpdoc_standard:
+  must_document:
+    - functions
+    - methods
+    - classes
+    - properties
+    - constants
+    - hooks
+    - requires_includes
+    - file_headers
+  style:
+    summary: {one_sentence: true, no_markup: true, period_end: true}
+    description_markdown: true
+    wrap: {soft: 80, hard: 120}
+    oxford_comma: true
+    voice: "third_person_singular"
+  versioning:
+    since_pattern: "\\d+\\.\\d+\\.\\d+|MU \\(3\\.0\\.0\\)"
+    deprecated_pattern: "@deprecated {ver} Use {alt} instead."
+  tags:
+    allowed_core: ["since","deprecated","see","link","param","return","var","type","global","access","ignore","package","subpackage","internal","todo","method"]
+    forbidden_synonyms: ["summary","returns","constructor","static","staticvar"]
+  formatting:
+    align_columns: true
+    no_html_in_param_return: true
+    array_param_hash_notation: true
+  hooks:
+    duplicate_reference_comment: true
+  file_header:
+    include_package: "WordPress"
+    require_summary_no_period: true

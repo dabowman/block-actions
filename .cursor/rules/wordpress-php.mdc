@@ -1,0 +1,66 @@
+---
+description: 
+globs: *.php
+alwaysApply: false
+---
+Description: PHP coding standards (syntax, naming, structure, best practices).
+wordpress_php_standard:
+  tags:
+    short_open: false
+    multiline_in_html: true
+    omit_closing_tag: true
+  indent: "tabs"
+  whitespace:
+    after_comma: true
+    around_operators: true
+    control_paren_space: true
+    trailing_space: false
+    eof_newline: true
+  naming:
+    variable: "snake_lower"
+    function_hook: "snake_lower"
+    class_like: "Camel_Underscore"
+    constant: "SCREAMING_SNAKE"
+    file: "kebab"
+    dynamic_hook: "interpolated"
+  includes:
+    style: "require_once PATH"
+  braces_arrays:
+    braces_always: true
+    array_syntax: "long"
+    multiline_call_one_arg_per_line: true
+  types:
+    space_around_hint: true
+    nullable_no_space: true
+    return_type_space: false
+    version_matrix_enforced: true
+  namespace_use:
+    one_per_file: true
+    order: ["class","function","const"]
+    group_use_allowed: true
+  oop:
+    one_structure_per_file: true
+    visibility_required: true
+    modifier_order: ["abstract|final","readonly","visibility","static","type"]
+    instantiate_paren: true
+  control:
+    elseif_only: true
+    yoda_equals: true
+    no_assignment_in_condition: true
+    ternary_short_forbidden: true
+    avoid_error_suppress: true
+    pre_increment_preferred: true
+  db:
+    prefer_wp_api: true
+    require_prepare: true
+  forbidden:
+    - "eval"
+    - "goto"
+    - "extract"
+    - "backtick"
+    - "loose_comparison"
+  misc:
+    closures_not_for_hooks: true
+    no_short_echo: true
+  resources:
+    official: [@https://developer.wordpress.org/coding-standards/wordpress-coding-standards/php/]

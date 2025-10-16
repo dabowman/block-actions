@@ -1,0 +1,32 @@
+---
+description: 
+globs: *.html
+alwaysApply: false
+---
+Description: HTML coding standards (syntax, validation, best practices).
+wordpress_html_standard:
+  validation: "w3c"
+  tag_syntax:
+    require_closing_tags: true
+    self_closing_format: "space+slash"      # e.g. <br />
+  case_rules:
+    tag_names: "lower"
+    attribute_names: "lower"
+    attribute_values:
+      machine: "lower"
+      human: "title"
+  attributes:
+    quoting: "always"
+    boolean:
+      value_allowed: false   # presence implies true
+  indentation:
+    style: "tabs"
+    php_alignment: true
+  best_practices:
+    - "validate_w3c"
+    - "quote_all_attributes"
+    - "avoid_boolean_values"
+    - "follow_dom_indentation"
+    - "space_before_selfclosing_slash"
+  resources:
+    official: [@https://developer.wordpress.org/coding-standards/wordpress-coding-standards/html/]

@@ -1,0 +1,87 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+description: Core WordPress development principles and cross-cutting best practices.
+
+wordpress_core_principles:
+  general:
+    # Broad development philosophy and environment setup
+    philosophy:
+      - modularity_focused # Favor modular design, OOP when appropriate
+      - iteration_over_duplication
+      - descriptive_naming # Functions, variables, files, etc.
+      - prefer_core_apis # Use WP core functions/APIs when available
+    standards_compliance:
+      - follow_wp_coding_standards # General reference, details in specific files
+    environment:
+      - php_version_target: "8.0+"
+      - strict_typing_preferred # declare(strict_types=1);
+    directory_structure:
+      naming_convention: "lowercase-hyphenated" # e.g., wp-content/themes/my-theme
+      follow_wp_conventions: true # Theme/plugin structures
+    error_handling:
+      strategy: ["wp_debug_logging", "custom_handlers_when_needed", "try_catch_for_exceptions"]
+    asset_management:
+      method: ["wp_enqueue_script", "wp_enqueue_style"] # Use WP enqueue functions
+    dependency_management:
+      tool: "composer" # For advanced plugins/themes
+    testing:
+      framework: "wp_unit_test_case" # Use WP's built-in tools
+    internationalization:
+      method: "wordpress_i18n_functions" # Use gettext functions, etc.
+
+  hooks:
+    # Guidelines for using WordPress hooks
+    usage: primary_extension_mechanism # Prefer hooks over modifying core files
+    types: ["actions", "filters"]
+
+  security:
+    # Key security practices
+    form_submissions: nonce_verification_required
+    data_handling: use_wp_validation_sanitization_functions
+    output: escaping_required # Escape all output appropriately
+
+  database:
+    # Interacting with the database
+    interaction_layer: "$wpdb"
+    query_security: prepared_statements_required # Use $wpdb->prepare()
+    query_methods: ["$wpdb", "WP_Query"] # Preferred ways to query posts/data
+    schema_management: use_dbDelta_for_changes
+
+  performance:
+    # Practices related to performance optimization
+    caching: use_transients_api
+    background_processing: use_wp_cron
+
+  theming:
+    # Best practices specific to theme development
+    structure: follow_template_hierarchy
+    core_files: functions_php_for_setup # Use functions.php correctly
+    templating: use_template_tags_and_conditionals
+    features:
+      pagination: use_paginate_links
+
+  content_architecture:
+    # Structuring content and configuration
+    data_modeling: use_custom_post_types_and_taxonomies # When appropriate
+    configuration: use_options_api
+
+  user_management:
+    # Handling users and permissions
+    permissions: use_roles_and_capabilities_system
+
+  block_editor:
+    # Best practices for the Gutenberg block editor
+    block_usage:
+      - prioritize_core_blocks
+      - prefer_extending_core_blocks # Over creating new custom blocks
+    development:
+      editor_ui: use_wp_components
+      configuration: use_theme_json # For styles, supports, settings
+    styling:
+      priority: # Order of preference for styling blocks
+        - block_supports_editor_controls
+        - css_for_unsupported_styles
+        - js_for_interactivity_or_last_resort

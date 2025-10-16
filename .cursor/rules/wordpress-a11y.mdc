@@ -1,0 +1,40 @@
+---
+description: Accessibility coding standards (WCAG 2.2 AA & ATAG 2.0)
+alwaysApply: false
+---
+Description: Accessibility coding standards (WCAG 2.2 AA & ATAG 2.0).
+wordpress_a11y_standard:
+  conformance:
+    wcag_version: "2.2"
+    level: "AA"
+    exceed_to_aaa_when_feasible: true
+  adopt_atag_20: true
+  principles:
+    perceivable:
+      - "text_alternatives"
+      - "time_based_media"
+      - "adaptable"
+      - "distinguishable"
+    operable:
+      - "keyboard_accessible"
+      - "enough_time"
+      - "seizures_physical_reactions"
+      - "navigable"
+      - "input_modalities"
+    understandable:
+      - "readable"
+      - "predictable"
+      - "input_assistance"
+    robust:
+      - "compatible"
+  sufficient_techniques_required: true
+  failure_examples_must_not_exist: true
+  testing_pipeline:
+    - static_lint
+    - keyboard_only
+    - screen_reader
+    - contrast_ratio
+    - motion_review
+    - human_usability
+  resources:
+    official: [@https://developer.wordpress.org/coding-standards/wordpress-coding-standards/accessibility/]
