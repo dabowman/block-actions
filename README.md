@@ -1,6 +1,11 @@
 # Block Actions
 
-A WordPress plugin that extends block editor functionality with configurable actions and custom data attributes. It enables dynamic behavior for blocks on the frontend while keeping a clean, accessible UI in the editor.
+Tested up to: 6.6
+Stable tag: 1.0.0
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+
+Assign modular actions and data attributes to blocks for lightweight frontend interactivity.
 
 ## Features
 
