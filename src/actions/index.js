@@ -6,13 +6,20 @@
 // Use webpack's require.context to get all .js files in current directory
 const actionContext = require.context('./', false, /\.js$/);
 
+// Whitelist core actions to ship by default
+const CORE_ACTION_IDS = [
+    'scroll-to-top',
+    'carousel',
+    'main-nav',
+];
+
 // Filter out this index file and create an array of action modules
 const actions = actionContext.keys()
     .filter(key => key !== './index.js' && key !== './base-action.js')
-    .map(key => {
-        const module = actionContext(key);
-        // Get the action name from the file path (e.g., './add-to-cart.js' -> 'add-to-cart')
-        const id = key.replace(/^\.\/(.*)\.js$/, '$1');
+    .map(key => key.replace(/^\.\/(.*)\.js$/, '$1'))
+    .filter(id => CORE_ACTION_IDS.includes(id))
+    .map(id => {
+        const module = actionContext(`./${id}.js`);
         return {
             id,
             label: id.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),

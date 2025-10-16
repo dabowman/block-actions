@@ -43,12 +43,19 @@ const telemetry = {
  * @param {Error|null} [error] - Optional error object
  */
 function log(type, message, error = null) {
-	const prefix = '[Tag Heuer Frontend]';
-
-	// Only log errors by default
-	if (type === 'error') {
-		console.error(`${prefix} ${message}`);
-	}
+    const prefix = '[Block Actions Frontend]';
+    const debug = !!(window?.blockActions?.debug);
+    if (type === 'error') {
+        console.error(`${prefix} ${message}`, error || '');
+        return;
+    }
+    if (debug) {
+        if (type === 'warning') {
+            console.warn(`${prefix} ${message}`);
+        } else {
+            console.log(`${prefix} ${message}`);
+        }
+    }
 }
 
 /**
@@ -59,37 +66,31 @@ function log(type, message, error = null) {
  * @async
  */
 async function loadAndExecuteAction(actionId, element) {
-	const startTime = performance.now();
+    const startTime = performance.now();
 
-	// Check if action is already loaded
-	if (!loadedActions.has(actionId)) {
-		// Dynamic import of the action module
-		const actionModule = await import(
-			/* webpackChunkName: "[request]" */
-			`./actions/${actionId}.js`
-		);
-		loadedActions.set(actionId, actionModule.default);
-		telemetry.actionsLoaded++;
-	}
+    // Build a registry of actions from the static manifest
+    if (!loadedActions.has(actionId)) {
+        const registryAction = actions.find(a => a.id === actionId);
+        if (registryAction && typeof registryAction.init === 'function') {
+            loadedActions.set(actionId, registryAction.init);
+            telemetry.actionsLoaded++;
+        }
+    }
 
-	// Get the loaded action
-	const action = loadedActions.get(actionId);
+    const action = loadedActions.get(actionId);
 
-	// Execute with error boundary
-	if (typeof action === 'function') {
-		action(element);
-		const loadTime = performance.now() - startTime;
-
-		// Track performance
-		if (!telemetry.actionLoadTimes[actionId]) {
-			telemetry.actionLoadTimes[actionId] = [];
-		}
-		telemetry.actionLoadTimes[actionId].push(Math.round(loadTime));
-
-		log('info', `Action ${actionId} loaded in ${Math.round(loadTime)}ms`);
-	} else {
-		log('error', `Action ${actionId} is not a valid function`);
-	}
+    if (typeof action === 'function') {
+        action(element);
+        const loadTime = performance.now() - startTime;
+        if (!telemetry.actionLoadTimes[actionId]) {
+            telemetry.actionLoadTimes[actionId] = [];
+        }
+        telemetry.actionLoadTimes[actionId].push(Math.round(loadTime));
+        log('info', `Action ${actionId} executed in ${Math.round(loadTime)}ms`);
+    } else {
+        telemetry.actionsFailed++;
+        log('error', `Action ${actionId} is not available`);
+    }
 }
 
 /**

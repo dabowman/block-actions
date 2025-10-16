@@ -18,10 +18,9 @@
 import apiFetch from '@wordpress/api-fetch';
 import DOMPurify from 'dompurify';
 
-// const PRODUCT_ID = '01tWs000005ccunIAA';
-// const PRODUCT_ID = '01tWs000005ccppIAA';
-const PRODUCT_ID = '01tWs000005ccxjIAA';
-const DATA_SOURCE_UUID = window?.tagHeuerActions?.dataSourceUuid || '';
+// Removed product specificity for standalone plugin
+const PRODUCT_ID = null;
+const DATA_SOURCE_UUID = '';
 
 export class BaseAction {
 	/**
@@ -34,9 +33,9 @@ export class BaseAction {
 		this.target = element.querySelector('a') || element;
 		this.originalText = this.target.textContent;
 		this.isExecuting = false;
-		this.nonce = window?.tagHeuerActions?.nonce || '';
+        this.nonce = window?.blockActions?.nonce || '';
 		this.actionId = element.getAttribute('data-action');
-		this.restUrl = window?.tagHeuerActions?.restUrl || 'http://127.0.0.1:9999';
+        this.restUrl = window?.blockActions?.restUrl || '';
 
 		// Track recent execution timestamps for rate limiting
 		this.executionTimestamps = [];
@@ -74,9 +73,10 @@ export class BaseAction {
 			opacity: /^(0(\.\d+)?|1(\.0+)?)$/
 		};
 
-		if (!allowedStyles[property] || !allowedStyles[property].test(value)) {
-			return;
-		}
+        if (!allowedStyles[property] || !allowedStyles[property].test(value)) {
+            console.warn(`[Block Actions] Invalid style ${property}: ${String(value)}`);
+            return;
+        }
 
 		this.target.style[property] = value;
 	}
@@ -90,7 +90,7 @@ export class BaseAction {
 	 */
 	async apiRequest(endpoint, data = {}) {
 		try {
-			const response = await fetch(endpoint, {
+            const response = await fetch(endpoint, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -106,7 +106,8 @@ export class BaseAction {
 
 			return await response.json();
 		} catch (error) {
-			this.log('error', 'API Request Failed', error);
+            this.log('error', 'API Request Failed', error);
+            throw error;
 		}
 	}
 
@@ -144,7 +145,7 @@ export class BaseAction {
 
 		// Safety timeout - automatically release lock after timeout
 		// to prevent deadlocks if completeExecution is never called
-		this._safetyTimeout = setTimeout(() => {
+        this._safetyTimeout = setTimeout(() => {
 			if (this.isExecuting) {
 				this.isExecuting = false;
 			}
@@ -201,15 +202,15 @@ export class BaseAction {
 	 * @deprecated Use log('info', message) instead
 	 * @param {string} message - Info message
 	 */
-	logInfo(message) {
-		if (window?.tagHeuerActions?.debug) {
-			this.log('info', message);
-		}
-	}
+    logInfo(message) {
+        if (window?.blockActions?.debug) {
+            this.log('info', message);
+        }
+    }
 
 	async setInitialCookieForBuyer() {
 		// ToDo: We should prob take into account the store_id so if that changes the cookie is invalid. It's tied to the site_id which is tied to the store_id.
-		let guestCookie = document.cookie.split('; ').find(row => row.startsWith('guest_uuid_essential_'));
+        let guestCookie = document.cookie.split('; ').find(row => row.startsWith('guest_uuid_essential_'));
 
 		if (guestCookie) {
 			this.log('info', 'Found the cookies for the guest checkout flow. We are good to continue on.');
@@ -220,12 +221,11 @@ export class BaseAction {
 			this.log('info', 'Making a request to our endpoint to get the guest checkout cookies.');
 			let response;
 			try {
-				response = await apiFetch({
-					url: sprintf('%s/salesforce-d2c/generate-buyer-info', this.restUrl),
+                response = await apiFetch({
+                    url: `${this.restUrl}salesforce-d2c/generate-buyer-info`,
 					method: 'POST',
 					data: {
-						// ToDo: This should be dynamic and not be hardcoded like it's been done here. Perhaps the block could have a data-source-uuid attribute?
-						uuid: DATA_SOURCE_UUID,
+                        uuid: DATA_SOURCE_UUID,
 					}
 				});
 			} catch (error) {
@@ -258,7 +258,7 @@ export class BaseAction {
 		const quantity = 1;
 
 		// ToDo: This should be dynamic and not be hardcoded like it's been done here. Perhaps the block could have a data-product-id attribute?
-		const productId = PRODUCT_ID;
+        const productId = PRODUCT_ID;
 
 		// Get the cartId from local storage.
 		const cartId = localStorage.getItem('cartId');
@@ -272,7 +272,7 @@ export class BaseAction {
 		this.log('info', 'Making a request to the endpoint to add the item to the cart.');
 		let response;
 		try {
-			const proxyUrl = sprintf('%s/salesforce-d2c/proxy-request', this.restUrl);
+            const proxyUrl = `${this.restUrl}salesforce-d2c/proxy-request`;
 			response = await apiFetch({
 				url: proxyUrl,
 				credentials: 'include',
@@ -283,7 +283,7 @@ export class BaseAction {
 						cartId,
 						productId,
 						quantity,
-						uuid: DATA_SOURCE_UUID,
+                        uuid: DATA_SOURCE_UUID,
 					}
 				}
 			});
@@ -308,15 +308,15 @@ export class BaseAction {
 		this.log('info', 'Making a request to the endpoint to get the cart items.');
 		let response;
 		try {
-			response = await apiFetch({
-				url: sprintf('%s/salesforce-d2c/proxy-request', this.restUrl),
+            response = await apiFetch({
+                url: `${this.restUrl}salesforce-d2c/proxy-request`,
 				credentials: 'include',
 				method: 'POST',
 				data: {
 					action: 'GET_CART_ITEMS',
 					payload: {
 						cartId,
-						uuid: DATA_SOURCE_UUID,
+                        uuid: DATA_SOURCE_UUID,
 					}
 				}
 			});
@@ -346,9 +346,22 @@ export class BaseAction {
 	 * @param {string} message - Log message
 	 * @param {Error} [error] - Optional error object for error logs
 	 */
-	log(type, message, error = null) {
-		return;
-	}
+    log(type, message, error = null) {
+        const prefix = '[Block Actions]';
+        switch (type) {
+            case 'error':
+                console.error(`${prefix} ${message}`, error || '');
+                this.telemetry.errorCount++;
+                break;
+            case 'warning':
+                console.warn(`${prefix} ${message}`);
+                break;
+            default:
+                if (window?.blockActions?.debug) {
+                    console.log(`${prefix} ${message}`);
+                }
+        }
+    }
 
 	/**
 	 * Executes a callback with rate limiting based on maximum executions per second

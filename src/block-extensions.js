@@ -19,6 +19,7 @@ import { createHigherOrderComponent } from '@wordpress/compose';
 import { Fragment } from '@wordpress/element';
 import { InspectorAdvancedControls } from '@wordpress/block-editor';
 import { TextControl, ComboboxControl } from '@wordpress/components';
+import { __ } from '@wordpress/i18n';
 import { assign } from 'lodash';
 import actions from './actions';
 
@@ -59,7 +60,7 @@ function log(type, message, error = null) {
             console.warn(`${prefix} ${message}`);
             break;
         case 'info':
-            if (window?.tagHeuerActions?.debug) {
+            if (window?.blockActions?.debug) {
                 console.log(`${prefix} ${message}`);
             }
             break;
@@ -79,12 +80,12 @@ function log(type, message, error = null) {
  */
 const BLOCKS_WITH_ACTIONS = {
     'core/button': {
-        label: 'Button Action',
-        help: 'Select a custom action to apply to this button block.'
+        label: __('Button Action', 'block-actions'),
+        help: __('Select a custom action to apply to this button block.', 'block-actions')
     },
     'core/group': {
-        label: 'Group Action',
-        help: 'Select a custom action to apply to this group block.'
+        label: __('Group Action', 'block-actions'),
+        help: __('Select a custom action to apply to this group block.', 'block-actions')
     }
 };
 
@@ -139,10 +140,10 @@ const withInspectorControl = createHigherOrderComponent((BlockEdit) => {
                     <BlockEdit {...props} />
                     <InspectorAdvancedControls>
                         <TextControl
-                            label="Data Attribute"
+                            label={ __( 'Data Attribute', 'block-actions' ) }
                             value={customData || ''}
                             onChange={(value) => setAttributes({ customData: value })}
-                            help="Enter a custom data attribute value. This will be added as data-custom to the block."
+                            help={ __( 'Enter a custom data attribute value. This will be added as data-custom to the block. Example: analytics hook or CSS selector target.', 'block-actions' ) }
                         />
                     </InspectorAdvancedControls>
                 </Fragment>
@@ -172,7 +173,7 @@ const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
 
             // Create action options from discovered actions
             const actionOptions = [
-                { value: '', label: 'None' },
+                { value: '', label: __( 'None', 'block-actions' ) },
                 ...actions.map(action => ({
                     value: action.id,
                     label: action.label
@@ -219,7 +220,7 @@ const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
                                         action: value,
                                         timestamp: Date.now()
                                     };
-                                    log('info', `Action set to: ${value || 'None'} for block: ${props.name}`);
+                                    log('info', `Action set to: ${value || __( 'None', 'block-actions' )} for block: ${props.name}`);
                                 } catch (error) {
                                     log('error', 'Failed to set action attribute', error);
                                 }
@@ -227,7 +228,7 @@ const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
                             onFilterValueChange={(inputValue) =>
                                 getFilteredOptions(inputValue)
                             }
-                            help={blockConfig.help}
+                            help={`${blockConfig.help} ${__( 'Choose “None” to remove an action. Actions should be paired with meaningful labels and remain keyboard accessible.', 'block-actions' )}`}
                         />
                     </InspectorAdvancedControls>
                 </Fragment>
@@ -275,25 +276,25 @@ try {
 
     addFilter(
         'blocks.registerBlockType',
-        'tag-heuer/custom-data-attribute',
+        'block-actions/custom-data-attribute',
         addCustomDataAttribute
     );
 
     addFilter(
         'editor.BlockEdit',
-        'tag-heuer/custom-data-inspector',
+        'block-actions/custom-data-inspector',
         withInspectorControl
     );
 
     addFilter(
         'editor.BlockEdit',
-        'tag-heuer/custom-action-inspector',
+        'block-actions/custom-action-inspector',
         withActionInspectorControl
     );
 
     addFilter(
         'blocks.getSaveContent.extraProps',
-        'tag-heuer/custom-data-save',
+        'block-actions/custom-data-save',
         addCustomDataToSave
     );
 

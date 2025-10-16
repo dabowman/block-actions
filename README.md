@@ -1,6 +1,6 @@
 # Block Actions
 
-A WordPress plugin that extends block editor functionality by adding custom actions and data attributes to blocks. This plugin enables dynamic behavior and interactivity for blocks in the frontend while maintaining a clean, user-friendly interface in the block editor.
+A WordPress plugin that extends block editor functionality with configurable actions and custom data attributes. It enables dynamic behavior for blocks on the frontend while keeping a clean, accessible UI in the editor.
 
 ## Features
 
@@ -58,16 +58,13 @@ A WordPress plugin that extends block editor functionality by adding custom acti
    }
    ```
 
-### Available Actions
+### Available Actions (core)
 
 - `main-nav`: Handles main navigation interactions and sub-menu behaviors
 - `cart-nav`: Manages cart popover visibility and positioning
 - `product-details`: Controls product details accordion functionality
 - `product-gallery`: Manages product image gallery and thumbnails
-- `product-grid-carousel`: Handles product grid carousel navigation
-- `tech-specs`: Manages technical specifications tabs
-- `watch-day-night`: Controls watch day/night image switching
-- `add-to-cart`: Handles add to cart button interactions
+- Example/integration actions are available in source but not shipped by default. Enable or build them explicitly if needed.
 - `scroll-to-top`: Provides smooth scroll-to-top functionality
 
 ## Architecture
@@ -146,18 +143,11 @@ The plugin implements several security measures:
 - Rate limiting for action execution
 - Proper error handling and logging
 
-### Content Security Policy
+### Content Security Policy (optional)
 
 Content Security Policy (CSP) headers are **currently disabled for development** as they can interfere with local development environments. To enable CSP for production:
 
-1. Open `block-actions.php`
-2. Locate the `add_security_headers()` function
-3. Uncomment the CSP header line:
-```php
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; font-src 'self' data: https://tagheuer.remotedatablocks.com; connect-src 'self' https:; media-src 'self' https:; object-src 'none'; child-src 'none'; frame-src 'self'; worker-src 'self'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests; block-all-mixed-content;");
-```
-
-You may need to adjust the CSP policy to match your production environment's requirements.
+Enable CSP via Settings → Block Actions. Adjust the policy using the `block_actions_csp_header` filter to fit your environment.
 
 ## Debugging
 
@@ -167,10 +157,7 @@ define('WP_DEBUG', true);
 define('WP_DEBUG_LOG', true);
 ```
 
-Actions will log initialization, errors, and key events to:
-1. Browser console (when `debug` is enabled)
-2. WordPress debug log
-3. Custom database log table
+Actions will log initialization, warnings, and errors to the browser console when `debug` is enabled. No server-side telemetry is sent by default.
 
 ## Logging System
 
@@ -274,10 +261,7 @@ if (this.canExecute()) {
 
 ### Server-side Logging
 
-Error logs are sent to the WordPress server and:
-1. Stored in the database (`wp_tag_heuer_action_logs` table) with optimized columns for telemetry
-2. Written to the WordPress debug log if `WP_DEBUG_LOG` is enabled
-3. Include additional metadata like user ID, URL, IP, and performance metrics
+Not enabled by default. If needed, implement via custom REST routes with proper permissions and nonces.
 
 ### Debug Mode
 

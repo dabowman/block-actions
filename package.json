@@ -10,7 +10,8 @@
     "create-action": "node scripts/create-action.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "zip": "git ls-files -z | xargs -0 -I{} sh -c 'mkdir -p dist && rm -f dist/block-actions.zip && zip -r dist/block-actions.zip block-actions.php build README.md docs || true'"
   },
   "author": "WPVIP",
   "license": "GPL-2.0-or-later",

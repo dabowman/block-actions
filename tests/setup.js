@@ -10,10 +10,11 @@ global.wp = {
 	}
 };
 
-// Mock window.tagHeuerActions
-window.tagHeuerActions = {
-	nonce: 'test-nonce',
-	debug: true
+// Mock window.blockActions
+window.blockActions = {
+    nonce: 'test-nonce',
+    debug: true,
+    restUrl: 'http://example.test/wp-json/'
 };
 
 // Setup fetch mock
