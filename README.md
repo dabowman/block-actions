@@ -65,12 +65,12 @@ Assign modular actions and data attributes to blocks for lightweight frontend in
 
 ### Available Actions (core)
 
-- `main-nav`: Handles main navigation interactions and sub-menu behaviors
-- `cart-nav`: Manages cart popover visibility and positioning
-- `product-details`: Controls product details accordion functionality
-- `product-gallery`: Manages product image gallery and thumbnails
-- Example/integration actions are available in source but not shipped by default. Enable or build them explicitly if needed.
+- `carousel`: Unified carousel action for image galleries with buttons, thumbnails, or both
 - `scroll-to-top`: Provides smooth scroll-to-top functionality
+
+Additional example/test actions are available in source but not shipped by default:
+- `example-rate-limited`: Demonstrates rate limiting functionality
+- `test-action`: Simple test action for development
 
 ## Architecture
 

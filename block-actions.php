@@ -22,9 +22,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Helper to read asset metadata with filemtime fallback.
  *
- * @param string $asset_filename Asset metadata filename.
+ * @since 1.0.0
+ *
+ * @param string $asset_filename  Asset metadata filename.
  * @param string $script_filename Script file for mtime fallback.
- * @return array{dependencies: array, version: string}
+ * @return array{dependencies: array, version: string} Asset metadata with dependencies and version.
  */
 function get_asset_meta( string $asset_filename, string $script_filename ): array {
 	$asset_path = plugin_dir_path( __FILE__ ) . $asset_filename;
@@ -44,6 +46,10 @@ function get_asset_meta( string $asset_filename, string $script_filename ): arra
 
 /**
  * Enqueue block editor assets.
+ *
+ * @since 1.0.0
+ *
+ * @return void
  */
 function enqueue_block_editor_assets(): void {
 	$asset = get_asset_meta( 'build/block-extensions.asset.php', 'build/block-extensions.js' );
@@ -61,7 +67,9 @@ add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_edit
 /**
  * Get plugin settings with defaults.
  *
- * @return array
+ * @since 1.0.0
+ *
+ * @return array Plugin settings with defaults applied.
  */
 function get_plugin_settings(): array {
 	$defaults = array(
@@ -74,6 +82,10 @@ function get_plugin_settings(): array {
 
 /**
  * Enqueue frontend assets and localize config.
+ *
+ * @since 1.0.0
+ *
+ * @return void
  */
 function enqueue_frontend_assets(): void {
 	$settings = get_plugin_settings();
@@ -101,6 +113,10 @@ add_action( 'wp_enqueue_scripts', __NAMESPACE__ . '\\enqueue_frontend_assets' );
 
 /**
  * Add security headers (CSP opt-in via setting/filter), and safe defaults.
+ *
+ * @since 1.0.0
+ *
+ * @return void
  */
 function add_security_headers(): void {
 	if ( is_admin() ) {
@@ -124,6 +140,10 @@ add_action( 'send_headers', __NAMESPACE__ . '\\add_security_headers' );
 
 /**
  * Register settings and admin page.
+ *
+ * @since 1.0.0
+ *
+ * @return void
  */
 function register_settings(): void {
 	register_setting( 'block_actions', 'block_actions_settings', array( 'type' => 'array', 'sanitize_callback' => __NAMESPACE__ . '\\sanitize_settings' ) );
@@ -141,8 +161,10 @@ add_action( 'admin_menu', __NAMESPACE__ . '\\register_settings' );
 /**
  * Sanitize settings.
  *
- * @param array $input Raw input.
- * @return array
+ * @since 1.0.0
+ *
+ * @param array $input Raw input from settings form.
+ * @return array Sanitized settings array.
  */
 function sanitize_settings( array $input ): array {
 	return array(
@@ -153,6 +175,10 @@ function sanitize_settings( array $input ): array {
 
 /**
  * Render settings page.
+ *
+ * @since 1.0.0
+ *
+ * @return void
  */
 function render_settings_page(): void { ?>
 	<div class="wrap">

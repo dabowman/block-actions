@@ -12,28 +12,31 @@ const rl = readline.createInterface({
 // Template for new action files
 const getActionTemplate = (name, description) => `/**
  * ${description}
- * @param {HTMLElement} element - The button element.
+ * 
+ * Note: The action ID is derived from the filename (${name}.js).
+ * Make sure the filename matches the desired action ID.
+ * 
+ * @param {HTMLElement} element - The element to attach the action to.
  */
 
-export const actionName = '${name}';
+import { BaseAction } from './base-action';
 
 export default function init(element) {
-    const target = element.querySelector('a') || element;
-    const originalText = target.textContent;
+    const action = new BaseAction(element);
 
-    target.addEventListener('click', (e) => {
+    action.target.addEventListener('click', (e) => {
         e.preventDefault();
 
-        // Add your action code here
-        console.log('${name} action executed');
+        action.executeWithRateLimit(() => {
+            // Add your action code here
+            action.log('info', '${name} action executed');
 
-        // Example: Change button text
-        target.textContent = 'Action Executed!';
+            // Example: Change button text
+            action.setTextContent('Action Executed!');
 
-        // Example: Reset after 2 seconds
-        setTimeout(() => {
-            target.textContent = originalText;
-        }, 2000);
+            // Example: Reset after 2 seconds
+            setTimeout(() => action.reset(), 2000);
+        });
     });
 }
 `;

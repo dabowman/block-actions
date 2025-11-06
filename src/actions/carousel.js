@@ -1,17 +1,18 @@
 /**
- * Unified carousel action for all carousel types
- * Handles image carousels with buttons, thumbnails, or both
- * Uses container queries for more reliable layouts
+ * Unified carousel action for all carousel types.
+ * Handles image carousels with buttons, thumbnails, or both.
+ * Uses container queries for more reliable layouts.
  *
  * Supports two structure options:
  * 1. Block element contains a child with class 'carousel-container'
  * 2. Block element itself has class 'carousel-container'
  *
- * @param {HTMLElement} element - The carousel element or parent element.
+ * @since 1.0.0
+ *
+ * @param {HTMLElement} element The carousel element or parent element.
+ * @return {void}
  */
 import { BaseAction } from './base-action';
-
-export const actionName = 'carousel';
 
 export default function init(element) {
     const action = new BaseAction(element);

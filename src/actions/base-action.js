@@ -11,22 +11,21 @@
  * - Safe DOM manipulation
  * - API request handling with security
  *
+ * @since 1.0.0
+ *
  * @class BaseAction
  */
 
 // Import DOMPurify for robust XSS protection
-import apiFetch from '@wordpress/api-fetch';
 import DOMPurify from 'dompurify';
-
-// Removed product specificity for standalone plugin
-const PRODUCT_ID = null;
-const DATA_SOURCE_UUID = '';
 
 export class BaseAction {
 	/**
-	 * Creates a new BaseAction instance
+	 * Creates a new BaseAction instance.
 	 *
-	 * @param {HTMLElement} element - The DOM element to attach the action to
+	 * @since 1.0.0
+	 *
+	 * @param {HTMLElement} element The DOM element to attach the action to.
 	 */
 	constructor(element) {
 		this.element = element;
@@ -50,9 +49,12 @@ export class BaseAction {
 	}
 
 	/**
-	 * Safely updates element text content with XSS protection
+	 * Safely updates element text content with XSS protection.
 	 *
-	 * @param {string} text - Text to set
+	 * @since 1.0.0
+	 *
+	 * @param {string} text Text to set.
+	 * @return {void}
 	 */
 	setTextContent(text) {
 		if (typeof text !== 'string') return;
@@ -60,10 +62,13 @@ export class BaseAction {
 	}
 
 	/**
-	 * Safely updates element style with validation
+	 * Safely updates element style with validation.
 	 *
-	 * @param {string} property - CSS property
-	 * @param {string} value - CSS value
+	 * @since 1.0.0
+	 *
+	 * @param {string} property CSS property name.
+	 * @param {string} value    CSS value to set.
+	 * @return {void}
 	 */
 	setStyle(property, value) {
 		// Whitelist of allowed CSS properties and their valid values
@@ -82,11 +87,13 @@ export class BaseAction {
 	}
 
 	/**
-	 * Makes an authenticated API request to WordPress
+	 * Makes an authenticated API request to WordPress.
 	 *
-	 * @param {string} endpoint - WordPress API endpoint
-	 * @param {Object} data - Request data
-	 * @returns {Promise} API response
+	 * @since 1.0.0
+	 *
+	 * @param {string} endpoint WordPress API endpoint.
+	 * @param {Object} data     Request data to send.
+	 * @return {Promise} Promise that resolves to the API response.
 	 */
 	async apiRequest(endpoint, data = {}) {
 		try {
@@ -112,10 +119,12 @@ export class BaseAction {
 	}
 
 	/**
-	 * Checks if the action can execute based on maximum executions per second
-	 * Also tracks execution telemetry
+	 * Checks if the action can execute based on maximum executions per second.
+	 * Also tracks execution telemetry.
 	 *
-	 * @returns {boolean} Whether the action can execute
+	 * @since 1.0.0
+	 *
+	 * @return {boolean} True if the action can execute, false if rate limited.
 	 */
 	canExecute() {
 		const now = Date.now();
@@ -156,7 +165,11 @@ export class BaseAction {
 
 	/**
 	 * Call this when execution is complete to properly update telemetry
-	 * and release the execution lock
+	 * and release the execution lock.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return {void}
 	 */
 	completeExecution() {
 		// Ignore if not executing (prevents errors from multiple calls)
@@ -179,160 +192,11 @@ export class BaseAction {
 	}
 
 	/**
-	 * Logs an error with telemetry data
-	 * @deprecated Use log('error', message, error) instead
-	 * @param {string} message - Error message
-	 * @param {Error} error - Error object
-	 */
-	logError(message, error) {
-		this.log('error', message, error);
-	}
-
-	/**
-	 * Logs a warning message
-	 * @deprecated Use log('warning', message) instead
-	 * @param {string} message - Warning message
-	 */
-	logWarning(message) {
-		this.log('warning', message);
-	}
-
-	/**
-	 * Logs an info message if debug mode is enabled
-	 * @deprecated Use log('info', message) instead
-	 * @param {string} message - Info message
-	 */
-    logInfo(message) {
-        if (window?.blockActions?.debug) {
-            this.log('info', message);
-        }
-    }
-
-	async setInitialCookieForBuyer() {
-		// ToDo: We should prob take into account the store_id so if that changes the cookie is invalid. It's tied to the site_id which is tied to the store_id.
-        let guestCookie = document.cookie.split('; ').find(row => row.startsWith('guest_uuid_essential_'));
-
-		if (guestCookie) {
-			this.log('info', 'Found the cookies for the guest checkout flow. We are good to continue on.');
-		} else {
-			this.log('info', 'No guest checkout flow cookies found');
-
-			// This would be where we make a request to our endpoint to get the guest checkout cookies.
-			this.log('info', 'Making a request to our endpoint to get the guest checkout cookies.');
-			let response;
-			try {
-                response = await apiFetch({
-                    url: `${this.restUrl}salesforce-d2c/generate-buyer-info`,
-					method: 'POST',
-					data: {
-                        uuid: DATA_SOURCE_UUID,
-					}
-				});
-			} catch (error) {
-				console.error('Error setting the initial cookie for the buyer', error);
-				return;
-			}
-
-			// Then we would set the cookies.
-			this.log('info', 'Setting the cookies.');
-
-			const buyerCookie = response.buyer_cookie;
-			const cartId = response.cart_id;
-			const sessionCookie = response.session_cookie;
-
-			document.cookie = buyerCookie;
-			document.cookie = sessionCookie;
-			document.cookie = `vip_guest_cart_id=${cartId}; path=/;`;
-
-			// Then we would set the cartId as well in local storage.
-			this.log('info', 'Setting the cartId in local storage.');
-
-			localStorage.setItem('cartId', cartId);
-
-			this.log('info', 'Initial cookie for the guest checkout flow has been set.');
-		}
-	}
-
-	async addItemToCart() {
-		// ToDo: This should be dynamic through a quantity attribute.
-		const quantity = 1;
-
-		// ToDo: This should be dynamic and not be hardcoded like it's been done here. Perhaps the block could have a data-product-id attribute?
-        const productId = PRODUCT_ID;
-
-		// Get the cartId from local storage.
-		const cartId = localStorage.getItem('cartId');
-
-		if (!cartId) {
-			this.log('error', 'No cartId found');
-			return;
-		}
-
-		// Make a request to the endpoint to add the item to the cart.
-		this.log('info', 'Making a request to the endpoint to add the item to the cart.');
-		let response;
-		try {
-            const proxyUrl = `${this.restUrl}salesforce-d2c/proxy-request`;
-			response = await apiFetch({
-				url: proxyUrl,
-				credentials: 'include',
-				method: 'POST',
-				data: {
-					action: 'ADD_TO_CART',
-					payload: {
-						cartId,
-						productId,
-						quantity,
-                        uuid: DATA_SOURCE_UUID,
-					}
-				}
-			});
-		} catch (error) {
-			console.error('Error adding the item to the cart', error);
-			return;
-		}
-
-		this.log('info', 'Item added to cart');
-	}
-
-	async getCartItems() {
-		// Get the cartId from local storage.
-		const cartId = localStorage.getItem('cartId');
-
-		if (!cartId) {
-			this.log('error', 'No cartId found');
-			return;
-		}
-
-		// Make a request to the endpoint to get the cart items.
-		this.log('info', 'Making a request to the endpoint to get the cart items.');
-		let response;
-		try {
-            response = await apiFetch({
-                url: `${this.restUrl}salesforce-d2c/proxy-request`,
-				credentials: 'include',
-				method: 'POST',
-				data: {
-					action: 'GET_CART_ITEMS',
-					payload: {
-						cartId,
-                        uuid: DATA_SOURCE_UUID,
-					}
-				}
-			});
-		} catch (error) {
-			console.error('Error getting the cart items', error);
-			return;
-		}
-
-		localStorage.setItem('cartItems', JSON.stringify(response));
-		console.log('Set local storage cart items:', response);
-
-		return response;
-	}
-
-	/**
-	 * Resets the element to its original state
+	 * Resets the element to its original state.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return {void}
 	 */
 	reset() {
 		this.setTextContent(this.originalText);
@@ -340,11 +204,14 @@ export class BaseAction {
 	}
 
 	/**
-	 * Centralized logging method for all log types
+	 * Centralized logging method for all log types.
 	 *
-	 * @param {string} type - Log type: 'error', 'warning', 'info'
-	 * @param {string} message - Log message
-	 * @param {Error} [error] - Optional error object for error logs
+	 * @since 1.0.0
+	 *
+	 * @param {string}      type    Log type: 'error', 'warning', or 'info'.
+	 * @param {string}      message Log message to display.
+	 * @param {Error|null} [error]  Optional error object for error logs.
+	 * @return {void}
 	 */
     log(type, message, error = null) {
         const prefix = '[Block Actions]';
@@ -364,7 +231,12 @@ export class BaseAction {
     }
 
 	/**
-	 * Executes a callback with rate limiting based on maximum executions per second
+	 * Executes a callback with rate limiting based on maximum executions per second.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param {Function} callback Function to execute with rate limiting.
+	 * @return {boolean} True if executed successfully, false if rate limited or error occurred.
 	 */
 	executeWithRateLimit(callback) {
 		if (!this.canExecute()) {

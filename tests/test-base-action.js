@@ -23,7 +23,7 @@ describe('BaseAction', () => {
         expect(action.target).toBe(element.querySelector('a'));
         expect(action.originalText).toBe('Test Button');
         expect(action.isExecuting).toBe(false);
-        expect(action.telemetry).toHaveProperty('startTime');
+        expect(action.telemetry).toHaveProperty('execCount');
     });
 
     test('setTextContent sanitizes input', () => {
@@ -68,8 +68,8 @@ describe('BaseAction', () => {
 
     test('telemetry tracks executions', () => {
         action.canExecute();
-        expect(action.telemetry.executions).toBe(1);
-        expect(action.telemetry.lastExecuted).toBeTruthy();
+        expect(action.telemetry.execCount).toBe(1);
+        expect(action.telemetry.lastExecTime).toBeTruthy();
     });
 
     test('API requests include nonce', async () => {

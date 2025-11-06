@@ -18,13 +18,19 @@
 import actions from './actions';
 
 /**
- * Cache for loaded action modules to prevent duplicate imports
+ * Cache for loaded action modules to prevent duplicate imports.
+ *
+ * @since 1.0.0
+ *
  * @type {Map<string, Function>}
  */
 const loadedActions = new Map();
 
 /**
- * Simplified telemetry for frontend
+ * Simplified telemetry for frontend.
+ *
+ * @since 1.0.0
+ *
  * @type {Object}
  */
 const telemetry = {
@@ -36,11 +42,14 @@ const telemetry = {
 };
 
 /**
- * Centralized logging utility for frontend
+ * Centralized logging utility for frontend.
  *
- * @param {string} type - Log type: 'error', 'warning', 'info'
- * @param {string} message - Log message
- * @param {Error|null} [error] - Optional error object
+ * @since 1.0.0
+ *
+ * @param {string}      type    Log type: 'error', 'warning', or 'info'.
+ * @param {string}      message Log message to display.
+ * @param {Error|null} [error]  Optional error object for error logs.
+ * @return {void}
  */
 function log(type, message, error = null) {
     const prefix = '[Block Actions Frontend]';
@@ -59,11 +68,13 @@ function log(type, message, error = null) {
 }
 
 /**
- * Safely loads and executes an action on a target element
+ * Safely loads and executes an action on a target element.
  *
- * @param {string} actionId - The ID of the action to load
- * @param {HTMLElement} element - The element to apply the action to
- * @async
+ * @since 1.0.0
+ *
+ * @param {string}      actionId The ID of the action to load.
+ * @param {HTMLElement} element  The element to apply the action to.
+ * @return {Promise<void>} Promise that resolves when action is loaded and executed.
  */
 async function loadAndExecuteAction(actionId, element) {
     const startTime = performance.now();
@@ -94,8 +105,12 @@ async function loadAndExecuteAction(actionId, element) {
 }
 
 /**
- * Initializes all actions on the page
- * Finds elements with data-action attributes and applies the corresponding actions
+ * Initializes all actions on the page.
+ * Finds elements with data-action attributes and applies the corresponding actions.
+ *
+ * @since 1.0.0
+ *
+ * @return {void}
  */
 function initActions() {
 	const startTime = performance.now();

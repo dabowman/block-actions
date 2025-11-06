@@ -1,13 +1,14 @@
 /**
- * Test Action
+ * Test Action.
  * This action changes the button's background color to red and updates its text.
- * @param {HTMLElement} element - The button element.
+ *
+ * @since 1.0.0
+ *
+ * @param {HTMLElement} element The button element.
+ * @return {void}
  */
 
 import { BaseAction } from './base-action';
-
-// Export both the action name and the init function
-export const actionName = 'test-action';
 
 export default function init(element) {
     const action = new BaseAction(element);

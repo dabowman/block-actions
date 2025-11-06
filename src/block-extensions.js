@@ -24,7 +24,10 @@ import { assign } from 'lodash';
 import actions from './actions';
 
 /**
- * Simple telemetry tracking for block extensions
+ * Simple telemetry tracking for block extensions.
+ *
+ * @since 1.0.0
+ *
  * @type {Object}
  */
 const telemetry = {
@@ -37,11 +40,14 @@ const telemetry = {
 };
 
 /**
- * Centralized logging utility for block extensions
+ * Centralized logging utility for block extensions.
  *
- * @param {string} type - Log type: 'error', 'warning', 'info'
- * @param {string} message - Log message
- * @param {Error|null} [error] - Optional error object
+ * @since 1.0.0
+ *
+ * @param {string}      type    Log type: 'error', 'warning', or 'info'.
+ * @param {string}      message Log message to display.
+ * @param {Error|null} [error]  Optional error object for error logs.
+ * @return {void}
  */
 function log(type, message, error = null) {
     const prefix = '[Block Actions]';
@@ -76,6 +82,8 @@ function log(type, message, error = null) {
  * Configuration object defining which blocks can have actions and their UI labels.
  * To add action support to a new block type, add an entry here.
  *
+ * @since 1.0.0
+ *
  * @type {Object.<string, {label: string, help: string}>}
  */
 const BLOCKS_WITH_ACTIONS = {
@@ -94,8 +102,10 @@ const BLOCKS_WITH_ACTIONS = {
  * - customData: Added to all blocks
  * - customAction: Added only to blocks that support actions
  *
- * @param {Object} settings - Block type settings
- * @returns {Object} Modified settings
+ * @since 1.0.0
+ *
+ * @param {Object} settings Block type settings from WordPress.
+ * @return {Object} Modified block type settings with custom attributes.
  */
 function addCustomDataAttribute(settings) {
     try {
@@ -128,6 +138,11 @@ function addCustomDataAttribute(settings) {
 /**
  * Higher-order component that adds the custom data attribute inspector control.
  * This control appears in the advanced panel of all blocks.
+ *
+ * @since 1.0.0
+ *
+ * @param {Function} BlockEdit The original BlockEdit component.
+ * @return {Function} Enhanced BlockEdit component with custom data inspector control.
  */
 const withInspectorControl = createHigherOrderComponent((BlockEdit) => {
     return (props) => {
@@ -158,6 +173,11 @@ const withInspectorControl = createHigherOrderComponent((BlockEdit) => {
 /**
  * Higher-order component that adds the action selector to supported blocks.
  * Uses ComboboxControl for searchable action selection.
+ *
+ * @since 1.0.0
+ *
+ * @param {Function} BlockEdit The original BlockEdit component.
+ * @return {Function} Enhanced BlockEdit component with action inspector control.
  */
 const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
     return (props) => {
@@ -184,8 +204,10 @@ const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
              * Filters the action options based on user input.
              * Used by the ComboboxControl for search functionality.
              *
-             * @param {string} inputValue - User's search input
-             * @returns {Array} Filtered options
+             * @since 1.0.0
+             *
+             * @param {string} inputValue User's search input.
+             * @return {Array} Filtered options array.
              */
             const getFilteredOptions = (inputValue) => {
                 try {
@@ -244,10 +266,12 @@ const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
  * Adds custom data and action attributes to block HTML.
  * This function runs when the block is saved.
  *
- * @param {Object} extraProps - Additional props to add to block element
- * @param {Object} blockType - Block type definition
- * @param {Object} attributes - Block attributes
- * @returns {Object} Modified props
+ * @since 1.0.0
+ *
+ * @param {Object} extraProps  Additional props to add to block element.
+ * @param {Object} blockType   Block type definition.
+ * @param {Object} attributes  Block attributes.
+ * @return {Object} Modified props with custom data attributes.
  */
 function addCustomDataToSave(extraProps, blockType, attributes) {
     try {

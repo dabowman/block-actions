@@ -1,11 +1,13 @@
 /**
- * Smoothly scrolls the page back to the top when clicked
- * @param {HTMLElement} element - The button element.
+ * Smoothly scrolls the page back to the top when clicked.
+ *
+ * @since 1.0.0
+ *
+ * @param {HTMLElement} element The button element.
+ * @return {void}
  */
 
 import { BaseAction } from './base-action';
-
-export const actionName = 'scroll-to-top';
 
 export default function init(element) {
     const action = new BaseAction(element);
@@ -13,18 +15,18 @@ export default function init(element) {
     action.target.addEventListener('click', (e) => {
         e.preventDefault();
 
-        if (!action.canExecute()) return;
+        action.executeWithRateLimit(() => {
+            // Smooth scroll to top
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
 
-        // Smooth scroll to top
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
+            action.setTextContent('Scrolling...');
+            action.log('info', 'Scrolling to top');
+
+            // Reset after animation
+            setTimeout(() => action.reset(), 500);
         });
-
-        action.setTextContent('Scrolling...');
-        action.log('info', 'Scrolling to top');
-
-        // Reset after animation
-        setTimeout(() => action.reset(), 500);
     });
 }

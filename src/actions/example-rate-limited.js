@@ -1,8 +1,13 @@
 /**
- * Example Rate Limited Action
+ * Example Rate Limited Action.
  *
  * Demonstrates the use of improved rate limiting in BaseAction.
  * This action toggles a CSS class with rate limiting.
+ *
+ * @since 1.0.0
+ *
+ * @param {HTMLElement} element The element to attach the action to.
+ * @return {void}
  */
 
 import { BaseAction } from './base-action';
@@ -30,7 +35,11 @@ class ClassToggleAction extends BaseAction {
     }
 
     /**
-     * Toggles CSS class on the target element
+     * Toggles CSS class on the target element.
+     *
+     * @since 1.0.0
+     *
+     * @return {void}
      */
     toggleClass() {
         // Toggle state
@@ -49,8 +58,12 @@ class ClassToggleAction extends BaseAction {
     }
 
     /**
-     * Manual implementation of the same functionality using direct rate limiting methods
-     * This shows the alternative approach for comparison
+     * Manual implementation of the same functionality using direct rate limiting methods.
+     * This shows the alternative approach for comparison.
+     *
+     * @since 1.0.0
+     *
+     * @return {void}
      */
     toggleClassManual() {
         // Check if we can execute (handles rate limiting)

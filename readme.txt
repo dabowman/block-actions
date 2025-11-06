@@ -1,5 +1,5 @@
 === Block Actions ===
-Contributors: wpvip
+Contributors: dabowman
 Tags: blocks, gutenberg, actions, interactivity, editor
 Requires at least: 6.0
 Tested up to: 6.6
@@ -8,11 +8,11 @@ Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Extend blocks with configurable actions and custom data attributes.
+Extend blocks with js snippets and custom data attributes.
 
 == Description ==
 
-Block Actions lets you assign lightweight, modular actions to blocks via the block editor. It adds accessible controls in Advanced settings and initializes actions on the frontend.
+Block Actions lets you assign lightweight, modular javascript "actions" to blocks via the block editor. It adds controls in Advanced settings and initializes js actions on the frontend.
 
 == Installation ==
 

@@ -114,17 +114,11 @@ describe('BaseAction', () => {
     });
 
     // New tests for error handling
-    test('logError sends telemetry data to WordPress', async () => {
+    test('log error increments error count', () => {
         const error = new Error('Test error');
-        await action.logError('Test message', error);
+        action.log('error', 'Test message', error);
 
-        expect(action.telemetry.errors).toBe(1);
-        expect(global.fetch).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.objectContaining({
-                body: expect.stringContaining('Test message')
-            })
-        );
+        expect(action.telemetry.errorCount).toBe(1);
         expect(consoleSpy.error).toHaveBeenCalledWith(
             expect.stringContaining('Test message'),
             error
@@ -132,15 +126,15 @@ describe('BaseAction', () => {
     });
 
     // New tests for debug logging
-    test('logInfo respects debug flag', () => {
+    test('log info respects debug flag', () => {
         // Test when debug is false
-        window.tagHeuerActions.debug = false;
-        action.logInfo('test message');
+        window.blockActions.debug = false;
+        action.log('info', 'test message');
         expect(consoleSpy.log).not.toHaveBeenCalled();
 
         // Test when debug is true
-        window.tagHeuerActions.debug = true;
-        action.logInfo('test message');
+        window.blockActions.debug = true;
+        action.log('info', 'test message');
         expect(consoleSpy.log).toHaveBeenCalledWith(
             expect.stringContaining('test message')
         );
