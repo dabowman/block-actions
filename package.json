@@ -13,7 +13,7 @@
     "test:coverage": "jest --coverage",
     "zip": "git ls-files -z | xargs -0 -I{} sh -c 'mkdir -p dist && rm -f dist/block-actions.zip && zip -r dist/block-actions.zip block-actions.php build README.md docs || true'"
   },
-  "author": "WPVIP",
+  "author": "dabowman",
   "license": "GPL-2.0-or-later",
   "devDependencies": {
     "@babel/preset-env": "^7.22.5",
