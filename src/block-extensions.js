@@ -25,21 +25,6 @@ import actions from './actions';
 import { BaseAction } from './actions/base-action';
 
 /**
- * Get all registered actions (built-in + theme actions).
- * Checks global API first, falls back to built-in actions.
- *
- * @since 1.0.0
- *
- * @return {Array} Array of registered actions.
- */
-function getAllActions() {
-	if (typeof window !== 'undefined' && window.BlockActions?.getRegisteredActions) {
-		return window.BlockActions.getRegisteredActions();
-	}
-	return actions.map(({ id, label }) => ({ id, label }));
-}
-
-/**
  * Simple telemetry tracking for block extensions.
  *
  * @since 1.0.0
@@ -55,10 +40,89 @@ const telemetry = {
     lastActionSet: null
 };
 
-// Expose BaseAction globally for theme actions
+/**
+ * Registry for theme actions in editor context.
+ *
+ * @since 1.0.0
+ *
+ * @type {Array}
+ */
+const editorActionRegistry = [];
+
+/**
+ * Register a theme action in the editor.
+ * In the editor, we just store the registration for the dropdown.
+ * The actual execution happens on the frontend.
+ *
+ * @since 1.0.0
+ *
+ * @param {string}   id    Action ID.
+ * @param {string}   label Action label.
+ * @param {Function} init  Init function (not executed in editor).
+ * @return {boolean} Success status.
+ */
+function registerEditorAction(id, label, init) {
+	const prefix = '[Block Actions]';
+	
+	// Validate parameters
+	if (!id || typeof id !== 'string') {
+		console.error(`${prefix} Action ID must be a non-empty string`);
+		return false;
+	}
+
+	if (!label || typeof label !== 'string') {
+		console.error(`${prefix} Action label must be a non-empty string`);
+		return false;
+	}
+
+	// Check if action already exists
+	if (editorActionRegistry.some(a => a.id === id)) {
+		if (window?.blockActions?.debug) {
+			console.log(`${prefix} Action "${id}" already registered in editor`);
+		}
+		return false;
+	}
+
+	// Register the action (just for the dropdown, won't execute in editor)
+	editorActionRegistry.push({ id, label, init });
+	
+	if (window?.blockActions?.debug) {
+		console.log(`${prefix} Registered theme action in editor: ${id}`);
+	}
+	
+	return true;
+}
+
+/**
+ * Get all registered actions in editor (built-in + theme).
+ *
+ * @since 1.0.0
+ *
+ * @return {Array} Array of action objects.
+ */
+function getEditorRegisteredActions() {
+	const builtInActions = actions.map(({ id, label }) => ({ id, label }));
+	const themeActions = editorActionRegistry.map(({ id, label }) => ({ id, label }));
+	return [...builtInActions, ...themeActions];
+}
+
+/**
+ * Get all registered actions (built-in + theme actions).
+ *
+ * @since 1.0.0
+ *
+ * @return {Array} Array of registered actions.
+ */
+function getAllActions() {
+	return getEditorRegisteredActions();
+}
+
+// Expose BaseAction and registration API globally for theme actions
 if (typeof window !== 'undefined') {
 	window.BlockActions = window.BlockActions || {};
 	window.BlockActions.BaseAction = BaseAction;
+	window.BlockActions.registerAction = registerEditorAction;
+	window.BlockActions.getRegisteredActions = getEditorRegisteredActions;
 }
 
 /**
@@ -348,9 +412,12 @@ try {
     // Update telemetry
     telemetry.initialized = true;
     telemetry.initTime = performance.now() - startTime;
-    telemetry.actionsRegistered = getAllActions().length;
-
-    log('info', `Block Actions initialized in ${Math.round(telemetry.initTime)}ms with ${telemetry.actionsRegistered} actions`);
+    
+    // Wait a tick to let theme actions register
+    setTimeout(() => {
+        telemetry.actionsRegistered = getAllActions().length;
+        log('info', `Block Actions initialized in ${Math.round(telemetry.initTime)}ms with ${telemetry.actionsRegistered} actions (${actions.length} built-in, ${editorActionRegistry.length} theme)`);
+    }, 0);
 } catch (error) {
     log('error', 'Failed to register Block Actions', error);
 }
