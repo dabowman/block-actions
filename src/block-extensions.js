@@ -22,6 +22,22 @@ import { TextControl, ComboboxControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { assign } from 'lodash';
 import actions from './actions';
+import { BaseAction } from './actions/base-action';
+
+/**
+ * Get all registered actions (built-in + theme actions).
+ * Checks global API first, falls back to built-in actions.
+ *
+ * @since 1.0.0
+ *
+ * @return {Array} Array of registered actions.
+ */
+function getAllActions() {
+	if (typeof window !== 'undefined' && window.BlockActions?.getRegisteredActions) {
+		return window.BlockActions.getRegisteredActions();
+	}
+	return actions.map(({ id, label }) => ({ id, label }));
+}
 
 /**
  * Simple telemetry tracking for block extensions.
@@ -33,11 +49,17 @@ import actions from './actions';
 const telemetry = {
     initialized: false,
     initTime: 0,
-    actionsRegistered: actions.length,
+    actionsRegistered: 0, // Will be updated on init
     customBlocksRegistered: 0,
     errorCount: 0,
     lastActionSet: null
 };
+
+// Expose BaseAction globally for theme actions
+if (typeof window !== 'undefined') {
+	window.BlockActions = window.BlockActions || {};
+	window.BlockActions.BaseAction = BaseAction;
+}
 
 /**
  * Centralized logging utility for block extensions.
@@ -191,10 +213,11 @@ const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
             const { customAction } = attributes;
             const blockConfig = BLOCKS_WITH_ACTIONS[props.name];
 
-            // Create action options from discovered actions
+            // Create action options from all registered actions (built-in + theme)
+            const allActions = getAllActions();
             const actionOptions = [
                 { value: '', label: __( 'None', 'block-actions' ) },
-                ...actions.map(action => ({
+                ...allActions.map(action => ({
                     value: action.id,
                     label: action.label
                 }))
@@ -325,8 +348,9 @@ try {
     // Update telemetry
     telemetry.initialized = true;
     telemetry.initTime = performance.now() - startTime;
+    telemetry.actionsRegistered = getAllActions().length;
 
-    log('info', `Block Actions initialized in ${Math.round(telemetry.initTime)}ms`);
+    log('info', `Block Actions initialized in ${Math.round(telemetry.initTime)}ms with ${telemetry.actionsRegistered} actions`);
 } catch (error) {
     log('error', 'Failed to register Block Actions', error);
 }

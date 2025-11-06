@@ -61,6 +61,18 @@ function enqueue_block_editor_assets(): void {
 		$asset['version'],
 		true
 	);
+
+	// Enqueue theme actions in editor so they appear in the action selector
+	$theme_actions = discover_theme_actions();
+	foreach ( $theme_actions as $action ) {
+		wp_enqueue_script(
+			'block-action-editor-' . $action['id'],
+			$action['url'],
+			array( 'block-actions-editor' ),
+			filemtime( $action['path'] ),
+			true
+		);
+	}
 }
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_editor_assets' );
 
@@ -78,6 +90,101 @@ function get_plugin_settings(): array {
 	);
 	$options = (array) get_option( 'block_actions_settings', array() );
 	return wp_parse_args( $options, $defaults );
+}
+
+/**
+ * Get action directories to scan for custom actions.
+ *
+ * @since 1.0.0
+ *
+ * @return array Array of directory paths to scan for actions.
+ */
+function get_action_directories(): array {
+	$directories = array();
+
+	// Add theme's /actions directory if it exists
+	$theme_dir = get_stylesheet_directory() . '/actions';
+	if ( is_dir( $theme_dir ) ) {
+		$directories[] = $theme_dir;
+	}
+
+	// Allow plugins/themes to add custom action directories
+	$directories = (array) apply_filters( 'block_actions_directories', $directories );
+
+	return $directories;
+}
+
+/**
+ * Discover action files in registered directories.
+ *
+ * @since 1.0.0
+ *
+ * @return array Array of action file information with 'id', 'path', and 'url'.
+ */
+function discover_theme_actions(): array {
+	$directories = get_action_directories();
+	$actions = array();
+
+	foreach ( $directories as $directory ) {
+		if ( ! is_dir( $directory ) ) {
+			continue;
+		}
+
+		// Get all .js files in the directory (non-recursive)
+		$files = glob( $directory . '/*.js' );
+		if ( ! $files ) {
+			continue;
+		}
+
+		foreach ( $files as $file_path ) {
+			$filename = basename( $file_path, '.js' );
+
+			// Skip files that start with underscore or dot
+			if ( strpos( $filename, '_' ) === 0 || strpos( $filename, '.' ) === 0 ) {
+				continue;
+			}
+
+			// Determine URL based on directory location
+			$file_url = '';
+			$theme_dir = get_stylesheet_directory();
+			$theme_uri = get_stylesheet_directory_uri();
+
+			if ( strpos( $file_path, $theme_dir ) === 0 ) {
+				$file_url = str_replace( $theme_dir, $theme_uri, $file_path );
+			}
+
+			if ( $file_url ) {
+				$actions[] = array(
+					'id' => $filename,
+					'path' => $file_path,
+					'url' => $file_url,
+				);
+			}
+		}
+	}
+
+	return $actions;
+}
+
+/**
+ * Enqueue theme action files.
+ *
+ * @since 1.0.0
+ *
+ * @return void
+ */
+function enqueue_theme_actions(): void {
+	$theme_actions = discover_theme_actions();
+
+	foreach ( $theme_actions as $action ) {
+		wp_enqueue_script(
+			'block-action-' . $action['id'],
+			$action['url'],
+			array( 'block-actions-frontend' ), // Depend on main frontend script
+			filemtime( $action['path'] ),
+			true
+		);
+	}
 }
 
 /**
@@ -108,6 +215,9 @@ function enqueue_frontend_assets(): void {
 		'nonce' => wp_create_nonce( 'wp_rest' ),
 		'debug' => defined( 'WP_DEBUG' ) && WP_DEBUG,
 	) );
+
+	// Enqueue theme actions after main frontend script
+	enqueue_theme_actions();
 }
 add_action( 'wp_enqueue_scripts', __NAMESPACE__ . '\\enqueue_frontend_assets' );
 

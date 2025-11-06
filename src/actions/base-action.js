@@ -19,6 +19,11 @@
 // Import DOMPurify for robust XSS protection
 import DOMPurify from 'dompurify';
 
+/**
+ * Base Action Class
+ * 
+ * Exported globally as window.BlockActions.BaseAction for use in theme actions.
+ */
 export class BaseAction {
 	/**
 	 * Creates a new BaseAction instance.

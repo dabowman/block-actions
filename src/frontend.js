@@ -14,8 +14,18 @@
  * @module frontend
  */
 
-// Import manifest of available actions
+// Import manifest of built-in actions
 import actions from './actions';
+import { BaseAction } from './actions/base-action';
+
+/**
+ * Registry of all available actions (built-in + theme actions).
+ *
+ * @since 1.0.0
+ *
+ * @type {Array<{id: string, label: string, init: Function}>}
+ */
+let actionRegistry = [...actions];
 
 /**
  * Cache for loaded action modules to prevent duplicate imports.
@@ -79,9 +89,9 @@ function log(type, message, error = null) {
 async function loadAndExecuteAction(actionId, element) {
     const startTime = performance.now();
 
-    // Build a registry of actions from the static manifest
+    // Build a registry of actions from both built-in and theme actions
     if (!loadedActions.has(actionId)) {
-        const registryAction = actions.find(a => a.id === actionId);
+        const registryAction = actionRegistry.find(a => a.id === actionId);
         if (registryAction && typeof registryAction.init === 'function') {
             loadedActions.set(actionId, registryAction.init);
             telemetry.actionsLoaded++;
@@ -126,7 +136,7 @@ function initActions() {
 		if (!actionId) return;
 
 		// Validate action exists in our registry
-		const actionExists = actions.some(a => a.id === actionId);
+		const actionExists = actionRegistry.some(a => a.id === actionId);
 		if (!actionExists) {
 			log('error', `Unknown action: ${actionId}`);
 			return;
@@ -138,7 +148,66 @@ function initActions() {
 
 	// Track initialization time
 	telemetry.initDuration = performance.now() - startTime;
-	// log('info', `Actions initialized in ${Math.round(telemetry.initDuration)}ms`);
+	log('info', `Actions initialized: ${actionRegistry.length} total (${actions.length} built-in, ${actionRegistry.length - actions.length} theme)`);
+}
+
+/**
+ * Register a custom action from theme or plugin.
+ *
+ * @since 1.0.0
+ *
+ * @param {string}   id    Unique action identifier (e.g., 'my-custom-action').
+ * @param {string}   label Human-readable label for the action.
+ * @param {Function} init  Initialization function that receives the element.
+ * @return {boolean} True if registered successfully, false if ID already exists.
+ */
+function registerAction(id, label, init) {
+	// Validate parameters
+	if (!id || typeof id !== 'string') {
+		log('error', 'Action ID must be a non-empty string');
+		return false;
+	}
+
+	if (!label || typeof label !== 'string') {
+		log('error', 'Action label must be a non-empty string');
+		return false;
+	}
+
+	if (typeof init !== 'function') {
+		log('error', 'Action init must be a function');
+		return false;
+	}
+
+	// Check if action already exists
+	if (actionRegistry.some(a => a.id === id)) {
+		log('warning', `Action "${id}" is already registered, skipping`);
+		return false;
+	}
+
+	// Register the action
+	actionRegistry.push({ id, label, init });
+	log('info', `Registered theme action: ${id}`);
+	
+	return true;
+}
+
+/**
+ * Get list of all registered actions (for editor).
+ *
+ * @since 1.0.0
+ *
+ * @return {Array} Array of action objects with id and label.
+ */
+function getRegisteredActions() {
+	return actionRegistry.map(({ id, label }) => ({ id, label }));
+}
+
+// Expose public API globally for theme actions and editor
+if (typeof window !== 'undefined') {
+	window.BlockActions = window.BlockActions || {};
+	window.BlockActions.BaseAction = BaseAction;
+	window.BlockActions.registerAction = registerAction;
+	window.BlockActions.getRegisteredActions = getRegisteredActions;
 }
 
 // Initialize actions when the DOM content is fully loaded

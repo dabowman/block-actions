@@ -10,12 +10,14 @@ Assign modular actions and data attributes to blocks for lightweight frontend in
 ## Features
 
 - **Custom Actions System**: Add dynamic behaviors to blocks through a modular action system
+- **Theme Actions Support**: Add custom actions from your theme without rebuilding the plugin
 - **Data Attributes**: Add custom data attributes to any block
 - **Block-Specific Actions**: Configure which blocks can receive actions
 - **Searchable Action Selection**: ComboboxControl interface for easy action discovery and selection
 - **Error Handling & Logging**: Comprehensive error handling and debug logging system
 - **Accessibility**: Built-in accessibility features for all actions
 - **Security**: Implements WordPress security best practices including nonce verification and data sanitization
+- **Extensible API**: Global JavaScript API for registering and managing actions
 
 ## Installation
 
@@ -42,7 +44,48 @@ Assign modular actions and data attributes to blocks for lightweight frontend in
    - In the block's advanced settings panel, find the "Data Attribute" field
    - Enter a value to be added as a `data-custom` attribute
 
-### Creating New Actions
+### Creating Custom Actions (Theme Developers)
+
+**The easiest way** - No plugin rebuild required!
+
+1. Create an `/actions` folder in your active theme
+2. Add a JavaScript file (e.g., `my-action.js`)
+3. Use the global API to register your action:
+
+```javascript
+(function() {
+    const { BaseAction } = window.BlockActions;
+    
+    function init(element) {
+        const action = new BaseAction(element);
+        
+        action.target.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            action.executeWithRateLimit(() => {
+                // Your action code here
+                action.setTextContent('Clicked!');
+                setTimeout(() => action.reset(), 2000);
+            });
+        });
+    }
+    
+    // Register with the plugin
+    window.BlockActions.registerAction(
+        'my-action',        // ID (must match filename)
+        'My Custom Action', // Label for editor
+        init               // Init function
+    );
+})();
+```
+
+4. The action will automatically appear in the block editor!
+
+**[See full Theme Actions Guide →](docs/THEME-ACTIONS.md)**
+
+### Creating Built-in Actions (Plugin Developers)
+
+To add actions that ship with the plugin:
 
 1. **Using the Action Creator**:
    ```bash
@@ -55,22 +98,28 @@ Assign modular actions and data attributes to blocks for lightweight frontend in
    ```javascript
    import { BaseAction } from './base-action';
 
-   export const actionName = 'my-action';
-
    export default function init(element) {
        const action = new BaseAction(element);
        // Your action code here
    }
    ```
 
-### Available Actions (core)
+3. **Add to CORE_ACTION_IDS** in `src/actions/index.js`
+4. **Rebuild the plugin**: `npm run build`
 
+### Available Actions
+
+**Built-in Actions** (shipped with plugin):
 - `carousel`: Unified carousel action for image galleries with buttons, thumbnails, or both
 - `scroll-to-top`: Provides smooth scroll-to-top functionality
 
-Additional example/test actions are available in source but not shipped by default:
-- `example-rate-limited`: Demonstrates rate limiting functionality
-- `test-action`: Simple test action for development
+**Example Actions** (available in `/docs/examples/`):
+- `smooth-scroll`: Smooth scrolling to page sections
+- `modal-toggle`: Open/close modals and dialogs
+
+**Additional Resources:**
+- Source examples: `example-rate-limited`, `test-action` (in `/src/actions/`)
+- [Create your own theme actions →](docs/THEME-ACTIONS.md)
 
 ## Architecture
 
@@ -80,25 +129,34 @@ Additional example/test actions are available in source but not shipped by defau
    - Registers custom attributes and controls in the block editor
    - Manages the action selection interface
    - Handles saving of custom attributes to blocks
+   - Displays both built-in and theme actions
 
 2. **Frontend Handler (`frontend.js`)**:
    - Initializes actions on the frontend
-   - Manages dynamic loading of action modules
+   - Manages action registry (built-in + theme)
+   - Exposes global API for theme actions
    - Handles error boundaries and logging
 
 3. **Base Action (`base-action.js`)**:
    - Provides common utilities for all actions
    - Handles security, logging, and error management
    - Manages state and DOM interactions
+   - Available globally as `window.BlockActions.BaseAction`
 
 ### Action System
 
-Actions are modular JavaScript modules that:
-- Export an action name
+**Built-in Actions** are webpack-bundled JavaScript modules that:
 - Export an initialization function
 - Inherit from BaseAction for common functionality
-- Handle their own DOM interactions and state
-- Implement proper cleanup and error handling
+- Ship with the plugin
+
+**Theme Actions** are standalone JavaScript files that:
+- Live in `/wp-content/themes/your-theme/actions/`
+- Register themselves using the global API
+- Inherit from BaseAction via `window.BlockActions.BaseAction`
+- Don't require rebuilding the plugin
+
+Both types share the same initialization pattern and capabilities.
 
 ## Development
 
@@ -127,16 +185,30 @@ npm run test:coverage
 
 ### Adding New Block Support
 
-To add action support to new blocks, modify the `BLOCKS_WITH_ACTIONS` constant in `block-extensions.js`:
+To add action support to new blocks, modify the `BLOCKS_WITH_ACTIONS` constant in `src/block-extensions.js`:
 
 ```javascript
 const BLOCKS_WITH_ACTIONS = {
-    'block-name': {
+    'core/block-name': {
         label: 'Action Label',
         help: 'Help text for the action selector'
     }
 };
 ```
+
+Then rebuild: `npm run build`
+
+### Global API Reference
+
+The plugin exposes `window.BlockActions` with:
+
+| Method/Property | Description |
+|----------------|-------------|
+| `BaseAction` | Base class for creating actions |
+| `registerAction(id, label, init)` | Register a custom action |
+| `getRegisteredActions()` | Get all registered actions |
+
+See the [Theme Actions Guide](docs/THEME-ACTIONS.md) for complete API documentation.
 
 ## Security
 
