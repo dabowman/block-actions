@@ -76,10 +76,14 @@ describe('BaseAction', () => {
     });
 
     test('rate limiting works', () => {
-        expect(action.canExecute()).toBe(true);
+        // Rate limit is 5 per second
+        for (let i = 0; i < 5; i++) {
+            expect(action.canExecute()).toBe(true);
+        }
+        // 6th call exceeds limit
         expect(action.canExecute()).toBe(false);
 
-        // Fast-forward time
+        // Fast-forward time past the 1s window
         jest.advanceTimersByTime(1000);
         expect(action.canExecute()).toBe(true);
     });
@@ -161,8 +165,10 @@ describe('BaseAction', () => {
     });
 
     test('rate limiting warns when limit exceeded', () => {
-        action.canExecute(); // First execution
-        action.canExecute(); // Should be rate limited
+        // Exhaust the 5-per-second limit
+        for (let i = 0; i < 5; i++) {
+            action.canExecute();
+        }
 
         expect(action.canExecute()).toBe(false);
     });
@@ -170,5 +176,150 @@ describe('BaseAction', () => {
     test('rate limiting warns when maximum executions reached', () => {
         // Ensure completeExecution releases the lock safely
         action.completeExecution();
+    });
+
+    test('constructor uses element as target when no anchor child', () => {
+        const div = document.createElement('div');
+        div.textContent = 'Direct Text';
+        div.setAttribute('data-action', 'my-action');
+        const a = new BaseAction(div);
+        expect(a.target).toBe(div);
+        expect(a.originalText).toBe('Direct Text');
+    });
+
+    test('constructor reads nonce and restUrl from window.blockActions', () => {
+        expect(action.nonce).toBe('test-nonce');
+        expect(action.restUrl).toBe('http://example.test/wp-json/');
+        expect(action.actionId).toBe('test-action');
+    });
+
+    test('constructor handles missing window.blockActions gracefully', () => {
+        const saved = window.blockActions;
+        delete window.blockActions;
+        const div = document.createElement('div');
+        div.setAttribute('data-action', 'x');
+        const a = new BaseAction(div);
+        expect(a.nonce).toBe('');
+        expect(a.restUrl).toBe('');
+        window.blockActions = saved;
+    });
+
+    test('setTextContent ignores non-string input', () => {
+        action.setTextContent('Valid');
+        expect(action.target.textContent).toBe('Valid');
+
+        action.setTextContent(123);
+        expect(action.target.textContent).toBe('Valid');
+
+        action.setTextContent(null);
+        expect(action.target.textContent).toBe('Valid');
+    });
+
+    test('setStyle applies valid color property', () => {
+        action.setStyle('color', '#FF0000');
+        expect(action.target.style.color).toBe('rgb(255, 0, 0)');
+    });
+
+    test('setStyle applies valid opacity property', () => {
+        action.setStyle('opacity', '0.5');
+        expect(action.target.style.opacity).toBe('0.5');
+    });
+
+    test('setStyle rejects invalid opacity values', () => {
+        action.setStyle('opacity', '2');
+        expect(action.target.style.opacity).toBe('');
+    });
+
+    test('completeExecution clears safety timeout and tracks duration', () => {
+        action.canExecute();
+        expect(action.isExecuting).toBe(true);
+        expect(action._safetyTimeout).toBeTruthy();
+
+        action.completeExecution();
+        expect(action.isExecuting).toBe(false);
+        expect(action._safetyTimeout).toBeNull();
+        expect(action.telemetry.lastDuration).toBeGreaterThanOrEqual(0);
+    });
+
+    test('completeExecution is a no-op when not executing', () => {
+        expect(action.isExecuting).toBe(false);
+        action.completeExecution();
+        expect(action.isExecuting).toBe(false);
+    });
+
+    test('safety timeout releases lock after 3 seconds', () => {
+        action.canExecute();
+        expect(action.isExecuting).toBe(true);
+
+        jest.advanceTimersByTime(3000);
+        expect(action.isExecuting).toBe(false);
+    });
+
+    test('executeWithRateLimit runs callback and returns true', () => {
+        const callback = jest.fn();
+        const result = action.executeWithRateLimit(callback);
+        expect(result).toBe(true);
+        expect(callback).toHaveBeenCalled();
+        expect(action.isExecuting).toBe(false);
+    });
+
+    test('executeWithRateLimit returns false when rate limited', () => {
+        // Exhaust rate limit
+        for (let i = 0; i < 5; i++) {
+            action.executeWithRateLimit(() => {});
+        }
+        const callback = jest.fn();
+        const result = action.executeWithRateLimit(callback);
+        expect(result).toBe(false);
+        expect(callback).not.toHaveBeenCalled();
+    });
+
+    test('executeWithRateLimit returns false and logs on callback error', () => {
+        const error = new Error('callback error');
+        const result = action.executeWithRateLimit(() => { throw error; });
+        expect(result).toBe(false);
+        expect(consoleSpy.error).toHaveBeenCalledWith(
+            expect.stringContaining('Error in rate-limited execution'),
+            error
+        );
+        // completeExecution still called in finally block
+        expect(action.isExecuting).toBe(false);
+    });
+
+    test('log warning calls console.warn', () => {
+        action.log('warning', 'a warning');
+        expect(consoleSpy.warn).toHaveBeenCalledWith(
+            expect.stringContaining('a warning')
+        );
+    });
+
+    test('log error without error object passes empty string', () => {
+        action.log('error', 'some error');
+        expect(consoleSpy.error).toHaveBeenCalledWith(
+            expect.stringContaining('some error'),
+            ''
+        );
+    });
+
+    test('apiRequest sends correct body and credentials', async () => {
+        await action.apiRequest('/endpoint', { key: 'value' });
+        expect(global.fetch).toHaveBeenCalledWith(
+            '/endpoint',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ key: 'value' }),
+                credentials: 'same-origin'
+            })
+        );
+    });
+
+    test('apiRequest sends empty object when no data provided', async () => {
+        await action.apiRequest('/endpoint');
+        expect(global.fetch).toHaveBeenCalledWith(
+            '/endpoint',
+            expect.objectContaining({
+                body: JSON.stringify({})
+            })
+        );
     });
 });
