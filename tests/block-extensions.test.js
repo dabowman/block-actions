@@ -48,8 +48,6 @@ jest.mock('../src/actions/base-action', () => ({
     }
 }));
 
-const { addFilter } = require('@wordpress/hooks');
-
 describe('block-extensions', () => {
     let consoleSpy;
 

@@ -69,7 +69,7 @@ describe('carousel action', () => {
         global.cancelAnimationFrame = jest.fn();
 
         // Mock IntersectionObserver
-        global.IntersectionObserver = jest.fn((callback) => ({
+        global.IntersectionObserver = jest.fn(() => ({
             observe: jest.fn(),
             unobserve: jest.fn(),
             disconnect: jest.fn()

@@ -6,7 +6,7 @@ global.wp = {
 	i18n: {
 		__: (text) => text,
 		_x: (text) => text,
-		sprintf: (text, ...args) => text
+		sprintf: (text) => text
 	}
 };
 
