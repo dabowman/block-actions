@@ -48,10 +48,14 @@ describe('BaseAction', () => {
     });
 
     test('rate limiting works', () => {
-        expect(action.canExecute()).toBe(true);
+        // Rate limit is 5 per second
+        for (let i = 0; i < 5; i++) {
+            expect(action.canExecute()).toBe(true);
+        }
+        // 6th call exceeds limit
         expect(action.canExecute()).toBe(false);
 
-        // Fast-forward time
+        // Fast-forward time past the 1s window
         jest.advanceTimersByTime(1000);
         expect(action.canExecute()).toBe(true);
     });
