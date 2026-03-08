@@ -3,6 +3,8 @@
  *
  * Hybrid approach: uses Interactivity API directives for reactive state
  * and imperative code for touch, IntersectionObserver, and accessibility setup.
+ * The init callback returns a cleanup function per Interactivity API best
+ * practices to disconnect observers and cancel pending animation frames.
  *
  * @since 2.0.0
  */
@@ -167,6 +169,14 @@ const { state } = store( 'block-actions/carousel', {
     },
 
     callbacks: {
+        /**
+         * Initialize carousel: count slides, set up accessibility, touch
+         * gestures, and lazy-load observer.
+         *
+         * @since 2.0.0
+         * @return {Function} Cleanup function that cancels pending RAF and
+         *                    disconnects the IntersectionObserver.
+         */
         init() {
             const ctx = getContext();
             const { ref } = getElement();

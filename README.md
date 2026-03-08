@@ -131,6 +131,10 @@ To add actions that ship with the plugin:
                const ctx = getContext();
                const { ref } = getElement();
                // Initialization logic
+
+               // Return a cleanup function if you set up observers,
+               // timers, or event listeners (Interactivity API best practice).
+               return () => { /* cleanup */ };
            },
        },
    } );

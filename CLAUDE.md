@@ -50,7 +50,7 @@ block-actions/
 │   │   ├── test-action.js
 │   │   └── toggle-visibility.js
 │   └── stores/                    # Interactivity API stores (v2.0.0)
-│       ├── carousel/view.js       # Carousel store (hybrid: reactive + imperative)
+│       ├── carousel/view.js       # Carousel store (hybrid: reactive + imperative, init returns cleanup)
 │       ├── scroll-to-top/view.js
 │       ├── toggle-visibility/view.js
 │       ├── modal-toggle/view.js
@@ -286,6 +286,7 @@ Or use the scaffolding tool: `npm run create-action`
 - Centralized logging via `log(type, message, error)` utility in stores
 - Legacy: centralized logging via `BaseAction.log(type, message, error)`
 - Graceful degradation over hard failures
+- `data-wp-init` callbacks return cleanup functions to disconnect observers and cancel animation frames (per Interactivity API best practices)
 
 ### Security
 - XSS protection via DOMPurify (text) and style whitelist (both systems)
