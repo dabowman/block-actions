@@ -301,6 +301,54 @@ The carousel action is compatible with:
 
 Note: Container queries are supported in all modern browsers, but for older browsers, you may need to provide fallbacks.
 
+## Interactivity API (v2.0.0)
+
+When the Interactivity API is enabled (Settings > Block Actions > "Use Interactivity API"), the carousel action uses a fully reactive store instead of imperative DOM manipulation.
+
+### How It Works
+
+The PHP `Carousel` renderer (`includes/renderers/class-carousel.php`) injects Interactivity API directives into the block HTML at render time:
+
+- **Root element**: `data-wp-interactive="block-actions/carousel"`, `data-wp-context`, `data-wp-init`, `data-wp-on--keydown`
+- **Navigation buttons**: `data-wp-on--click="actions.prevSlide"` / `actions.nextSlide`
+- **Slides**: `data-wp-context` (per-slide index), `data-wp-class--active`, `data-wp-bind--aria-hidden`
+- **Thumbnails**: `data-wp-on--click="actions.goToSlide"`, `data-wp-class--active`
+- **Slider**: `data-wp-style--transform="state.sliderTransform"` (reactive CSS transform)
+
+### Reactive State
+
+The carousel store (`src/stores/carousel/view.js`) uses derived state getters:
+
+| Getter | Description |
+|--------|-------------|
+| `state.sliderTransform` | CSS `translateX()` value based on `currentIndex` |
+| `state.isPrevDisabled` | Whether previous button should be disabled |
+| `state.isNextDisabled` | Whether next button should be disabled |
+| `state.isSlideActive` | Whether the current slide matches context `slideIndex` |
+
+### Hybrid Approach
+
+The carousel uses a hybrid of reactive directives and imperative setup:
+- **Reactive**: Slide transforms, active states, disabled buttons (via directives)
+- **Imperative** (in `callbacks.init`): Accessibility attributes, touch event listeners, IntersectionObserver for lazy loading, RAF-based animation
+
+This approach provides the best of both worlds: declarative reactivity where it simplifies code, and imperative control for complex DOM setup that directives can't express.
+
+### Context
+
+The initial context injected by the PHP renderer:
+
+```json
+{
+    "currentIndex": 0,
+    "isAnimating": false,
+    "totalSlides": 0,
+    "wrapAround": true
+}
+```
+
+`totalSlides` is set dynamically by `callbacks.init()` from the DOM.
+
 ## Best Practices
 
 1. Always provide alternative navigation (buttons and/or thumbnails)

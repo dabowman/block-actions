@@ -10,8 +10,8 @@ In your active theme directory, create an `/actions` folder:
 
 ```
 wp-content/themes/your-theme/
-├── actions/              ← Create this folder
-│   └── your-action.js   ← Your custom action file
+├── actions/              <-- Create this folder
+│   └── your-action.js   <-- Your custom action file
 ├── functions.php
 └── style.css
 ```
@@ -25,7 +25,7 @@ Create a JavaScript file in `/actions`. The filename becomes the action ID.
 ```javascript
 /**
  * Smooth Toggle Action
- * 
+ *
  * Toggles an element's visibility with a smooth animation.
  */
 
@@ -36,20 +36,20 @@ Create a JavaScript file in `/actions`. The filename becomes the action ID.
     // Define your action's initialization function
     function init(element) {
         const action = new BaseAction(element);
-        
+
         action.target.addEventListener('click', (e) => {
             e.preventDefault();
-            
+
             action.executeWithRateLimit(() => {
                 // Find the target element
                 const targetId = element.getAttribute('data-target');
                 const targetElement = document.getElementById(targetId);
-                
+
                 if (!targetElement) {
                     action.log('error', `Target element ${targetId} not found`);
                     return;
                 }
-                
+
                 // Toggle visibility with smooth transition
                 if (targetElement.style.display === 'none') {
                     targetElement.style.display = 'block';
@@ -58,7 +58,7 @@ Create a JavaScript file in `/actions`. The filename becomes the action ID.
                     targetElement.style.display = 'none';
                     action.setTextContent('Show');
                 }
-                
+
                 action.log('info', 'Toggled element visibility');
             });
         });
@@ -76,12 +76,33 @@ Create a JavaScript file in `/actions`. The filename becomes the action ID.
 ### 3. That's It!
 
 The plugin will automatically:
-- ✅ Discover your action file
-- ✅ Enqueue it on the frontend and in the editor
-- ✅ Make it available in the block editor's action selector
-- ✅ Initialize it when blocks use it
+- Discover your action file
+- Enqueue it on the frontend and in the editor
+- Make it available in the block editor's action selector
+- Initialize it when blocks use it
 
 No rebuild needed!
+
+---
+
+## Interactivity API Compatibility (v2.0.0)
+
+Starting with v2.0.0, the plugin supports the WordPress Interactivity API. Your existing IIFE theme actions continue to work in both modes:
+
+- **Legacy mode** (default): Actions run exactly as before.
+- **Interactivity API mode**: The built-in **legacy bridge** automatically wraps your `registerAction()` call into an Interactivity API store. Your `init(element)` function is called via a `data-wp-init` callback.
+
+**No changes required to your existing theme actions.** They will work regardless of which mode the site administrator enables.
+
+### How the Legacy Bridge Works
+
+When the Interactivity API is enabled, the legacy bridge (`build/compat/legacy-bridge.js`) replaces `window.BlockActions.registerAction()` with a version that:
+
+1. Creates an Interactivity API store namespaced as `block-actions/<your-action-id>`
+2. Wraps your `init(element)` in a `callbacks.init()` that receives the element via `getElement()`
+3. The PHP `Theme_Action` renderer injects the necessary `data-wp-interactive` and `data-wp-init` directives
+
+This is transparent to your action code.
 
 ---
 
@@ -93,7 +114,7 @@ The plugin exposes a global `window.BlockActions` object with the following:
 
 #### `BlockActions.BaseAction`
 
-The base class providing common utilities and security features.
+The base class providing common utilities and security features. Available in legacy mode.
 
 ```javascript
 const action = new window.BlockActions.BaseAction(element);
@@ -126,7 +147,7 @@ const action = new window.BlockActions.BaseAction(element);
 
 #### `BlockActions.registerAction(id, label, init)`
 
-Register a custom action.
+Register a custom action. Works in both legacy and Interactivity API modes.
 
 ```javascript
 window.BlockActions.registerAction(
@@ -145,12 +166,14 @@ window.BlockActions.registerAction(
 
 #### `BlockActions.getRegisteredActions()`
 
-Get all registered actions (built-in + theme).
+Get all registered actions (built-in + theme). Available in legacy mode.
 
 ```javascript
 const allActions = window.BlockActions.getRegisteredActions();
 // Returns: [{id: 'scroll-to-top', label: 'Scroll To Top'}, ...]
 ```
+
+Note: In Interactivity API mode, this returns an empty array since stores are managed by WordPress.
 
 ---
 
@@ -161,13 +184,13 @@ const allActions = window.BlockActions.getRegisteredActions();
 ```javascript
 (function() {
     const { BaseAction } = window.BlockActions;
-    
+
     function init(element) {
         const action = new BaseAction(element);
-        
+
         action.target.addEventListener('click', (e) => {
             e.preventDefault();
-            
+
             action.executeWithRateLimit(() => {
                 // Your action code here
                 action.setTextContent('Clicked!');
@@ -175,7 +198,7 @@ const allActions = window.BlockActions.getRegisteredActions();
             });
         });
     }
-    
+
     window.BlockActions.registerAction('my-click-action', 'My Click Action', init);
 })();
 ```
@@ -185,9 +208,9 @@ const allActions = window.BlockActions.getRegisteredActions();
 ```javascript
 action.target.addEventListener('click', (e) => {
     e.preventDefault();
-    
+
     if (!action.canExecute()) return;
-    
+
     try {
         // Your code here
         action.log('info', 'Action executed');
@@ -206,7 +229,7 @@ action.executeWithRateLimit(async () => {
             action.restUrl + 'myplugin/v1/endpoint',
             { data: 'value' }
         );
-        
+
         action.log('info', 'API request successful', response);
     } catch (error) {
         action.log('error', 'API request failed', error);
@@ -219,38 +242,38 @@ action.executeWithRateLimit(async () => {
 ```javascript
 (function() {
     const { BaseAction } = window.BlockActions;
-    
+
     function init(element) {
         const action = new BaseAction(element);
         let isActive = false;
-        
+
         // Click handler
         action.target.addEventListener('click', (e) => {
             e.preventDefault();
-            
+
             action.executeWithRateLimit(() => {
                 isActive = !isActive;
-                
+
                 element.classList.toggle('is-active', isActive);
                 action.setTextContent(isActive ? 'Active' : 'Inactive');
                 action.log('info', `Toggled to ${isActive ? 'active' : 'inactive'}`);
             });
         });
-        
+
         // Hover effects
         element.addEventListener('mouseenter', () => {
             if (!isActive) {
                 action.setStyle('backgroundColor', '#f0f0f0');
             }
         });
-        
+
         element.addEventListener('mouseleave', () => {
             if (!isActive) {
                 action.setStyle('backgroundColor', '');
             }
         });
     }
-    
+
     window.BlockActions.registerAction('interactive-toggle', 'Interactive Toggle', init);
 })();
 ```
@@ -274,8 +297,8 @@ add_filter('block_actions_directories', function($directories) {
 
 ### Action File Naming
 
-- ✅ **Good**: `my-action.js`, `smooth-scroll.js`, `toggle-menu.js`
-- ❌ **Bad**: `_private.js` (starts with underscore), `.hidden.js` (starts with dot)
+- **Good**: `my-action.js`, `smooth-scroll.js`, `toggle-menu.js`
+- **Bad**: `_private.js` (starts with underscore), `.hidden.js` (starts with dot)
 
 Files starting with `_` or `.` are ignored.
 
@@ -286,12 +309,12 @@ While not recommended, you can register multiple actions in one file:
 ```javascript
 (function() {
     const { BaseAction } = window.BlockActions;
-    
+
     // Action 1
     window.BlockActions.registerAction('action-1', 'Action One', (element) => {
         // ...
     });
-    
+
     // Action 2
     window.BlockActions.registerAction('action-2', 'Action Two', (element) => {
         // ...
@@ -381,7 +404,7 @@ If your action creates event listeners or observers, clean them up:
 function init(element) {
     const action = new BaseAction(element);
     const observer = new IntersectionObserver(/* ... */);
-    
+
     // Clean up on page unload
     window.addEventListener('beforeunload', () => {
         observer.disconnect();
@@ -398,16 +421,16 @@ function init(element) {
 ```javascript
 (function() {
     const { BaseAction } = window.BlockActions;
-    
+
     function init(element) {
         const action = new BaseAction(element);
-        
+
         window.addEventListener('scroll', () => {
             const scrolled = window.scrollY > 300;
             element.classList.toggle('is-scrolled', scrolled);
         });
     }
-    
+
     window.BlockActions.registerAction('scroll-indicator', 'Scroll Indicator', init);
 })();
 ```
@@ -417,28 +440,28 @@ function init(element) {
 ```javascript
 (function() {
     const { BaseAction } = window.BlockActions;
-    
+
     function init(element) {
         const action = new BaseAction(element);
         const tabs = element.querySelectorAll('[data-tab]');
         const panels = element.querySelectorAll('[data-panel]');
-        
+
         tabs.forEach((tab, index) => {
             tab.addEventListener('click', (e) => {
                 e.preventDefault();
-                
+
                 action.executeWithRateLimit(() => {
                     // Update active states
                     tabs.forEach(t => t.classList.remove('active'));
                     panels.forEach(p => p.classList.remove('active'));
-                    
+
                     tab.classList.add('active');
                     panels[index].classList.add('active');
                 });
             });
         });
     }
-    
+
     window.BlockActions.registerAction('tab-navigation', 'Tab Navigation', init);
 })();
 ```
@@ -460,12 +483,20 @@ function init(element) {
 2. Check that the ID matches the filename
 3. Ensure the action is registered before DOM content loads
 4. Check browser console for error messages
+5. If using Interactivity API mode, verify the PHP `Theme_Action` renderer is registered (it should be automatic)
 
 ### Rate Limiting Too Aggressive
 
 The default is 5 executions per second. If you need more frequent execution, consider:
 1. Using throttle/debounce for scroll/resize events instead of rate limiting
 2. Creating a custom execution manager for your specific use case
+
+### Interactivity API Mode Issues
+
+1. Ensure WordPress 6.6+ is installed
+2. Verify "Use Interactivity API" is checked in Settings > Block Actions
+3. Check that the legacy bridge script (`build/compat/legacy-bridge.js`) exists
+4. Check browser console for Interactivity API errors
 
 ---
 
@@ -474,19 +505,17 @@ The default is 5 executions per second. If you need more frequent execution, con
 Check `/docs/examples/` for complete, ready-to-use action examples:
 
 - `smooth-scroll.js` - Smooth scrolling to page sections
-- `lazy-load.js` - Lazy load images on scroll
-- `form-validator.js` - Client-side form validation
 - `modal-toggle.js` - Modal/dialog control
-- `countdown.js` - Countdown timer
+- `toggle-visibility.js` - Show/hide elements
+- `copy-to-clipboard.js` - Copy text to clipboard
+- `alert-message.js` - Simple alert action
+- `boilerplate-action.js` - Starter template
 
 ---
 
 ## Need Help?
 
 - Check the [main README](../README.md) for plugin overview
-- Review built-in actions in `/src/actions/` for more examples
+- Review built-in actions in `/src/actions/` (legacy) or `/src/stores/` (Interactivity API) for more examples
 - Enable debug mode for detailed logs
 - File issues on the GitHub repository
-
-**Happy coding!** 🚀
-

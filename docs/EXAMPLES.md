@@ -2,6 +2,8 @@
 
 Ready-to-use examples for creating custom theme actions. Copy any of these to your theme's `/actions` folder to get started.
 
+> **v2.0.0 Note:** All examples below use the IIFE/`registerAction()` pattern. This pattern works in both legacy mode and Interactivity API mode (via the built-in legacy bridge). No changes are needed to use these examples with the Interactivity API enabled.
+
 ## 📚 Available Examples
 
 ### 1. **Boilerplate Action** (`boilerplate-action.js`)
@@ -287,8 +289,9 @@ function init(element) {
 ## 📖 Full Documentation
 
 For complete API reference and detailed guides, see:
-- [Theme Actions Guide](THEME-ACTIONS.md) - Complete documentation
+- [Theme Actions Guide](THEME-ACTIONS.md) - Complete documentation (includes Interactivity API compatibility notes)
 - [Main README](../README.md) - Plugin overview
+- [Carousel Action](carousel-action.md) - Detailed carousel documentation
 
 ---
 
