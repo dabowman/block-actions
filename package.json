@@ -1,11 +1,11 @@
 {
   "name": "block-actions",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Lightweight JavaScript actions for WordPress core blocks",
   "main": "build/block-extensions.js",
   "scripts": {
-    "build": "NODE_ENV=production wp-scripts build src/block-extensions.js src/frontend.js --output-path=build",
-    "start": "wp-scripts start src/block-extensions.js src/frontend.js --output-path=build",
+    "build": "NODE_ENV=production webpack --config webpack.config.js --mode production",
+    "start": "webpack --config webpack.config.js --mode development --watch",
     "packages-update": "wp-scripts packages-update",
     "create-action": "node scripts/create-action.js",
     "test": "jest",
@@ -48,7 +48,8 @@
       "<rootDir>/tests/**/test-*.js"
     ],
     "moduleNameMapper": {
-      "\\.(css|less|scss|sass)$": "<rootDir>/tests/__mocks__/styleMock.js"
+      "\\.(css|less|scss|sass)$": "<rootDir>/tests/__mocks__/styleMock.js",
+      "@wordpress/interactivity": "<rootDir>/tests/__mocks__/interactivity.js"
     },
     "testPathIgnorePatterns": [
       "/node_modules/",

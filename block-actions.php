@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Block Actions
  * Description: Extend blocks with custom actions and data attributes.
- * Version: 1.0.0
- * Requires at least: 6.0
+ * Version: 2.0.0
+ * Requires at least: 6.6
  * Requires PHP: 8.0
  * Author: dabowman
  * License: GPL-2.0-or-later
@@ -16,6 +16,17 @@ namespace Block_Actions;
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
+
+// Load Interactivity API infrastructure.
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-action-renderer.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-directive-transformer.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-scroll-to-top.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-carousel.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-toggle-visibility.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-modal-toggle.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-smooth-scroll.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-copy-to-clipboard.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-theme-action.php';
 
 // Translations are auto-loaded by WordPress.org for this plugin slug.
 
@@ -85,8 +96,9 @@ add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_edit
  */
 function get_plugin_settings(): array {
 	$defaults = array(
-		'enable_frontend' => true,
-		'enable_csp' => false,
+		'enable_frontend'        => true,
+		'enable_csp'             => false,
+		'use_interactivity_api'  => false,
 	);
 	$options = (array) get_option( 'block_actions_settings', array() );
 	return wp_parse_args( $options, $defaults );
@@ -278,8 +290,9 @@ add_action( 'admin_menu', __NAMESPACE__ . '\\register_settings' );
  */
 function sanitize_settings( array $input ): array {
 	return array(
-		'enable_frontend' => ! empty( $input['enable_frontend'] ),
-		'enable_csp' => ! empty( $input['enable_csp'] ),
+		'enable_frontend'        => ! empty( $input['enable_frontend'] ),
+		'enable_csp'             => ! empty( $input['enable_csp'] ),
+		'use_interactivity_api'  => ! empty( $input['use_interactivity_api'] ),
 	);
 }
 
@@ -307,6 +320,15 @@ function render_settings_page(): void { ?>
 					</td>
 				</tr>
 				<tr>
+					<th scope="row"><?php echo esc_html( __( 'Use Interactivity API', 'block-actions' ) ); ?></th>
+					<td>
+						<label>
+							<input type="checkbox" name="block_actions_settings[use_interactivity_api]" value="1" <?php checked( $settings['use_interactivity_api'] ); ?> />
+							<?php echo esc_html( __( 'Use WordPress Interactivity API for frontend actions (requires WP 6.6+)', 'block-actions' ) ); ?>
+						</label>
+					</td>
+				</tr>
+				<tr>
 					<th scope="row"><?php echo esc_html( __( 'Enable Content Security Policy', 'block-actions' ) ); ?></th>
 					<td>
 						<label>
@@ -320,3 +342,94 @@ function render_settings_page(): void { ?>
 		</form>
 	</div>
 <?php }
+
+/**
+ * Initialize the Interactivity API directive transformer.
+ *
+ * Registers all built-in action renderers and hooks into render_block
+ * when the Interactivity API feature flag is enabled.
+ *
+ * @since 2.0.0
+ *
+ * @return void
+ */
+function init_interactivity_api(): void {
+	$settings = get_plugin_settings();
+	if ( empty( $settings['use_interactivity_api'] ) ) {
+		return;
+	}
+
+	$transformer = new Directive_Transformer();
+
+	// Register built-in action renderers.
+	$transformer->register_renderer( 'scroll-to-top', new Renderers\Scroll_To_Top() );
+	$transformer->register_renderer( 'carousel', new Renderers\Carousel() );
+	$transformer->register_renderer( 'toggle-visibility', new Renderers\Toggle_Visibility() );
+	$transformer->register_renderer( 'modal-toggle', new Renderers\Modal_Toggle() );
+	$transformer->register_renderer( 'smooth-scroll', new Renderers\Smooth_Scroll() );
+	$transformer->register_renderer( 'copy-to-clipboard', new Renderers\Copy_To_Clipboard() );
+
+	// Register generic renderer for theme actions.
+	$theme_actions = discover_theme_actions();
+	$theme_renderer = new Renderers\Theme_Action();
+	foreach ( $theme_actions as $action ) {
+		if ( ! in_array( $action['id'], $transformer->get_registered_ids(), true ) ) {
+			$transformer->register_renderer( $action['id'], $theme_renderer );
+		}
+	}
+
+	// Hook into render_block to inject directives.
+	add_filter(
+		'render_block',
+		function ( string $block_content, array $block ) use ( $transformer ): string {
+			return $transformer->transform( $block_content, $block );
+		},
+		10,
+		2
+	);
+}
+add_action( 'init', __NAMESPACE__ . '\\init_interactivity_api' );
+
+/**
+ * Enqueue theme action script modules for Interactivity API.
+ *
+ * When the Interactivity API is enabled, theme actions are registered
+ * as script modules instead of classic scripts.
+ *
+ * @since 2.0.0
+ *
+ * @return void
+ */
+function enqueue_theme_action_modules(): void {
+	$settings = get_plugin_settings();
+	if ( empty( $settings['use_interactivity_api'] ) ) {
+		return;
+	}
+
+	$theme_actions = discover_theme_actions();
+	foreach ( $theme_actions as $action ) {
+		// Check if this is a legacy IIFE action (contains registerAction).
+		$contents = file_get_contents( $action['path'] );
+		$is_legacy = ( false !== strpos( $contents, 'registerAction' ) );
+
+		if ( $is_legacy ) {
+			// Enqueue legacy bridge + the action as classic script.
+			$bridge_path = plugin_dir_path( __FILE__ ) . 'build/compat/legacy-bridge.js';
+			if ( file_exists( $bridge_path ) ) {
+				wp_enqueue_script_module(
+					'block-actions-legacy-bridge',
+					plugin_dir_url( __FILE__ ) . 'build/compat/legacy-bridge.js',
+					array( '@wordpress/interactivity' )
+				);
+			}
+		} else {
+			// New-style ES module theme action.
+			wp_enqueue_script_module(
+				'block-actions-theme-' . $action['id'],
+				$action['url'],
+				array( '@wordpress/interactivity' )
+			);
+		}
+	}
+}
+add_action( 'wp_enqueue_scripts', __NAMESPACE__ . '\\enqueue_theme_action_modules' );
