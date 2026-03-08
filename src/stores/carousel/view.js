@@ -289,6 +289,17 @@ const { state } = store( 'block-actions/carousel', {
 
             // Initialize first slide position.
             ctx.currentIndex = 0;
+
+            // Return cleanup function for when element is removed.
+            return () => {
+                const p = getPrivate( ref );
+                if ( p.rafId ) {
+                    cancelAnimationFrame( p.rafId );
+                }
+                if ( p.observer ) {
+                    p.observer.disconnect();
+                }
+            };
         },
     },
 } );
