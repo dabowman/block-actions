@@ -299,9 +299,9 @@ The carousel action is compatible with:
 
 Note: Container queries are supported in all modern browsers, but for older browsers, you may need to provide fallbacks.
 
-## Interactivity API (v2.0.0)
+## Interactivity API
 
-When the Interactivity API is enabled (Settings > Block Actions > "Use Interactivity API"), the carousel action uses a fully reactive store instead of imperative DOM manipulation.
+The carousel action uses a reactive Interactivity API store with server-side directive injection.
 
 ### How It Works
 

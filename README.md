@@ -10,9 +10,8 @@ Assign modular actions and data attributes to blocks for lightweight frontend in
 ## Features
 
 - **Custom Actions System**: Add dynamic behaviors to blocks through a modular action system
-- **WordPress Interactivity API** (v2.0.0): Declarative, reactive stores with server-side directive injection
+- **WordPress Interactivity API**: Declarative, reactive stores with server-side directive injection
 - **Theme Actions Support**: Add custom actions from your theme without rebuilding the plugin
-- **Legacy Bridge**: Existing IIFE theme actions work automatically with the Interactivity API
 - **Data Attributes**: Add custom data attributes to any block
 - **Block-Specific Actions**: Configure which blocks can receive actions
 - **Searchable Action Selection**: ComboboxControl interface for easy action discovery and selection
@@ -46,55 +45,43 @@ Assign modular actions and data attributes to blocks for lightweight frontend in
    - In the block's advanced settings panel, find the "Data Attribute" field
    - Enter a value to be added as a `data-custom` attribute
 
-### Choosing a Frontend Mode
-
-Block Actions v2.0.0 supports two frontend rendering systems:
-
-- **Legacy mode** (default): Classic imperative DOM manipulation via `BaseAction` class. Works with all WordPress 6.0+ sites.
-- **Interactivity API mode** (opt-in): Declarative stores with server-side directive injection. Requires WordPress 6.6+.
-
-Enable the Interactivity API via **Settings > Block Actions > "Use Interactivity API"**.
-
-Both modes use the same editor UI and `data-action` attributes. Existing theme actions using `window.BlockActions.registerAction()` continue to work in Interactivity API mode via the built-in legacy bridge.
-
 ### Creating Custom Actions (Theme Developers)
 
 **The easiest way** - No plugin rebuild required!
 
 1. Create an `/actions` folder in your active theme
-2. Add a JavaScript file (e.g., `my-action.js`)
-3. Use the global API to register your action:
+2. Add a JavaScript file (e.g., `my-action.js`) as an ES module using `@wordpress/interactivity`
+3. Create a corresponding PHP renderer or rely on the generic `Theme_Action` renderer
 
 ```javascript
-(function() {
-    const { BaseAction } = window.BlockActions;
+/**
+ * My Custom Action
+ * File: wp-content/themes/your-theme/actions/my-action.js
+ */
+import { store, getContext, getElement } from '@wordpress/interactivity';
 
-    function init(element) {
-        const action = new BaseAction(element);
+store( 'block-actions/my-action', {
+    actions: {
+        handleClick( event ) {
+            event.preventDefault();
+            const ctx = getContext();
+            ctx.clicked = true;
+            // Your action logic here
+        },
+    },
+    callbacks: {
+        init() {
+            const ctx = getContext();
+            const { ref } = getElement();
+            // Initialization logic
 
-        action.target.addEventListener('click', (e) => {
-            e.preventDefault();
-
-            action.executeWithRateLimit(() => {
-                // Your action code here
-                action.setTextContent('Clicked!');
-                setTimeout(() => action.reset(), 2000);
-            });
-        });
-    }
-
-    // Register with the plugin
-    window.BlockActions.registerAction(
-        'my-action',        // ID (must match filename)
-        'My Custom Action', // Label for editor
-        init               // Init function
-    );
-})();
+            return () => { /* cleanup */ };
+        },
+    },
+} );
 ```
 
 4. The action will automatically appear in the block editor!
-
-This IIFE pattern works in both legacy and Interactivity API modes. In Interactivity API mode, the legacy bridge wraps your `init()` function in a store automatically.
 
 **[See full Theme Actions Guide](docs/THEME-ACTIONS.md)**
 
@@ -108,7 +95,7 @@ To add actions that ship with the plugin:
    ```
    Follow the prompts to create a new action file.
 
-2. **Manual Creation (Interactivity API)**:
+2. **Manual Creation**:
    Create a store in `src/stores/your-action/view.js`:
    ```javascript
    import { store, getContext, getElement } from '@wordpress/interactivity';
@@ -142,19 +129,7 @@ To add actions that ship with the plugin:
 
    Then create a PHP renderer in `includes/renderers/class-your-action.php` and add the webpack entry.
 
-3. **Manual Creation (Legacy)**:
-   Create `src/actions/your-action.js`:
-   ```javascript
-   import { BaseAction } from './base-action';
-
-   export default function init(element) {
-       const action = new BaseAction(element);
-       // Your action code here
-   }
-   ```
-
-4. **Add to CORE_ACTION_IDS** in `src/actions/index.js`
-5. **Rebuild the plugin**: `npm run build`
+3. **Rebuild the plugin**: `npm run build`
 
 ### Available Actions
 
@@ -167,7 +142,7 @@ To add actions that ship with the plugin:
 - `modal-toggle`: Open/close modals and dialogs
 
 **Additional Resources:**
-- Source examples: `example-rate-limited`, `test-action` (in `/src/actions/`)
+- Source examples: `example-rate-limited`, `test-action` (in `/src/stores/`)
 - [Create your own theme actions](docs/THEME-ACTIONS.md)
 
 ## Architecture
@@ -180,38 +155,24 @@ To add actions that ship with the plugin:
    - Handles saving of custom attributes to blocks
    - Displays both built-in and theme actions
 
-2. **Frontend Handler (`frontend.js`)** — Legacy mode:
-   - Initializes actions on the frontend
-   - Manages action registry (built-in + theme)
-   - Exposes global API for theme actions
-   - Handles error boundaries and logging
-
-3. **Interactivity API Stores (`src/stores/`)** — v2.0.0:
+2. **Interactivity API Stores (`src/stores/`)**:
    - Per-action stores using `@wordpress/interactivity` `store()` API
    - Reactive derived state (getters), declarative actions, and init callbacks
    - Shared utilities: `rate-limiter.js`, `sanitize.js`, `api.js`
 
-4. **PHP Directive Transformer** — v2.0.0:
+3. **PHP Directive Transformer**:
    - `render_block` filter using `WP_HTML_Tag_Processor` for safe HTML manipulation
    - Per-action renderers inject `data-wp-interactive`, `data-wp-context`, and directives
    - Script modules enqueued automatically via `wp_enqueue_script_module()`
 
-5. **Base Action (`base-action.js`)** — Legacy mode:
-   - Provides common utilities for all actions
-   - Handles security, logging, and error management
-   - Manages state and DOM interactions
-   - Available globally as `window.BlockActions.BaseAction`
-
 ### Action System
 
-**Built-in Actions** are available in both modes:
-- **Legacy**: Webpack-bundled JavaScript modules exporting an `init` function
-- **Interactivity API**: Per-action stores built as script modules, with PHP renderers for server-side directive injection
+**Built-in Actions** are per-action Interactivity API stores built as script modules, with PHP renderers for server-side directive injection.
 
-**Theme Actions** are standalone JavaScript files that:
+**Theme Actions** are ES module JavaScript files that:
 - Live in `/wp-content/themes/your-theme/actions/`
-- Register themselves using the global API
-- Work in both modes (legacy bridge provides automatic compatibility)
+- Use `@wordpress/interactivity` `store()` for frontend behavior
+- Register themselves in the editor via `window.BlockActions.registerAction()`
 - Don't require rebuilding the plugin
 
 ## Development
@@ -260,9 +221,7 @@ The plugin exposes `window.BlockActions` with:
 
 | Method/Property | Description |
 |----------------|-------------|
-| `BaseAction` | Base class for creating actions (legacy mode) |
-| `registerAction(id, label, init)` | Register a custom action (works in both modes) |
-| `getRegisteredActions()` | Get all registered actions (legacy mode) |
+| `registerAction(id, label, init)` | Register a custom action (populates editor dropdown) |
 
 See the [Theme Actions Guide](docs/THEME-ACTIONS.md) for complete API documentation.
 
@@ -298,28 +257,13 @@ Enable CSP via Settings > Block Actions. Adjust the policy using the `block_acti
 
 ## Logging System
 
-The Block Actions plugin includes a centralized logging system that provides consistent error handling and telemetry across all components.
+The Block Actions plugin includes a centralized logging system that provides consistent error handling across all components.
 
 ### JavaScript Logging
 
-Both the legacy `BaseAction` and the Interactivity API `log()` utility share the same signature:
-
 ```javascript
-/**
- * Centralized logging utility
- *
- * @param {string} type - Log type: 'error', 'warning', 'info'
- * @param {string} message - Log message
- * @param {Error|null} [error] - Optional error object for error logs
- */
-function log(type, message, error = null) {
-    // Implementation details
-}
-```
+import { log } from '../utils/api';
 
-#### Usage Examples:
-
-```javascript
 // Info logging (only appears in debug mode)
 log('info', 'Initializing component');
 
@@ -334,49 +278,7 @@ try {
 }
 ```
 
-### Performance Telemetry
-
-The legacy `BaseAction` class includes lightweight performance tracking that measures:
-
-1. Action initialization time
-2. Action execution time
-3. Error counts
-4. Execution counts
-
-#### BaseAction Telemetry
-
-```javascript
-this.telemetry = {
-    execCount: 0,        // Total number of executions
-    errorCount: 0,       // Total number of errors
-    lastExecTime: null,  // Timestamp of last execution
-    lastDuration: 0      // Last execution duration in ms
-};
-```
-
 ### Rate Limiting
-
-Both frontend systems include rate limiting:
-
-#### Legacy (BaseAction)
-
-```javascript
-// Simple
-this.executeWithRateLimit(() => {
-    // Your rate-limited code here
-});
-
-// Manual
-if (this.canExecute()) {
-    try {
-        // Your rate-limited code here
-    } finally {
-        this.completeExecution();
-    }
-}
-```
-
-#### Interactivity API (v2.0.0)
 
 ```javascript
 import { getRateLimiter } from '../utils/rate-limiter';
@@ -390,7 +292,7 @@ if ( ! limiter.canExecute() ) {
 // Proceed with action...
 ```
 
-The Interactivity API rate limiter uses a `WeakMap` keyed by DOM element, so limiter state is automatically garbage collected when elements are removed.
+The rate limiter uses a `WeakMap` keyed by DOM element, so limiter state is automatically garbage collected when elements are removed.
 
 ### Server-side Logging
 
@@ -414,12 +316,6 @@ Yes. Create an `/actions` folder in your theme and drop in your action files.
 
 **Do I need to rebuild the plugin for new actions?**
 No. Theme actions are auto-discovered — no rebuild required.
-
-**What's the difference between legacy and Interactivity API mode?**
-Legacy uses imperative DOM manipulation. Interactivity API uses declarative stores with server-side rendering. Both produce the same user-facing behavior. The Interactivity API is the WordPress standard going forward.
-
-**Will existing theme actions break if I enable the Interactivity API?**
-No. The legacy bridge automatically wraps IIFE-style `registerAction()` calls into Interactivity API stores.
 
 **What if I need editor preview?**
 Build a custom block. Actions are for frontend-only interactions.

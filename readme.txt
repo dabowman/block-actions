@@ -17,8 +17,7 @@ Block Actions lets you add JavaScript interactions to core WordPress blocks (But
 **Key features:**
 
 * **Theme Actions** — Drop a JS file in your theme's `/actions` folder. No plugin rebuild needed.
-* **WordPress Interactivity API** (v2.0.0) — Opt-in declarative stores with server-side directive injection.
-* **Legacy Bridge** — Existing IIFE theme actions work automatically with the Interactivity API.
+* **WordPress Interactivity API** — Declarative stores with server-side directive injection.
 * **Security** — XSS protection via DOMPurify, nonce verification, rate limiting, optional CSP headers.
 * **Accessibility** — Built-in keyboard navigation, ARIA attributes, and focus management.
 
@@ -36,12 +35,6 @@ No. It extends existing core blocks (Button, Group) via filters and Advanced pan
 = Can I add my own actions without rebuilding the plugin? =
 Yes. Create an `/actions` folder in your active theme and add your action JS files there. They are auto-discovered and available in the editor immediately.
 
-= What is the Interactivity API mode? =
-An opt-in mode (Settings > Block Actions) that uses WordPress's Interactivity API for declarative, reactive stores with server-side rendering instead of imperative DOM manipulation.
-
-= Will my existing theme actions break if I enable the Interactivity API? =
-No. The legacy bridge automatically wraps IIFE-style `registerAction()` calls into Interactivity API stores.
-
 = Does it work with block themes? =
 Yes. Works with both classic and block themes.
 
@@ -51,11 +44,11 @@ Yes. Works with both classic and block themes.
 == Changelog ==
 
 = 2.0.0 =
-* Added WordPress Interactivity API support with server-side directive injection.
+* Migrated to WordPress Interactivity API with server-side directive injection.
 * Added per-action PHP renderers and Directive Transformer.
-* Added legacy bridge for automatic IIFE theme action compatibility.
 * Added shared store utilities: rate limiter, sanitizer, API helper.
 * Added cleanup returns to init callbacks (Interactivity API best practice).
+* Removed legacy frontend system (BaseAction, IIFE actions, frontend.js).
 
 = 1.0.0 =
 Initial standalone release. Generic namespaces/handles, i18n, settings, opt-in CSP, refined actions registry, CI.

@@ -1,1 +1,0 @@
-(()=>{"use strict";const t=window.wp.interactivity;window.BlockActions=window.BlockActions||{},window.BlockActions.registerAction=function(n,o,i){return!(!n||"string"!=typeof n||"function"!=typeof i||((0,t.store)("block-actions/".concat(n),{callbacks:{init:function(){var n=(0,t.getElement)().ref;i(n)}}}),0))},window.BlockActions.getRegisteredActions=function(){return[]}})();

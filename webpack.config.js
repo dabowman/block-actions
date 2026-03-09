@@ -15,14 +15,11 @@ const { entry: _defaultEntry, ...configWithoutEntry } = defaultConfig;
 module.exports = {
     ...configWithoutEntry,
     entry: {
-        // Editor (unchanged).
+        // Editor.
         'block-extensions': path.resolve(
             __dirname,
             'src/block-extensions.js'
         ),
-
-        // Legacy frontend (kept during migration).
-        frontend: path.resolve( __dirname, 'src/frontend.js' ),
 
         // Interactivity API view stores (one per action).
         'actions/scroll-to-top/view': path.resolve(
@@ -56,12 +53,6 @@ module.exports = {
         'actions/example-rate-limited/view': path.resolve(
             __dirname,
             'src/stores/example-rate-limited/view.js'
-        ),
-
-        // Legacy bridge for old-style theme actions.
-        'compat/legacy-bridge': path.resolve(
-            __dirname,
-            'src/stores/compat/legacy-bridge.js'
         ),
     },
     output: {
