@@ -115,8 +115,7 @@ block-actions/
 │   ├── EXAMPLES.md
 │   ├── carousel-action.md
 │   └── examples/                  # Copy-paste action templates
-├── README.md
-└── QUICK-INTRO.md
+└── README.md
 ```
 
 ## Build & Development Commands

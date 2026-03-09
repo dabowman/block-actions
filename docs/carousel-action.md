@@ -73,19 +73,17 @@ Alternatively, the block itself can be the carousel container by adding the `car
 </div>
 ```
 
-### Alternative Class Names
+### Required Class Names
 
-For consistency with existing patterns, these alternative class names are also supported:
-
-| Component | Primary Class | Alternative Classes |
-|-----------|--------------|---------------------|
-| Container | `carousel-container` | `gallery-container` |
-| Slider | `carousel-slider` | `gallery-slider`, `gallery-images-wrapper` |
-| Slides | `carousel-image` | `gallery-image`, `gallery-image-container` |
-| Previous Button | `carousel-button-left` | `gallery-button-left` |
-| Next Button | `carousel-button-right` | `gallery-button-right` |
-| Thumbnails Container | `carousel-thumbnails` | `gallery-thumbnails` |
-| Thumbnail | `carousel-thumbnail` | `gallery-thumbnail`, `wp-block-image` (inside thumbnails container) |
+| Component | Class |
+|-----------|-------|
+| Container | `carousel-container` |
+| Slider | `carousel-slider` |
+| Slides | `carousel-slide` |
+| Previous Button | `carousel-button-left` |
+| Next Button | `carousel-button-right` |
+| Thumbnails Container | `carousel-thumbnails` |
+| Thumbnail | `carousel-thumbnail` |
 
 ## Container Queries
 
@@ -105,10 +103,10 @@ This approach ensures that your carousel works correctly even when nested inside
 <div class="wp-block-group product-carousel" data-action="carousel">
     <div class="carousel-container">
         <div class="carousel-slider">
-            <figure class="carousel-image">
+            <figure class="carousel-slide">
                 <img src="image1.jpg" alt="Product image 1" />
             </figure>
-            <figure class="carousel-image">
+            <figure class="carousel-slide">
                 <img src="image2.jpg" alt="Product image 2" />
             </figure>
         </div>
@@ -117,7 +115,7 @@ This approach ensures that your carousel works correctly even when nested inside
     <div class="carousel-button carousel-button-left">
         <svg><!-- Left arrow icon --></svg>
     </div>
-    
+
     <div class="carousel-button carousel-button-right">
         <svg><!-- Right arrow icon --></svg>
     </div>
@@ -128,24 +126,24 @@ This approach ensures that your carousel works correctly even when nested inside
 
 ```html
 <div class="wp-block-group gallery" data-action="carousel">
-    <div class="gallery-container">
-        <div class="gallery-slider">
-            <div class="gallery-image">
+    <div class="carousel-container">
+        <div class="carousel-slider">
+            <div class="carousel-slide">
                 <img src="image1.jpg" alt="Gallery image 1" />
                 <p class="gallery-caption">Caption 1</p>
             </div>
-            <div class="gallery-image">
+            <div class="carousel-slide">
                 <img src="image2.jpg" alt="Gallery image 2" />
                 <p class="gallery-caption">Caption 2</p>
             </div>
         </div>
     </div>
-    
-    <div class="gallery-thumbnails">
-        <div class="gallery-thumbnail">
+
+    <div class="carousel-thumbnails">
+        <div class="carousel-thumbnail">
             <img src="thumbnail1.jpg" alt="Thumbnail 1" />
         </div>
-        <div class="gallery-thumbnail">
+        <div class="carousel-thumbnail">
             <img src="thumbnail2.jpg" alt="Thumbnail 2" />
         </div>
     </div>
@@ -161,23 +159,23 @@ This approach ensures that your carousel works correctly even when nested inside
         <div class="carousel-button carousel-button-left">
             <a class="wp-block-button__link">←</a>
         </div>
-    
+
         <div class="carousel-slider">
-            <div class="carousel-image">
+            <div class="carousel-slide">
                 <img src="image1.jpg" alt="Magazine image 1" />
                 <p class="caption">Caption text 1</p>
             </div>
-            <div class="carousel-image">
+            <div class="carousel-slide">
                 <img src="image2.jpg" alt="Magazine image 2" />
                 <p class="caption">Caption text 2</p>
             </div>
         </div>
-        
+
         <div class="carousel-button carousel-button-right">
             <a class="wp-block-button__link">→</a>
         </div>
     </div>
-    
+
     <div class="carousel-thumbnails">
         <div class="carousel-thumbnail">
             <img src="thumbnail1.jpg" alt="Thumbnail 1" />
@@ -213,14 +211,14 @@ The carousel action handles the interactive functionality but relies on CSS for 
 }
 
 /* Slides */
-.carousel-image {
+.carousel-slide {
     width: 100cqw !important; /* Container query width unit */
     min-width: 100cqw;
     flex: 0 0 100cqw;
 }
 
 /* Images inside slides */
-.carousel-image img {
+.carousel-slide img {
     width: 100cqw;
     height: auto;
     object-fit: contain;

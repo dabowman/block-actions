@@ -145,34 +145,6 @@ Opens and closes modals with accessibility features.
 
 ---
 
-### 7. **Homepage Carousel** (`homepage-carousel.js` / `homepage-carousel-enhanced.js`)
-**Perfect for:** Continuous animations  
-**Complexity:** ⭐⭐⭐⭐ Advanced
-
-Continuously scrolling carousel with cloning for seamless loops.
-
-**What it does:**
-- Infinite scroll animation
-- Opacity effects based on position
-- Automatic cloning for seamless loop
-- Window resize handling
-- requestAnimationFrame for smooth performance
-
-**Learn from this:**
-- Animation loops
-- DOM cloning
-- Performance optimization
-- Position calculations
-- Cleanup patterns
-
-**Use cases:**
-- Hero sections
-- Logo carousels
-- Image galleries
-- Testimonial sliders
-
----
-
 ## 📋 Quick Start Guide
 
 ### Step 1: Choose an Example

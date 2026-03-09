@@ -296,16 +296,6 @@ CSP headers are **disabled by default**. To enable CSP for production:
 
 Enable CSP via Settings > Block Actions. Adjust the policy using the `block_actions_csp_header` filter to fit your environment.
 
-## Debugging
-
-Enable WordPress debug mode to see detailed logs:
-```php
-define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', true);
-```
-
-Actions will log initialization, warnings, and errors to the browser console when `debug` is enabled. No server-side telemetry is sent by default.
-
 ## Logging System
 
 The Block Actions plugin includes a centralized logging system that provides consistent error handling and telemetry across all components.
@@ -416,6 +406,26 @@ define('WP_DEBUG_LOG', true);
 ```
 
 When debug mode is active, informational logs will appear in the browser console.
+
+## FAQ
+
+**Can I use this with any theme?**
+Yes. Create an `/actions` folder in your theme and drop in your action files.
+
+**Do I need to rebuild the plugin for new actions?**
+No. Theme actions are auto-discovered — no rebuild required.
+
+**What's the difference between legacy and Interactivity API mode?**
+Legacy uses imperative DOM manipulation. Interactivity API uses declarative stores with server-side rendering. Both produce the same user-facing behavior. The Interactivity API is the WordPress standard going forward.
+
+**Will existing theme actions break if I enable the Interactivity API?**
+No. The legacy bridge automatically wraps IIFE-style `registerAction()` calls into Interactivity API stores.
+
+**What if I need editor preview?**
+Build a custom block. Actions are for frontend-only interactions.
+
+**Does it work with block themes?**
+Yes. Works with classic or block themes.
 
 ## Contributing
 
