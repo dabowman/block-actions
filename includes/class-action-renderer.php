@@ -60,7 +60,10 @@ abstract class Action_Renderer {
 	}
 
 	/**
-	 * Enqueue the view script module for this action.
+	 * Enqueue the view script for this action.
+	 *
+	 * Uses wp_enqueue_script() because the webpack build outputs IIFE bundles
+	 * that reference window.wp.interactivity, not ES modules.
 	 *
 	 * @since 2.0.0
 	 *
@@ -68,17 +71,29 @@ abstract class Action_Renderer {
 	 * @return void
 	 */
 	public function enqueue_view_script( string $action_id ): void {
-		$handle = "block-actions-{$action_id}-view";
-		$path   = plugin_dir_path( dirname( __FILE__ ) ) . "build/actions/{$action_id}/view.js";
+		$handle     = "block-actions-{$action_id}-view";
+		$plugin_dir = plugin_dir_path( dirname( __FILE__ ) );
+		$plugin_url = plugin_dir_url( dirname( __FILE__ ) );
+		$js_path    = "build/actions/{$action_id}/view.js";
+		$asset_path = "build/actions/{$action_id}/view.asset.php";
 
-		if ( ! file_exists( $path ) ) {
+		if ( ! file_exists( $plugin_dir . $js_path ) ) {
 			return;
 		}
 
-		wp_enqueue_script_module(
+		$asset = file_exists( $plugin_dir . $asset_path )
+			? include $plugin_dir . $asset_path
+			: array(
+				'dependencies' => array( 'wp-interactivity' ),
+				'version'      => filemtime( $plugin_dir . $js_path ),
+			);
+
+		wp_enqueue_script(
 			$handle,
-			plugin_dir_url( dirname( __FILE__ ) ) . "build/actions/{$action_id}/view.js",
-			array( '@wordpress/interactivity' )
+			$plugin_url . $js_path,
+			$asset['dependencies'],
+			$asset['version'],
+			true
 		);
 	}
 }
