@@ -25,6 +25,9 @@ function getPrivate( el ) {
             rafId: null,
             observer: null,
             touchStartX: 0,
+            handleTouchStart: null,
+            handleTouchEnd: null,
+            touchContainer: null,
         } );
     }
     return privateState.get( el );
@@ -239,33 +242,38 @@ const { state } = store( 'block-actions/carousel', {
             // Setup touch support.
             if ( container ) {
                 const priv = getPrivate( ref );
+                priv.touchContainer = container;
+
+                priv.handleTouchStart = ( e ) => {
+                    priv.touchStartX = e.changedTouches[ 0 ].screenX;
+                };
+
+                priv.handleTouchEnd = ( e ) => {
+                    const touchEndX = e.changedTouches[ 0 ].screenX;
+                    const threshold = 50;
+
+                    if ( touchEndX < priv.touchStartX - threshold ) {
+                        store(
+                            'block-actions/carousel'
+                        ).actions.nextSlide();
+                    } else if (
+                        touchEndX >
+                        priv.touchStartX + threshold
+                    ) {
+                        store(
+                            'block-actions/carousel'
+                        ).actions.prevSlide();
+                    }
+                };
+
                 container.addEventListener(
                     'touchstart',
-                    ( e ) => {
-                        priv.touchStartX = e.changedTouches[ 0 ].screenX;
-                    },
+                    priv.handleTouchStart,
                     { passive: true }
                 );
-
                 container.addEventListener(
                     'touchend',
-                    ( e ) => {
-                        const touchEndX = e.changedTouches[ 0 ].screenX;
-                        const threshold = 50;
-
-                        if ( touchEndX < priv.touchStartX - threshold ) {
-                            store(
-                                'block-actions/carousel'
-                            ).actions.nextSlide();
-                        } else if (
-                            touchEndX >
-                            priv.touchStartX + threshold
-                        ) {
-                            store(
-                                'block-actions/carousel'
-                            ).actions.prevSlide();
-                        }
-                    },
+                    priv.handleTouchEnd,
                     { passive: true }
                 );
             }
@@ -308,6 +316,16 @@ const { state } = store( 'block-actions/carousel', {
                 }
                 if ( p.observer ) {
                     p.observer.disconnect();
+                }
+                if ( p.touchContainer ) {
+                    p.touchContainer.removeEventListener(
+                        'touchstart',
+                        p.handleTouchStart
+                    );
+                    p.touchContainer.removeEventListener(
+                        'touchend',
+                        p.handleTouchEnd
+                    );
                 }
             };
         },

@@ -29,7 +29,12 @@ describe( 'Toggle Visibility Store', () => {
         targetElement.id = 'test-target';
         document.body.appendChild( targetElement );
 
-        mockContext = { targetId: 'test-target', isVisible: true };
+        mockContext = {
+            targetId: 'test-target',
+            isVisible: true,
+            showLabel: 'Show',
+            hideLabel: 'Hide',
+        };
         interactivityMock.__setContext( mockContext );
         interactivityMock.__setElement( mockElement );
     } );
@@ -51,7 +56,7 @@ describe( 'Toggle Visibility Store', () => {
     } );
 
     it( 'should detect hidden state on init', () => {
-        targetElement.style.display = 'none';
+        targetElement.classList.add( 'is-hidden' );
         storeDefinition.callbacks.init();
         expect( mockContext.isVisible ).toBe( false );
     } );
@@ -61,18 +66,20 @@ describe( 'Toggle Visibility Store', () => {
         storeDefinition.actions.toggle( event );
 
         expect( mockContext.isVisible ).toBe( false );
-        expect( targetElement.style.display ).toBe( 'none' );
+        expect( targetElement.classList.contains( 'is-hidden' ) ).toBe( true );
     } );
 
     it( 'should show target on toggle when hidden', () => {
         mockContext.isVisible = false;
-        targetElement.style.display = 'none';
+        targetElement.classList.add( 'is-hidden' );
 
         const event = { preventDefault: jest.fn() };
         storeDefinition.actions.toggle( event );
 
         expect( mockContext.isVisible ).toBe( true );
-        expect( targetElement.style.display ).toBe( '' );
+        expect( targetElement.classList.contains( 'is-hidden' ) ).toBe(
+            false
+        );
     } );
 
     it( 'should update button text', () => {
@@ -84,5 +91,23 @@ describe( 'Toggle Visibility Store', () => {
 
         storeDefinition.actions.toggle( event );
         expect( link.textContent ).toBe( 'Hide' );
+    } );
+
+    it( 'should use context labels for button text', () => {
+        mockContext.showLabel = 'Reveal';
+        mockContext.hideLabel = 'Conceal';
+        const link = mockElement.querySelector( 'a' );
+        const event = { preventDefault: jest.fn() };
+
+        storeDefinition.actions.toggle( event );
+        expect( link.textContent ).toBe( 'Reveal' );
+
+        storeDefinition.actions.toggle( event );
+        expect( link.textContent ).toBe( 'Conceal' );
+    } );
+
+    it( 'should return a cleanup function from init', () => {
+        const cleanup = storeDefinition.callbacks.init();
+        expect( typeof cleanup ).toBe( 'function' );
     } );
 } );

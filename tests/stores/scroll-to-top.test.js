@@ -74,4 +74,25 @@ describe( 'Scroll to Top Store', () => {
         jest.advanceTimersByTime( 500 );
         expect( link.textContent ).toBe( 'Back to Top' );
     } );
+
+    it( 'should return a cleanup function from init', () => {
+        const cleanup = storeDefinition.callbacks.init();
+        expect( typeof cleanup ).toBe( 'function' );
+    } );
+
+    it( 'should cancel pending timeout on cleanup', () => {
+        const cleanup = storeDefinition.callbacks.init();
+        const link = mockElement.querySelector( 'a' );
+
+        const event = { preventDefault: jest.fn() };
+        storeDefinition.actions.scrollToTop( event );
+        expect( link.textContent ).toBe( 'Scrolling...' );
+
+        // Cleanup before timeout fires.
+        cleanup();
+        jest.advanceTimersByTime( 500 );
+
+        // Text should NOT have reset because cleanup cancelled the timer.
+        expect( link.textContent ).toBe( 'Scrolling...' );
+    } );
 } );

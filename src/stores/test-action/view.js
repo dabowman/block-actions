@@ -6,6 +6,14 @@
 
 import { store, getContext, getElement } from '@wordpress/interactivity';
 import { getRateLimiter } from '../utils/rate-limiter';
+import { validateStyle } from '../utils/sanitize';
+
+/**
+ * Timer IDs per element for cleanup.
+ *
+ * @type {WeakMap<HTMLElement, number>}
+ */
+const timers = new WeakMap();
 
 store( 'block-actions/test-action', {
     actions: {
@@ -20,13 +28,24 @@ store( 'block-actions/test-action', {
             const ctx = getContext();
             const target = ref.querySelector( 'a' ) || ref;
 
-            target.style.backgroundColor = 'red';
+            const activeColor = validateStyle( 'backgroundColor', 'red' );
+            if ( activeColor ) {
+                target.style.backgroundColor = activeColor;
+            }
             target.textContent = 'it worked!';
 
-            setTimeout( () => {
-                target.textContent = ctx.originalText;
-                target.removeAttribute( 'style' );
-            }, 2000 );
+            const existingTimer = timers.get( ref );
+            if ( existingTimer ) {
+                clearTimeout( existingTimer );
+            }
+            timers.set(
+                ref,
+                setTimeout( () => {
+                    target.textContent = ctx.originalText;
+                    target.removeAttribute( 'style' );
+                    timers.delete( ref );
+                }, 2000 )
+            );
         },
     },
     callbacks: {
@@ -35,6 +54,14 @@ store( 'block-actions/test-action', {
             const { ref } = getElement();
             const target = ref.querySelector( 'a' ) || ref;
             ctx.originalText = target.textContent;
+
+            return () => {
+                const timer = timers.get( ref );
+                if ( timer ) {
+                    clearTimeout( timer );
+                    timers.delete( ref );
+                }
+            };
         },
     },
 } );

@@ -32,9 +32,11 @@ class Copy_To_Clipboard extends Action_Renderer {
 	 */
 	public function get_initial_context( \WP_HTML_Tag_Processor $processor, array $block ): array {
 		return array(
-			'copyText'     => $processor->get_attribute( 'data-copy-text' ) ?? '',
-			'originalText' => '',
-			'status'       => 'idle',
+			'copyText'       => $processor->get_attribute( 'data-copy-text' ) ?? '',
+			'originalText'   => '',
+			'status'         => 'idle',
+			'copiedText'     => __( 'Copied!', 'block-actions' ),
+			'copyFailedText' => __( 'Copy failed', 'block-actions' ),
 		);
 	}
 

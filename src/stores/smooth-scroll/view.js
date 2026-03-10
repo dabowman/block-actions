@@ -7,6 +7,13 @@
 import { store, getContext, getElement } from '@wordpress/interactivity';
 import { getRateLimiter } from '../utils/rate-limiter';
 
+/**
+ * Timer IDs per element for cleanup.
+ *
+ * @type {WeakMap<HTMLElement, number>}
+ */
+const timers = new WeakMap();
+
 store( 'block-actions/smooth-scroll', {
     actions: {
         scrollToTarget( event ) {
@@ -35,10 +42,19 @@ store( 'block-actions/smooth-scroll', {
             window.scrollTo( { top: targetPosition, behavior: 'smooth' } );
 
             const target = ref.querySelector( 'a' ) || ref;
-            target.textContent = 'Scrolling...';
-            setTimeout( () => {
-                target.textContent = ctx.originalText;
-            }, 1000 );
+            target.textContent = ctx.scrollingText || 'Scrolling...';
+
+            const existingTimer = timers.get( ref );
+            if ( existingTimer ) {
+                clearTimeout( existingTimer );
+            }
+            timers.set(
+                ref,
+                setTimeout( () => {
+                    target.textContent = ctx.originalText;
+                    timers.delete( ref );
+                }, 1000 )
+            );
         },
     },
     callbacks: {
@@ -47,6 +63,14 @@ store( 'block-actions/smooth-scroll', {
             const { ref } = getElement();
             const target = ref.querySelector( 'a' ) || ref;
             ctx.originalText = target.textContent;
+
+            return () => {
+                const timer = timers.get( ref );
+                if ( timer ) {
+                    clearTimeout( timer );
+                    timers.delete( ref );
+                }
+            };
         },
     },
 } );

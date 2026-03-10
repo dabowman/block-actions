@@ -6,6 +6,14 @@
 
 import { store, getContext, getElement } from '@wordpress/interactivity';
 import { getRateLimiter } from '../utils/rate-limiter';
+import { validateStyle } from '../utils/sanitize';
+
+/**
+ * Timer IDs per element for cleanup.
+ *
+ * @type {WeakMap<HTMLElement, number>}
+ */
+const timers = new WeakMap();
 
 store( 'block-actions/copy-to-clipboard', {
     actions: {
@@ -26,20 +34,40 @@ store( 'block-actions/copy-to-clipboard', {
 
             try {
                 yield navigator.clipboard.writeText( ctx.copyText );
-                target.textContent = 'Copied! \u2713';
-                target.style.backgroundColor = '#10b981';
+                target.textContent = ctx.copiedText || 'Copied! \u2713';
+                const successColor = validateStyle(
+                    'backgroundColor',
+                    '#10b981'
+                );
+                if ( successColor ) {
+                    target.style.backgroundColor = successColor;
+                }
                 ctx.status = 'success';
             } catch ( error ) {
-                target.textContent = 'Copy failed';
-                target.style.backgroundColor = '#ef4444';
+                target.textContent = ctx.copyFailedText || 'Copy failed';
+                const errorColor = validateStyle(
+                    'backgroundColor',
+                    '#ef4444'
+                );
+                if ( errorColor ) {
+                    target.style.backgroundColor = errorColor;
+                }
                 ctx.status = 'error';
             }
 
-            setTimeout( () => {
-                target.textContent = ctx.originalText;
-                target.removeAttribute( 'style' );
-                ctx.status = 'idle';
-            }, 2000 );
+            const existingTimer = timers.get( ref );
+            if ( existingTimer ) {
+                clearTimeout( existingTimer );
+            }
+            timers.set(
+                ref,
+                setTimeout( () => {
+                    target.textContent = ctx.originalText;
+                    target.removeAttribute( 'style' );
+                    ctx.status = 'idle';
+                    timers.delete( ref );
+                }, 2000 )
+            );
         },
     },
     callbacks: {
@@ -48,6 +76,14 @@ store( 'block-actions/copy-to-clipboard', {
             const { ref } = getElement();
             const target = ref.querySelector( 'a' ) || ref;
             ctx.originalText = target.textContent;
+
+            return () => {
+                const timer = timers.get( ref );
+                if ( timer ) {
+                    clearTimeout( timer );
+                    timers.delete( ref );
+                }
+            };
         },
     },
 } );
