@@ -25,7 +25,8 @@ jest.mock('@wordpress/block-editor', () => ({
 
 jest.mock('@wordpress/components', () => ({
     TextControl: 'TextControl',
-    ComboboxControl: 'ComboboxControl'
+    ComboboxControl: 'ComboboxControl',
+    ToggleControl: 'ToggleControl'
 }));
 
 jest.mock('@wordpress/i18n', () => ({
@@ -38,8 +39,44 @@ jest.mock('lodash', () => ({
 
 // Mock action registry
 jest.mock('../src/action-registry', () => [
-    { id: 'scroll-to-top', label: 'Scroll To Top' },
-    { id: 'carousel', label: 'Carousel' }
+    { id: 'scroll-to-top', label: 'Scroll To Top', fields: [] },
+    {
+        id: 'carousel',
+        label: 'Carousel',
+        fields: [
+            {
+                key: 'wrapAround',
+                type: 'toggle',
+                label: 'Wrap Around',
+                help: 'Loop back to the first slide after the last.',
+                dataAttribute: 'data-wrap-around',
+                required: false,
+                default: true,
+            }
+        ]
+    },
+    {
+        id: 'smooth-scroll',
+        label: 'Smooth Scroll',
+        fields: [
+            {
+                key: 'target',
+                type: 'text',
+                label: 'Target Element ID',
+                dataAttribute: 'data-target',
+                required: true,
+                default: '',
+            },
+            {
+                key: 'offset',
+                type: 'number',
+                label: 'Scroll Offset (px)',
+                dataAttribute: 'data-offset',
+                required: false,
+                default: 0,
+            }
+        ]
+    }
 ]);
 
 describe('block-extensions', () => {
@@ -73,12 +110,48 @@ describe('block-extensions', () => {
         }));
         jest.mock('@wordpress/element', () => ({ Fragment: 'Fragment' }));
         jest.mock('@wordpress/block-editor', () => ({ InspectorAdvancedControls: 'InspectorAdvancedControls' }));
-        jest.mock('@wordpress/components', () => ({ TextControl: 'TextControl', ComboboxControl: 'ComboboxControl' }));
+        jest.mock('@wordpress/components', () => ({ TextControl: 'TextControl', ComboboxControl: 'ComboboxControl', ToggleControl: 'ToggleControl' }));
         jest.mock('@wordpress/i18n', () => ({ __: (text) => text }));
         jest.mock('lodash', () => ({ assign: Object.assign }));
         jest.mock('../src/action-registry', () => [
-            { id: 'scroll-to-top', label: 'Scroll To Top' },
-            { id: 'carousel', label: 'Carousel' }
+            { id: 'scroll-to-top', label: 'Scroll To Top', fields: [] },
+            {
+                id: 'carousel',
+                label: 'Carousel',
+                fields: [
+                    {
+                        key: 'wrapAround',
+                        type: 'toggle',
+                        label: 'Wrap Around',
+                        help: 'Loop back to the first slide after the last.',
+                        dataAttribute: 'data-wrap-around',
+                        required: false,
+                        default: true,
+                    }
+                ]
+            },
+            {
+                id: 'smooth-scroll',
+                label: 'Smooth Scroll',
+                fields: [
+                    {
+                        key: 'target',
+                        type: 'text',
+                        label: 'Target Element ID',
+                        dataAttribute: 'data-target',
+                        required: true,
+                        default: '',
+                    },
+                    {
+                        key: 'offset',
+                        type: 'number',
+                        label: 'Scroll Offset (px)',
+                        dataAttribute: 'data-offset',
+                        required: false,
+                        default: 0,
+                    }
+                ]
+            }
         ]);
     });
 
@@ -145,12 +218,12 @@ describe('block-extensions', () => {
     });
 
     describe('getEditorRegisteredActions', () => {
-        test('returns built-in actions', () => {
+        test('returns built-in actions with fields', () => {
             loadModule();
             const actions = window.BlockActions.getRegisteredActions();
             expect(actions).toEqual(expect.arrayContaining([
-                { id: 'scroll-to-top', label: 'Scroll To Top' },
-                { id: 'carousel', label: 'Carousel' }
+                expect.objectContaining({ id: 'scroll-to-top', label: 'Scroll To Top', fields: [] }),
+                expect.objectContaining({ id: 'carousel', label: 'Carousel', fields: expect.any(Array) })
             ]));
         });
 
@@ -159,8 +232,17 @@ describe('block-extensions', () => {
             window.BlockActions.registerAction('my-theme', 'My Theme', () => {});
             const actions = window.BlockActions.getRegisteredActions();
             expect(actions).toEqual(expect.arrayContaining([
-                { id: 'my-theme', label: 'My Theme' }
+                expect.objectContaining({ id: 'my-theme', label: 'My Theme', fields: [] })
             ]));
+        });
+
+        test('includes fields for theme actions registered with fields', () => {
+            loadModule();
+            const fields = [{ key: 'gallery', type: 'text', label: 'Gallery', dataAttribute: 'data-gallery' }];
+            window.BlockActions.registerAction('lightbox', 'Lightbox', fields, () => {});
+            const actions = window.BlockActions.getRegisteredActions();
+            const lightbox = actions.find(a => a.id === 'lightbox');
+            expect(lightbox.fields).toEqual(fields);
         });
     });
 
@@ -379,7 +461,7 @@ describe('block-extensions', () => {
             expect(comboCall).toBeDefined();
         });
 
-        test('onChange handler sets customAction attribute', () => {
+        test('onChange handler sets customAction and clears actionData', () => {
             const hoc = getHOC();
             const MockBlockEdit = jest.fn(() => null);
             const Component = hoc(MockBlockEdit);
@@ -387,7 +469,7 @@ describe('block-extensions', () => {
             const setAttributes = jest.fn();
             const props = {
                 name: 'core/button',
-                attributes: { customAction: '' },
+                attributes: { customAction: '', actionData: { old: 'data' } },
                 setAttributes
             };
             Component(props);
@@ -397,7 +479,7 @@ describe('block-extensions', () => {
             );
             if (comboCall && comboCall[1] && comboCall[1].onChange) {
                 comboCall[1].onChange('carousel');
-                expect(setAttributes).toHaveBeenCalledWith({ customAction: 'carousel' });
+                expect(setAttributes).toHaveBeenCalledWith({ customAction: 'carousel', actionData: {} });
             }
         });
 
@@ -493,6 +575,251 @@ describe('block-extensions', () => {
         });
     });
 
+    describe('actionData attribute', () => {
+        function getRegisterFilter() {
+            loadModule();
+            const { addFilter } = require('@wordpress/hooks');
+            return addFilter.mock.calls.find(c => c[0] === 'blocks.registerBlockType')[2];
+        }
+
+        test('adds actionData attribute to supported blocks', () => {
+            const filterFn = getRegisterFilter();
+            const settings = { name: 'core/button', attributes: {} };
+            const result = filterFn(settings);
+            expect(result.attributes.actionData).toEqual({ type: 'object', default: {} });
+        });
+
+        test('does not add actionData to unsupported blocks', () => {
+            const filterFn = getRegisterFilter();
+            const settings = { name: 'core/paragraph', attributes: {} };
+            const result = filterFn(settings);
+            expect(result.attributes.actionData).toBeUndefined();
+        });
+    });
+
+    describe('actionData in save filter', () => {
+        function getSaveFilter() {
+            loadModule();
+            const { addFilter } = require('@wordpress/hooks');
+            return addFilter.mock.calls.find(c => c[0] === 'blocks.getSaveContent.extraProps')[2];
+        }
+
+        test('maps actionData fields to data-* attributes', () => {
+            const filterFn = getSaveFilter();
+            const result = filterFn({}, { name: 'core/button' }, {
+                customAction: 'smooth-scroll',
+                customData: '',
+                actionData: { target: 'my-section', offset: 80 }
+            });
+            expect(result['data-action']).toBe('smooth-scroll');
+            expect(result['data-target']).toBe('my-section');
+            expect(result['data-offset']).toBe('80');
+        });
+
+        test('maps toggle field values to data-* attributes', () => {
+            const filterFn = getSaveFilter();
+            const result = filterFn({}, { name: 'core/button' }, {
+                customAction: 'carousel',
+                customData: '',
+                actionData: { wrapAround: true }
+            });
+            expect(result['data-wrap-around']).toBe('true');
+        });
+
+        test('does not emit data-* for empty string values', () => {
+            const filterFn = getSaveFilter();
+            const result = filterFn({}, { name: 'core/button' }, {
+                customAction: 'smooth-scroll',
+                customData: '',
+                actionData: { target: '', offset: 0 }
+            });
+            expect(result['data-target']).toBeUndefined();
+        });
+
+        test('ignores actionData when no action is selected', () => {
+            const filterFn = getSaveFilter();
+            const result = filterFn({}, { name: 'core/button' }, {
+                customAction: '',
+                customData: '',
+                actionData: { target: 'something' }
+            });
+            expect(result['data-target']).toBeUndefined();
+        });
+
+        test('handles missing actionData gracefully', () => {
+            const filterFn = getSaveFilter();
+            const result = filterFn({}, { name: 'core/button' }, {
+                customAction: 'carousel',
+                customData: ''
+            });
+            expect(result['data-action']).toBe('carousel');
+        });
+
+        test('only emits declared fields, not arbitrary actionData keys', () => {
+            const filterFn = getSaveFilter();
+            const result = filterFn({}, { name: 'core/button' }, {
+                customAction: 'scroll-to-top',
+                customData: '',
+                actionData: { sneaky: 'value' }
+            });
+            expect(result['data-sneaky']).toBeUndefined();
+        });
+    });
+
+    describe('action field rendering in withActionInspectorControl', () => {
+        function getHOC() {
+            loadModule();
+            const { addFilter } = require('@wordpress/hooks');
+            const editCalls = addFilter.mock.calls.filter(c => c[0] === 'editor.BlockEdit');
+            return editCalls[1][2];
+        }
+
+        test('renders toggle control for action with toggle field', () => {
+            const hoc = getHOC();
+            const MockBlockEdit = jest.fn(() => null);
+            const Component = hoc(MockBlockEdit);
+
+            Component({
+                name: 'core/button',
+                attributes: { customAction: 'carousel', actionData: {} },
+                setAttributes: jest.fn()
+            });
+
+            const toggleCall = global.wp.element.createElement.mock.calls.find(
+                call => call[0] === 'ToggleControl'
+            );
+            expect(toggleCall).toBeDefined();
+            expect(toggleCall[1].label).toBe('Wrap Around');
+        });
+
+        test('renders text and number controls for multi-field action', () => {
+            const hoc = getHOC();
+            const MockBlockEdit = jest.fn(() => null);
+            const Component = hoc(MockBlockEdit);
+
+            Component({
+                name: 'core/button',
+                attributes: { customAction: 'smooth-scroll', actionData: {} },
+                setAttributes: jest.fn()
+            });
+
+            const textCalls = global.wp.element.createElement.mock.calls.filter(
+                call => call[0] === 'TextControl'
+            );
+            // Should have at least 2 TextControls for the smooth-scroll fields
+            // (target as text, offset as number rendered via TextControl type=number)
+            const targetControl = textCalls.find(c => c[1].label === 'Target Element ID');
+            const offsetControl = textCalls.find(c => c[1].label === 'Scroll Offset (px)');
+            expect(targetControl).toBeDefined();
+            expect(offsetControl).toBeDefined();
+            expect(offsetControl[1].type).toBe('number');
+        });
+
+        test('renders no field controls for action without fields', () => {
+            const hoc = getHOC();
+            const MockBlockEdit = jest.fn(() => null);
+            const Component = hoc(MockBlockEdit);
+
+            Component({
+                name: 'core/button',
+                attributes: { customAction: 'scroll-to-top', actionData: {} },
+                setAttributes: jest.fn()
+            });
+
+            const toggleCall = global.wp.element.createElement.mock.calls.find(
+                call => call[0] === 'ToggleControl'
+            );
+            expect(toggleCall).toBeUndefined();
+        });
+
+        test('field onChange updates actionData', () => {
+            const hoc = getHOC();
+            const MockBlockEdit = jest.fn(() => null);
+            const Component = hoc(MockBlockEdit);
+            const setAttributes = jest.fn();
+
+            Component({
+                name: 'core/button',
+                attributes: { customAction: 'carousel', actionData: {} },
+                setAttributes
+            });
+
+            const toggleCall = global.wp.element.createElement.mock.calls.find(
+                call => call[0] === 'ToggleControl'
+            );
+            if (toggleCall && toggleCall[1] && toggleCall[1].onChange) {
+                toggleCall[1].onChange(false);
+                expect(setAttributes).toHaveBeenCalledWith({
+                    actionData: { wrapAround: false }
+                });
+            }
+        });
+
+        test('uses field default when actionData key is missing', () => {
+            const hoc = getHOC();
+            const MockBlockEdit = jest.fn(() => null);
+            const Component = hoc(MockBlockEdit);
+
+            Component({
+                name: 'core/button',
+                attributes: { customAction: 'carousel', actionData: {} },
+                setAttributes: jest.fn()
+            });
+
+            const toggleCall = global.wp.element.createElement.mock.calls.find(
+                call => call[0] === 'ToggleControl'
+            );
+            // Default for wrapAround is true
+            expect(toggleCall[1].checked).toBe(true);
+        });
+    });
+
+    describe('registerEditorAction with fields', () => {
+        test('accepts fields array as third argument', () => {
+            loadModule();
+            const fields = [{ key: 'target', type: 'text', label: 'Target', dataAttribute: 'data-target' }];
+            const result = window.BlockActions.registerAction('my-action', 'My Action', fields, () => {});
+            expect(result).toBe(true);
+        });
+
+        test('backward compatible with function as third argument', () => {
+            loadModule();
+            const result = window.BlockActions.registerAction('compat-action', 'Compat', () => {});
+            expect(result).toBe(true);
+            const actions = window.BlockActions.getRegisteredActions();
+            const action = actions.find(a => a.id === 'compat-action');
+            expect(action.fields).toEqual([]);
+        });
+
+        test('rejects field with missing key', () => {
+            loadModule();
+            const fields = [{ type: 'text', label: 'Bad', dataAttribute: 'data-bad' }];
+            const result = window.BlockActions.registerAction('bad-field', 'Bad', fields);
+            expect(result).toBe(false);
+        });
+
+        test('rejects field with invalid dataAttribute', () => {
+            loadModule();
+            const fields = [{ key: 'ok', type: 'text', label: 'OK', dataAttribute: 'not-data' }];
+            const result = window.BlockActions.registerAction('bad-attr', 'Bad', fields);
+            expect(result).toBe(false);
+        });
+
+        test('rejects field with invalid type', () => {
+            loadModule();
+            const fields = [{ key: 'ok', type: 'invalid', label: 'OK', dataAttribute: 'data-ok' }];
+            const result = window.BlockActions.registerAction('bad-type', 'Bad', fields);
+            expect(result).toBe(false);
+        });
+
+        test('accepts field without explicit type', () => {
+            loadModule();
+            const fields = [{ key: 'ok', label: 'OK', dataAttribute: 'data-ok' }];
+            const result = window.BlockActions.registerAction('no-type', 'No Type', fields);
+            expect(result).toBe(true);
+        });
+    });
+
     describe('module-level error handling', () => {
         test('catches filter registration failure', () => {
             jest.mock('@wordpress/hooks', () => ({
@@ -503,7 +830,7 @@ describe('block-extensions', () => {
             }));
             jest.mock('@wordpress/element', () => ({ Fragment: 'Fragment' }));
             jest.mock('@wordpress/block-editor', () => ({ InspectorAdvancedControls: 'InspectorAdvancedControls' }));
-            jest.mock('@wordpress/components', () => ({ TextControl: 'TextControl', ComboboxControl: 'ComboboxControl' }));
+            jest.mock('@wordpress/components', () => ({ TextControl: 'TextControl', ComboboxControl: 'ComboboxControl', ToggleControl: 'ToggleControl' }));
             jest.mock('@wordpress/i18n', () => ({ __: (text) => text }));
             jest.mock('lodash', () => ({ assign: Object.assign }));
             jest.mock('../src/action-registry', () => []);

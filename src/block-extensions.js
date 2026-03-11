@@ -18,7 +18,7 @@ import { addFilter } from '@wordpress/hooks';
 import { createHigherOrderComponent } from '@wordpress/compose';
 import { Fragment } from '@wordpress/element';
 import { InspectorAdvancedControls } from '@wordpress/block-editor';
-import { TextControl, ComboboxControl } from '@wordpress/components';
+import { TextControl, ComboboxControl, ToggleControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { assign } from 'lodash';
 import actions from './action-registry';
@@ -53,16 +53,21 @@ const editorActionRegistry = [];
  * In the editor, we just store the registration for the dropdown.
  * The actual execution happens on the frontend.
  *
+ * Supports two call signatures for backward compatibility:
+ * - registerEditorAction(id, label, init) — original, no fields
+ * - registerEditorAction(id, label, fields, init) — with field definitions
+ *
  * @since 1.0.0
  *
- * @param {string}   id    Action ID.
- * @param {string}   label Action label.
- * @param {Function} init  Init function (not executed in editor).
+ * @param {string}              id            Action ID.
+ * @param {string}              label         Action label.
+ * @param {Array|Function|null} fieldsOrInit  Field definitions array or init function.
+ * @param {Function|null}       [maybeInit]   Init function when fields are provided.
  * @return {boolean} Success status.
  */
-function registerEditorAction(id, label, init) {
+function registerEditorAction(id, label, fieldsOrInit, maybeInit) {
 	const prefix = '[Block Actions]';
-	
+
 	// Validate parameters
 	if (!id || typeof id !== 'string') {
 		console.error(`${prefix} Action ID must be a non-empty string`);
@@ -74,6 +79,34 @@ function registerEditorAction(id, label, init) {
 		return false;
 	}
 
+	// Resolve fields and init from flexible arguments
+	let fields = [];
+	let init = null;
+
+	if (Array.isArray(fieldsOrInit)) {
+		fields = fieldsOrInit;
+		init = maybeInit || null;
+	} else if (typeof fieldsOrInit === 'function') {
+		init = fieldsOrInit;
+	}
+
+	// Validate fields
+	const validTypes = ['text', 'number', 'toggle'];
+	for (const field of fields) {
+		if (!field.key || typeof field.key !== 'string') {
+			console.error(`${prefix} Field key must be a non-empty string`);
+			return false;
+		}
+		if (!field.dataAttribute || typeof field.dataAttribute !== 'string' || !field.dataAttribute.startsWith('data-')) {
+			console.error(`${prefix} Field dataAttribute must start with "data-"`);
+			return false;
+		}
+		if (field.type && !validTypes.includes(field.type)) {
+			console.error(`${prefix} Field type must be one of: ${validTypes.join(', ')}`);
+			return false;
+		}
+	}
+
 	// Check if action already exists
 	if (editorActionRegistry.some(a => a.id === id)) {
 		if (window?.blockActions?.debug) {
@@ -83,12 +116,12 @@ function registerEditorAction(id, label, init) {
 	}
 
 	// Register the action (just for the dropdown, won't execute in editor)
-	editorActionRegistry.push({ id, label, init });
-	
+	editorActionRegistry.push({ id, label, fields, init });
+
 	if (window?.blockActions?.debug) {
 		console.log(`${prefix} Registered theme action in editor: ${id}`);
 	}
-	
+
 	return true;
 }
 
@@ -100,8 +133,8 @@ function registerEditorAction(id, label, init) {
  * @return {Array} Array of action objects.
  */
 function getEditorRegisteredActions() {
-	const builtInActions = actions.map(({ id, label }) => ({ id, label }));
-	const themeActions = editorActionRegistry.map(({ id, label }) => ({ id, label }));
+	const builtInActions = actions.map(({ id, label, fields }) => ({ id, label, fields: fields || [] }));
+	const themeActions = editorActionRegistry.map(({ id, label, fields }) => ({ id, label, fields: fields || [] }));
 	return [...builtInActions, ...themeActions];
 }
 
@@ -114,6 +147,88 @@ function getEditorRegisteredActions() {
  */
 function getAllActions() {
 	return getEditorRegisteredActions();
+}
+
+/**
+ * Get field definitions for a specific action.
+ *
+ * @since 2.1.0
+ *
+ * @param {string} actionId The action ID.
+ * @return {Array} Array of field definitions, empty if none.
+ */
+function getFieldsForAction(actionId) {
+    if (!actionId) {
+        return [];
+    }
+    const allActions = getAllActions();
+    const action = allActions.find(a => a.id === actionId);
+    return action?.fields || [];
+}
+
+/**
+ * Render inspector controls for action-specific fields.
+ *
+ * Maps field definitions to WordPress editor components based on field type.
+ * Each control updates the actionData object attribute on change.
+ *
+ * @since 2.1.0
+ *
+ * @param {Array}    fields        Field definitions for the selected action.
+ * @param {Object}   actionData    Current field values.
+ * @param {Function} setAttributes Block setAttributes function.
+ * @return {Array} Array of rendered control elements.
+ */
+function renderActionFields(fields, actionData, setAttributes) {
+    return fields.map(field => {
+        const value = actionData[field.key] !== undefined
+            ? actionData[field.key]
+            : field.default;
+
+        const onChange = (newValue) => {
+            setAttributes({
+                actionData: {
+                    ...actionData,
+                    [field.key]: newValue,
+                },
+            });
+        };
+
+        switch (field.type) {
+            case 'number':
+                return (
+                    <TextControl
+                        key={field.key}
+                        label={field.label}
+                        type="number"
+                        value={value !== undefined && value !== null ? String(value) : ''}
+                        onChange={(val) => onChange(val !== '' ? Number(val) : field.default !== undefined ? field.default : 0)}
+                        help={field.help || ''}
+                    />
+                );
+            case 'toggle':
+                return (
+                    <ToggleControl
+                        key={field.key}
+                        label={field.label}
+                        checked={!!value}
+                        onChange={onChange}
+                        help={field.help || ''}
+                    />
+                );
+            case 'text':
+            default:
+                return (
+                    <TextControl
+                        key={field.key}
+                        label={field.label}
+                        value={value || ''}
+                        onChange={onChange}
+                        help={field.help || ''}
+                    />
+                );
+        }
+    });
 }
 
 // Expose registration API globally for theme actions (editor dropdown)
@@ -201,12 +316,16 @@ function addCustomDataAttribute(settings) {
             },
         });
 
-        // Add customAction attribute only to blocks that support actions
+        // Add customAction and actionData attributes only to blocks that support actions
         if (BLOCKS_WITH_ACTIONS[settings.name]) {
             settings.attributes = assign(settings.attributes, {
                 customAction: {
                     type: 'string',
                     default: '',
+                },
+                actionData: {
+                    type: 'object',
+                    default: {},
                 },
             });
             telemetry.customBlocksRegistered++;
@@ -272,8 +391,9 @@ const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
             }
 
             const { attributes, setAttributes } = props;
-            const { customAction } = attributes;
+            const { customAction, actionData = {} } = attributes;
             const blockConfig = BLOCKS_WITH_ACTIONS[props.name];
+            const fields = getFieldsForAction(customAction);
 
             // Create action options from all registered actions (built-in + theme)
             const allActions = getAllActions();
@@ -320,7 +440,7 @@ const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
                             options={actionOptions}
                             onChange={(value) => {
                                 try {
-                                    setAttributes({ customAction: value });
+                                    setAttributes({ customAction: value, actionData: {} });
                                     // Track last action set for telemetry
                                     telemetry.lastActionSet = {
                                         blockType: props.name,
@@ -337,6 +457,7 @@ const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
                             }
                             help={`${blockConfig.help} ${__( 'Choose “None” to remove an action. Actions should be paired with meaningful labels and remain keyboard accessible.', 'block-actions' )}`}
                         />
+                        {fields.length > 0 && renderActionFields(fields, actionData, setAttributes)}
                     </InspectorAdvancedControls>
                 </Fragment>
             );
@@ -360,7 +481,7 @@ const withActionInspectorControl = createHigherOrderComponent((BlockEdit) => {
  */
 function addCustomDataToSave(extraProps, blockType, attributes) {
     try {
-        const { customData, customAction } = attributes;
+        const { customData, customAction, actionData } = attributes;
 
         if (customData) {
             extraProps['data-custom'] = customData;
@@ -369,6 +490,18 @@ function addCustomDataToSave(extraProps, blockType, attributes) {
         // Add action attribute only to blocks that support actions
         if (BLOCKS_WITH_ACTIONS[blockType.name] && customAction) {
             extraProps['data-action'] = customAction;
+
+            // Map actionData fields to data-* attributes
+            if (actionData && typeof actionData === 'object') {
+                const fields = getFieldsForAction(customAction);
+                fields.forEach(field => {
+                    const value = actionData[field.key];
+                    if (value !== undefined && value !== null && value !== '') {
+                        extraProps[field.dataAttribute] = String(value);
+                    }
+                });
+            }
+
             log('info', `Saving block with action: ${customAction}`);
         }
 
