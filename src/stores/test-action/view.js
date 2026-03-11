@@ -4,37 +4,35 @@
  * @since 2.0.0
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
-import { getRateLimiter } from '../utils/rate-limiter';
+import { store } from '@wordpress/interactivity';
+import {
+    createFeedbackInit,
+    createFeedbackAction,
+} from '../utils/create-feedback-store';
+import { validateStyle } from '../utils/sanitize';
+
+const timers = new WeakMap();
 
 store( 'block-actions/test-action', {
     actions: {
-        handleClick( event ) {
-            event.preventDefault();
-            const { ref } = getElement();
-            const limiter = getRateLimiter( ref );
-            if ( ! limiter.canExecute() ) {
-                return;
-            }
-
-            const ctx = getContext();
-            const target = ref.querySelector( 'a' ) || ref;
-
-            target.style.backgroundColor = 'red';
-            target.textContent = 'it worked!';
-
-            setTimeout( () => {
-                target.textContent = ctx.originalText;
+        handleClick: createFeedbackAction( timers, {
+            perform( ctx, ref, target ) {
+                const activeColor = validateStyle(
+                    'backgroundColor',
+                    'red'
+                );
+                if ( activeColor ) {
+                    target.style.backgroundColor = activeColor;
+                }
+            },
+            feedbackText: () => 'it worked!',
+            duration: 2000,
+            onRestore( ctx, target ) {
                 target.removeAttribute( 'style' );
-            }, 2000 );
-        },
+            },
+        } ),
     },
     callbacks: {
-        init() {
-            const ctx = getContext();
-            const { ref } = getElement();
-            const target = ref.querySelector( 'a' ) || ref;
-            ctx.originalText = target.textContent;
-        },
+        init: createFeedbackInit( timers ),
     },
 } );

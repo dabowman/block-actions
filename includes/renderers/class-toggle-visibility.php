@@ -34,6 +34,8 @@ class Toggle_Visibility extends Action_Renderer {
 		return array(
 			'targetId'  => $processor->get_attribute( 'data-target' ) ?? '',
 			'isVisible' => true,
+			'showLabel' => __( 'Show', 'block-actions' ),
+			'hideLabel' => __( 'Hide', 'block-actions' ),
 		);
 	}
 

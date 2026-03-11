@@ -107,4 +107,23 @@ describe( 'Smooth Scroll Store', () => {
         storeDefinition.actions.scrollToTarget( event );
         expect( window.scrollTo ).not.toHaveBeenCalled();
     } );
+
+    it( 'should return a cleanup function from init', () => {
+        const cleanup = storeDefinition.callbacks.init();
+        expect( typeof cleanup ).toBe( 'function' );
+    } );
+
+    it( 'should cancel pending timeout on cleanup', () => {
+        const cleanup = storeDefinition.callbacks.init();
+        const link = mockElement.querySelector( 'a' );
+        const event = { preventDefault: jest.fn() };
+
+        storeDefinition.actions.scrollToTarget( event );
+        expect( link.textContent ).toBe( 'Scrolling...' );
+
+        cleanup();
+        jest.advanceTimersByTime( 1000 );
+
+        expect( link.textContent ).toBe( 'Scrolling...' );
+    } );
 } );

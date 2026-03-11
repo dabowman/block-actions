@@ -32,8 +32,9 @@ class Scroll_To_Top extends Action_Renderer {
 	 */
 	public function get_initial_context( \WP_HTML_Tag_Processor $processor, array $block ): array {
 		return array(
-			'originalText' => '',
-			'isScrolling'  => false,
+			'originalText'  => '',
+			'isScrolling'   => false,
+			'scrollingText' => __( 'Scrolling...', 'block-actions' ),
 		);
 	}
 

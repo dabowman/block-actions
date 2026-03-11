@@ -4,36 +4,25 @@
  * @since 2.0.0
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
-import { getRateLimiter } from '../utils/rate-limiter';
+import { store } from '@wordpress/interactivity';
+import {
+    createFeedbackInit,
+    createFeedbackAction,
+} from '../utils/create-feedback-store';
+
+const timers = new WeakMap();
 
 store( 'block-actions/scroll-to-top', {
     actions: {
-        scrollToTop( event ) {
-            event.preventDefault();
-            const { ref } = getElement();
-            const limiter = getRateLimiter( ref );
-            if ( ! limiter.canExecute() ) {
-                return;
-            }
-
-            const ctx = getContext();
-            const target = ref.querySelector( 'a' ) || ref;
-
-            window.scrollTo( { top: 0, behavior: 'smooth' } );
-
-            target.textContent = 'Scrolling...';
-            setTimeout( () => {
-                target.textContent = ctx.originalText;
-            }, 500 );
-        },
+        scrollToTop: createFeedbackAction( timers, {
+            perform() {
+                window.scrollTo( { top: 0, behavior: 'smooth' } );
+            },
+            feedbackText: ( ctx ) => ctx.scrollingText || 'Scrolling...',
+            duration: 500,
+        } ),
     },
     callbacks: {
-        init() {
-            const ctx = getContext();
-            const { ref } = getElement();
-            const target = ref.querySelector( 'a' ) || ref;
-            ctx.originalText = target.textContent;
-        },
+        init: createFeedbackInit( timers ),
     },
 } );

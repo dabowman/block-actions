@@ -32,10 +32,11 @@ class Smooth_Scroll extends Action_Renderer {
 	 */
 	public function get_initial_context( \WP_HTML_Tag_Processor $processor, array $block ): array {
 		return array(
-			'targetId'     => $processor->get_attribute( 'data-target' ) ?? '',
-			'offset'       => (int) ( $processor->get_attribute( 'data-offset' ) ?? 0 ),
-			'originalText' => '',
-			'isScrolling'  => false,
+			'targetId'      => $processor->get_attribute( 'data-target' ) ?? '',
+			'offset'        => (int) ( $processor->get_attribute( 'data-offset' ) ?? 0 ),
+			'originalText'  => '',
+			'isScrolling'   => false,
+			'scrollingText' => __( 'Scrolling...', 'block-actions' ),
 		);
 	}
 

@@ -143,6 +143,31 @@ describe( 'Carousel Store', () => {
             } );
         } );
 
+        it( 'should return a cleanup function', () => {
+            const cleanup = storeDefinition.callbacks.init();
+            expect( typeof cleanup ).toBe( 'function' );
+        } );
+
+        it( 'should remove touch listeners on cleanup', () => {
+            const container = mockElement.querySelector(
+                '.carousel-container'
+            );
+            const removeSpy = jest.spyOn( container, 'removeEventListener' );
+
+            const cleanup = storeDefinition.callbacks.init();
+            cleanup();
+
+            expect( removeSpy ).toHaveBeenCalledWith(
+                'touchstart',
+                expect.any( Function )
+            );
+            expect( removeSpy ).toHaveBeenCalledWith(
+                'touchend',
+                expect.any( Function )
+            );
+            removeSpy.mockRestore();
+        } );
+
         it( 'should set accessibility attributes on buttons', () => {
             storeDefinition.callbacks.init();
             const prev = mockElement.querySelector(

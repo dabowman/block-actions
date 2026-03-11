@@ -1,11 +1,18 @@
 /**
  * Copy to Clipboard — Interactivity API Store
  *
+ * Uses a generator function for async clipboard access. Shares init and
+ * timer management with the feedback store utilities.
+ *
  * @since 2.0.0
  */
 
 import { store, getContext, getElement } from '@wordpress/interactivity';
 import { getRateLimiter } from '../utils/rate-limiter';
+import { validateStyle } from '../utils/sanitize';
+import { createFeedbackInit, setFeedbackTimer } from '../utils/create-feedback-store';
+
+const timers = new WeakMap();
 
 store( 'block-actions/copy-to-clipboard', {
     actions: {
@@ -26,28 +33,32 @@ store( 'block-actions/copy-to-clipboard', {
 
             try {
                 yield navigator.clipboard.writeText( ctx.copyText );
-                target.textContent = 'Copied! \u2713';
-                target.style.backgroundColor = '#10b981';
                 ctx.status = 'success';
             } catch ( error ) {
-                target.textContent = 'Copy failed';
-                target.style.backgroundColor = '#ef4444';
                 ctx.status = 'error';
             }
 
-            setTimeout( () => {
-                target.textContent = ctx.originalText;
-                target.removeAttribute( 'style' );
-                ctx.status = 'idle';
-            }, 2000 );
+            const isSuccess = ctx.status === 'success';
+            const color = isSuccess ? '#10b981' : '#ef4444';
+            const validColor = validateStyle( 'backgroundColor', color );
+            if ( validColor ) {
+                target.style.backgroundColor = validColor;
+            }
+
+            setFeedbackTimer( ref, timers, target, ctx, {
+                feedbackText: ( c ) =>
+                    isSuccess
+                        ? c.copiedText || 'Copied! \u2713'
+                        : c.copyFailedText || 'Copy failed',
+                duration: 2000,
+                onRestore( c ) {
+                    target.removeAttribute( 'style' );
+                    c.status = 'idle';
+                },
+            } );
         },
     },
     callbacks: {
-        init() {
-            const ctx = getContext();
-            const { ref } = getElement();
-            const target = ref.querySelector( 'a' ) || ref;
-            ctx.originalText = target.textContent;
-        },
+        init: createFeedbackInit( timers ),
     },
 } );

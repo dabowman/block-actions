@@ -66,4 +66,9 @@ describe( 'Copy to Clipboard Store', () => {
         gen.next();
         expect( navigator.clipboard.writeText ).not.toHaveBeenCalled();
     } );
+
+    it( 'should return a cleanup function from init', () => {
+        const cleanup = storeDefinition.callbacks.init();
+        expect( typeof cleanup ).toBe( 'function' );
+    } );
 } );
