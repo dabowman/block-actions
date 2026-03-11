@@ -1,7 +1,7 @@
 # Block Actions
 
-Tested up to: 6.6
-Stable tag: 1.0.0
+Tested up to: 6.8
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -10,14 +10,15 @@ Assign modular actions and data attributes to blocks for lightweight frontend in
 ## Features
 
 - **Custom Actions System**: Add dynamic behaviors to blocks through a modular action system
+- **WordPress Interactivity API**: Declarative, reactive stores with server-side directive injection
 - **Theme Actions Support**: Add custom actions from your theme without rebuilding the plugin
 - **Data Attributes**: Add custom data attributes to any block
 - **Block-Specific Actions**: Configure which blocks can receive actions
 - **Searchable Action Selection**: ComboboxControl interface for easy action discovery and selection
 - **Error Handling & Logging**: Comprehensive error handling and debug logging system
 - **Accessibility**: Built-in accessibility features for all actions
-- **Security**: Implements WordPress security best practices including nonce verification and data sanitization
-- **Extensible API**: Global JavaScript API for registering and managing actions
+- **Security**: XSS protection via DOMPurify, nonce verification, rate limiting, and optional CSP headers
+- **Extensible API**: Global JavaScript API and PHP renderer system for registering and managing actions
 
 ## Installation
 
@@ -49,39 +50,40 @@ Assign modular actions and data attributes to blocks for lightweight frontend in
 **The easiest way** - No plugin rebuild required!
 
 1. Create an `/actions` folder in your active theme
-2. Add a JavaScript file (e.g., `my-action.js`)
-3. Use the global API to register your action:
+2. Add a JavaScript file (e.g., `my-action.js`) as an ES module using `@wordpress/interactivity`
+3. Create a corresponding PHP renderer or rely on the generic `Theme_Action` renderer
 
 ```javascript
-(function() {
-    const { BaseAction } = window.BlockActions;
-    
-    function init(element) {
-        const action = new BaseAction(element);
-        
-        action.target.addEventListener('click', (e) => {
-            e.preventDefault();
-            
-            action.executeWithRateLimit(() => {
-                // Your action code here
-                action.setTextContent('Clicked!');
-                setTimeout(() => action.reset(), 2000);
-            });
-        });
-    }
-    
-    // Register with the plugin
-    window.BlockActions.registerAction(
-        'my-action',        // ID (must match filename)
-        'My Custom Action', // Label for editor
-        init               // Init function
-    );
-})();
+/**
+ * My Custom Action
+ * File: wp-content/themes/your-theme/actions/my-action.js
+ */
+import { store, getContext, getElement } from '@wordpress/interactivity';
+
+store( 'block-actions/my-action', {
+    actions: {
+        handleClick( event ) {
+            event.preventDefault();
+            const ctx = getContext();
+            ctx.clicked = true;
+            // Your action logic here
+        },
+    },
+    callbacks: {
+        init() {
+            const ctx = getContext();
+            const { ref } = getElement();
+            // Initialization logic
+
+            return () => { /* cleanup */ };
+        },
+    },
+} );
 ```
 
 4. The action will automatically appear in the block editor!
 
-**[See full Theme Actions Guide →](docs/THEME-ACTIONS.md)**
+**[See full Theme Actions Guide](docs/THEME-ACTIONS.md)**
 
 ### Creating Built-in Actions (Plugin Developers)
 
@@ -94,18 +96,40 @@ To add actions that ship with the plugin:
    Follow the prompts to create a new action file.
 
 2. **Manual Creation**:
-   Create a new file in `src/actions/` with the following structure:
+   Create a store in `src/stores/your-action/view.js`:
    ```javascript
-   import { BaseAction } from './base-action';
+   import { store, getContext, getElement } from '@wordpress/interactivity';
+   import { getRateLimiter } from '../utils/rate-limiter';
 
-   export default function init(element) {
-       const action = new BaseAction(element);
-       // Your action code here
-   }
+   store( 'block-actions/your-action', {
+       actions: {
+           handleClick( event ) {
+               event.preventDefault();
+               const { ref } = getElement();
+               const limiter = getRateLimiter( ref );
+               if ( ! limiter.canExecute() ) return;
+
+               const ctx = getContext();
+               // Your action logic here
+           },
+       },
+       callbacks: {
+           init() {
+               const ctx = getContext();
+               const { ref } = getElement();
+               // Initialization logic
+
+               // Return a cleanup function if you set up observers,
+               // timers, or event listeners (Interactivity API best practice).
+               return () => { /* cleanup */ };
+           },
+       },
+   } );
    ```
 
-3. **Add to CORE_ACTION_IDS** in `src/actions/index.js`
-4. **Rebuild the plugin**: `npm run build`
+   Then create a PHP renderer in `includes/renderers/class-your-action.php` and add the webpack entry.
+
+3. **Rebuild the plugin**: `npm run build`
 
 ### Available Actions
 
@@ -118,8 +142,8 @@ To add actions that ship with the plugin:
 - `modal-toggle`: Open/close modals and dialogs
 
 **Additional Resources:**
-- Source examples: `example-rate-limited`, `test-action` (in `/src/actions/`)
-- [Create your own theme actions →](docs/THEME-ACTIONS.md)
+- Source examples: `example-rate-limited`, `test-action` (in `/src/stores/`)
+- [Create your own theme actions](docs/THEME-ACTIONS.md)
 
 ## Architecture
 
@@ -131,32 +155,25 @@ To add actions that ship with the plugin:
    - Handles saving of custom attributes to blocks
    - Displays both built-in and theme actions
 
-2. **Frontend Handler (`frontend.js`)**:
-   - Initializes actions on the frontend
-   - Manages action registry (built-in + theme)
-   - Exposes global API for theme actions
-   - Handles error boundaries and logging
+2. **Interactivity API Stores (`src/stores/`)**:
+   - Per-action stores using `@wordpress/interactivity` `store()` API
+   - Reactive derived state (getters), declarative actions, and init callbacks
+   - Shared utilities: `rate-limiter.js`, `sanitize.js`, `api.js`
 
-3. **Base Action (`base-action.js`)**:
-   - Provides common utilities for all actions
-   - Handles security, logging, and error management
-   - Manages state and DOM interactions
-   - Available globally as `window.BlockActions.BaseAction`
+3. **PHP Directive Transformer**:
+   - `render_block` filter using `WP_HTML_Tag_Processor` for safe HTML manipulation
+   - Per-action renderers inject `data-wp-interactive`, `data-wp-context`, and directives
+   - Script modules enqueued automatically via `wp_enqueue_script_module()`
 
 ### Action System
 
-**Built-in Actions** are webpack-bundled JavaScript modules that:
-- Export an initialization function
-- Inherit from BaseAction for common functionality
-- Ship with the plugin
+**Built-in Actions** are per-action Interactivity API stores built as script modules, with PHP renderers for server-side directive injection.
 
-**Theme Actions** are standalone JavaScript files that:
+**Theme Actions** are ES module JavaScript files that:
 - Live in `/wp-content/themes/your-theme/actions/`
-- Register themselves using the global API
-- Inherit from BaseAction via `window.BlockActions.BaseAction`
+- Use `@wordpress/interactivity` `store()` for frontend behavior
+- Register themselves in the editor via `window.BlockActions.registerAction()`
 - Don't require rebuilding the plugin
-
-Both types share the same initialization pattern and capabilities.
 
 ## Development
 
@@ -204,11 +221,22 @@ The plugin exposes `window.BlockActions` with:
 
 | Method/Property | Description |
 |----------------|-------------|
-| `BaseAction` | Base class for creating actions |
-| `registerAction(id, label, init)` | Register a custom action |
-| `getRegisteredActions()` | Get all registered actions |
+| `registerAction(id, label, init)` | Register a custom action (populates editor dropdown) |
 
 See the [Theme Actions Guide](docs/THEME-ACTIONS.md) for complete API documentation.
+
+### Interactivity API Store Utilities
+
+When building stores for the Interactivity API, these shared utilities are available:
+
+| Module | Export | Description |
+|--------|--------|-------------|
+| `utils/rate-limiter` | `getRateLimiter(element)` | WeakMap-based per-element rate limiting (auto GC) |
+| `utils/rate-limiter` | `createRateLimiter(maxPerSecond)` | Create a standalone rate limiter instance |
+| `utils/sanitize` | `sanitizeText(text)` | Strip HTML via DOMPurify |
+| `utils/sanitize` | `validateStyle(property, value)` | Validate CSS values against allowlist |
+| `utils/api` | `apiRequest(endpoint, data)` | Nonce-authenticated WordPress REST API fetch |
+| `utils/api` | `log(type, message, error)` | Centralized logging utility |
 
 ## Security
 
@@ -216,50 +244,26 @@ The plugin implements several security measures:
 - WordPress nonce verification for AJAX requests
 - Data sanitization for all inputs
 - XSS protection through DOMPurify
-- Basic security headers (X-XSS-Protection, X-Content-Type-Options, Referrer-Policy)
-- Rate limiting for action execution
+- Basic security headers (X-Content-Type-Options, Referrer-Policy)
+- Rate limiting for action execution (5 per second per element)
 - Proper error handling and logging
+- `WP_HTML_Tag_Processor` for safe server-side HTML manipulation (v2.0.0)
 
 ### Content Security Policy (optional)
 
-Content Security Policy (CSP) headers are **currently disabled for development** as they can interfere with local development environments. To enable CSP for production:
+CSP headers are **disabled by default**. To enable CSP for production:
 
-Enable CSP via Settings → Block Actions. Adjust the policy using the `block_actions_csp_header` filter to fit your environment.
-
-## Debugging
-
-Enable WordPress debug mode to see detailed logs:
-```php
-define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', true);
-```
-
-Actions will log initialization, warnings, and errors to the browser console when `debug` is enabled. No server-side telemetry is sent by default.
+Enable CSP via Settings > Block Actions. Adjust the policy using the `block_actions_csp_header` filter to fit your environment.
 
 ## Logging System
 
-The Block Actions plugin includes a centralized logging system that provides consistent error handling and telemetry across all components.
+The Block Actions plugin includes a centralized logging system that provides consistent error handling across all components.
 
 ### JavaScript Logging
 
-Each main module includes a standardized `log()` function with the following signature:
-
 ```javascript
-/**
- * Centralized logging utility
- * 
- * @param {string} type - Log type: 'error', 'warning', 'info'
- * @param {string} message - Log message
- * @param {Error|null} [error] - Optional error object for error logs
- */
-function log(type, message, error = null) {
-    // Implementation details
-}
-```
+import { log } from '../utils/api';
 
-#### Usage Examples:
-
-```javascript
 // Info logging (only appears in debug mode)
 log('info', 'Initializing component');
 
@@ -274,67 +278,21 @@ try {
 }
 ```
 
-### Performance Telemetry
-
-The plugin includes lightweight performance tracking that measures:
-
-1. Action initialization time
-2. Action execution time
-3. Error counts
-4. Execution counts
-
-This data is automatically collected and sent to the server for error logs, providing valuable insights without impacting performance.
-
-#### BaseAction Telemetry
-
-For individual actions, the BaseAction class tracks:
-
-```javascript
-this.telemetry = {
-    execCount: 0,        // Total number of executions
-    errorCount: 0,       // Total number of errors
-    lastExecTime: null,  // Timestamp of last execution 
-    lastDuration: 0      // Last execution duration in ms
-};
-```
-
 ### Rate Limiting
 
-The BaseAction class includes a sophisticated yet simple rate limiting system to prevent excessive action executions:
-
-#### Basic Usage
-
-The simplest way to implement rate limiting is to use the `executeWithRateLimit` helper method:
-
 ```javascript
-// In your action code
-this.executeWithRateLimit(() => {
-    // Your rate-limited code here
-    // This will automatically handle rate limiting and cleanup
-});
-```
+import { getRateLimiter } from '../utils/rate-limiter';
 
-#### Manual Implementation
-
-For more control, you can use the rate limiting methods directly:
-
-```javascript
-if (this.canExecute()) {
-    try {
-        // Your rate-limited code here
-    } finally {
-        this.completeExecution(); // Important: always call this to release the execution lock
-    }
+// In a store action:
+const { ref } = getElement();
+const limiter = getRateLimiter( ref );
+if ( ! limiter.canExecute() ) {
+    return;
 }
+// Proceed with action...
 ```
 
-#### Rate Limiting Features
-
-- Prevents concurrent executions of the same action
-- Enforces a minimum time interval between executions (500ms)
-- Automatic safety timeout to prevent deadlocks
-- Performance tracking for execution time
-- Complete telemetry integration
+The rate limiter uses a `WeakMap` keyed by DOM element, so limiter state is automatically garbage collected when elements are removed.
 
 ### Server-side Logging
 
@@ -351,14 +309,28 @@ define('WP_DEBUG_LOG', true);
 
 When debug mode is active, informational logs will appear in the browser console.
 
+## FAQ
+
+**Can I use this with any theme?**
+Yes. Create an `/actions` folder in your theme and drop in your action files.
+
+**Do I need to rebuild the plugin for new actions?**
+No. Theme actions are auto-discovered — no rebuild required.
+
+**What if I need editor preview?**
+Build a custom block. Actions are for frontend-only interactions.
+
+**Does it work with block themes?**
+Yes. Works with classic or block themes.
+
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run tests
+4. Run tests: `npm test`
 5. Submit a pull request
 
 ## License
 
-GPL-2.0-or-later 
+GPL-2.0-or-later

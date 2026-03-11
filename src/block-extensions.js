@@ -21,8 +21,7 @@ import { InspectorAdvancedControls } from '@wordpress/block-editor';
 import { TextControl, ComboboxControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { assign } from 'lodash';
-import actions from './actions';
-import { BaseAction } from './actions/base-action';
+import actions from './action-registry';
 
 /**
  * Simple telemetry tracking for block extensions.
@@ -117,10 +116,9 @@ function getAllActions() {
 	return getEditorRegisteredActions();
 }
 
-// Expose BaseAction and registration API globally for theme actions
+// Expose registration API globally for theme actions (editor dropdown)
 if (typeof window !== 'undefined') {
 	window.BlockActions = window.BlockActions || {};
-	window.BlockActions.BaseAction = BaseAction;
 	window.BlockActions.registerAction = registerEditorAction;
 	window.BlockActions.getRegisteredActions = getEditorRegisteredActions;
 }

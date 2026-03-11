@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Block Actions
  * Description: Extend blocks with custom actions and data attributes.
- * Version: 1.0.0
- * Requires at least: 6.0
+ * Version: 2.0.0
+ * Requires at least: 6.6
  * Requires PHP: 8.0
  * Author: dabowman
  * License: GPL-2.0-or-later
@@ -16,6 +16,17 @@ namespace Block_Actions;
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
+
+// Load Interactivity API infrastructure.
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-action-renderer.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-directive-transformer.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-scroll-to-top.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-carousel.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-toggle-visibility.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-modal-toggle.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-smooth-scroll.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-copy-to-clipboard.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-theme-action.php';
 
 // Translations are auto-loaded by WordPress.org for this plugin slug.
 
@@ -62,7 +73,7 @@ function enqueue_block_editor_assets(): void {
 		true
 	);
 
-	// Enqueue theme actions in editor so they appear in the action selector
+	// Enqueue theme actions in editor so they appear in the action selector.
 	$theme_actions = discover_theme_actions();
 	foreach ( $theme_actions as $action ) {
 		wp_enqueue_script(
@@ -85,7 +96,6 @@ add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_edit
  */
 function get_plugin_settings(): array {
 	$defaults = array(
-		'enable_frontend' => true,
 		'enable_csp' => false,
 	);
 	$options = (array) get_option( 'block_actions_settings', array() );
@@ -102,13 +112,13 @@ function get_plugin_settings(): array {
 function get_action_directories(): array {
 	$directories = array();
 
-	// Add theme's /actions directory if it exists
+	// Add theme's /actions directory if it exists.
 	$theme_dir = get_stylesheet_directory() . '/actions';
 	if ( is_dir( $theme_dir ) ) {
 		$directories[] = $theme_dir;
 	}
 
-	// Allow plugins/themes to add custom action directories
+	// Allow plugins/themes to add custom action directories.
 	$directories = (array) apply_filters( 'block_actions_directories', $directories );
 
 	return $directories;
@@ -130,7 +140,7 @@ function discover_theme_actions(): array {
 			continue;
 		}
 
-		// Get all .js files in the directory (non-recursive)
+		// Get all .js files in the directory (non-recursive).
 		$files = glob( $directory . '/*.js' );
 		if ( ! $files ) {
 			continue;
@@ -139,12 +149,12 @@ function discover_theme_actions(): array {
 		foreach ( $files as $file_path ) {
 			$filename = basename( $file_path, '.js' );
 
-			// Skip files that start with underscore or dot
+			// Skip files that start with underscore or dot.
 			if ( strpos( $filename, '_' ) === 0 || strpos( $filename, '.' ) === 0 ) {
 				continue;
 			}
 
-			// Determine URL based on directory location
+			// Determine URL based on directory location.
 			$file_url = '';
 			$theme_dir = get_stylesheet_directory();
 			$theme_uri = get_stylesheet_directory_uri();
@@ -165,61 +175,6 @@ function discover_theme_actions(): array {
 
 	return $actions;
 }
-
-/**
- * Enqueue theme action files.
- *
- * @since 1.0.0
- *
- * @return void
- */
-function enqueue_theme_actions(): void {
-	$theme_actions = discover_theme_actions();
-
-	foreach ( $theme_actions as $action ) {
-		wp_enqueue_script(
-			'block-action-' . $action['id'],
-			$action['url'],
-			array( 'block-actions-frontend' ), // Depend on main frontend script
-			filemtime( $action['path'] ),
-			true
-		);
-	}
-}
-
-/**
- * Enqueue frontend assets and localize config.
- *
- * @since 1.0.0
- *
- * @return void
- */
-function enqueue_frontend_assets(): void {
-	$settings = get_plugin_settings();
-	if ( empty( $settings['enable_frontend'] ) ) {
-		return;
-	}
-
-	$asset = get_asset_meta( 'build/frontend.asset.php', 'build/frontend.js' );
-
-	wp_enqueue_script(
-		'block-actions-frontend',
-		plugin_dir_url( __FILE__ ) . 'build/frontend.js',
-		$asset['dependencies'],
-		$asset['version'],
-		true
-	);
-
-	wp_localize_script( 'block-actions-frontend', 'blockActions', array(
-		'restUrl' => esc_url_raw( rest_url() ),
-		'nonce' => wp_create_nonce( 'wp_rest' ),
-		'debug' => defined( 'WP_DEBUG' ) && WP_DEBUG,
-	) );
-
-	// Enqueue theme actions after main frontend script
-	enqueue_theme_actions();
-}
-add_action( 'wp_enqueue_scripts', __NAMESPACE__ . '\\enqueue_frontend_assets' );
 
 /**
  * Add security headers (CSP opt-in via setting/filter), and safe defaults.
@@ -278,7 +233,6 @@ add_action( 'admin_menu', __NAMESPACE__ . '\\register_settings' );
  */
 function sanitize_settings( array $input ): array {
 	return array(
-		'enable_frontend' => ! empty( $input['enable_frontend'] ),
 		'enable_csp' => ! empty( $input['enable_csp'] ),
 	);
 }
@@ -298,15 +252,6 @@ function render_settings_page(): void { ?>
 			<?php $settings = get_plugin_settings(); ?>
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><?php echo esc_html( __( 'Enable frontend script', 'block-actions' ) ); ?></th>
-					<td>
-						<label>
-							<input type="checkbox" name="block_actions_settings[enable_frontend]" value="1" <?php checked( $settings['enable_frontend'] ); ?> />
-							<?php echo esc_html( __( 'Load the frontend initializer on the site', 'block-actions' ) ); ?>
-						</label>
-					</td>
-				</tr>
-				<tr>
 					<th scope="row"><?php echo esc_html( __( 'Enable Content Security Policy', 'block-actions' ) ); ?></th>
 					<td>
 						<label>
@@ -320,3 +265,66 @@ function render_settings_page(): void { ?>
 		</form>
 	</div>
 <?php }
+
+/**
+ * Initialize the Interactivity API directive transformer.
+ *
+ * Registers all built-in action renderers and hooks into render_block.
+ *
+ * @since 2.0.0
+ *
+ * @return void
+ */
+function init_interactivity_api(): void {
+	$transformer = new Directive_Transformer();
+
+	// Register built-in action renderers.
+	$transformer->register_renderer( 'scroll-to-top', new Renderers\Scroll_To_Top() );
+	$transformer->register_renderer( 'carousel', new Renderers\Carousel() );
+	$transformer->register_renderer( 'toggle-visibility', new Renderers\Toggle_Visibility() );
+	$transformer->register_renderer( 'modal-toggle', new Renderers\Modal_Toggle() );
+	$transformer->register_renderer( 'smooth-scroll', new Renderers\Smooth_Scroll() );
+	$transformer->register_renderer( 'copy-to-clipboard', new Renderers\Copy_To_Clipboard() );
+
+	// Register generic renderer for theme actions.
+	$theme_actions = discover_theme_actions();
+	$theme_renderer = new Renderers\Theme_Action();
+	foreach ( $theme_actions as $action ) {
+		if ( ! in_array( $action['id'], $transformer->get_registered_ids(), true ) ) {
+			$transformer->register_renderer( $action['id'], $theme_renderer );
+		}
+	}
+
+	// Hook into render_block to inject directives.
+	add_filter(
+		'render_block',
+		function ( string $block_content, array $block ) use ( $transformer ): string {
+			return $transformer->transform( $block_content, $block );
+		},
+		10,
+		2
+	);
+}
+add_action( 'init', __NAMESPACE__ . '\\init_interactivity_api' );
+
+/**
+ * Enqueue theme action script modules for the Interactivity API.
+ *
+ * Theme actions are enqueued as ES script modules with
+ * '@wordpress/interactivity' as a dependency.
+ *
+ * @since 2.0.0
+ *
+ * @return void
+ */
+function enqueue_theme_action_modules(): void {
+	$theme_actions = discover_theme_actions();
+	foreach ( $theme_actions as $action ) {
+		wp_enqueue_script_module(
+			'block-actions-theme-' . $action['id'],
+			$action['url'],
+			array( '@wordpress/interactivity' )
+		);
+	}
+}
+add_action( 'wp_enqueue_scripts', __NAMESPACE__ . '\\enqueue_theme_action_modules' );

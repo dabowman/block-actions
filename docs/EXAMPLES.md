@@ -2,11 +2,13 @@
 
 Ready-to-use examples for creating custom theme actions. Copy any of these to your theme's `/actions` folder to get started.
 
-## 📚 Available Examples
+> All examples use the Interactivity API `store()` pattern. Theme actions must be ES modules using `@wordpress/interactivity`.
+
+## Available Examples
 
 ### 1. **Boilerplate Action** (`boilerplate-action.js`)
-**Perfect for:** Creating your first action  
-**Complexity:** ⭐ Beginner
+**Perfect for:** Creating your first action
+**Complexity:** Beginner
 
 The essential template with detailed comments explaining every part. Start here!
 
@@ -21,8 +23,8 @@ The essential template with detailed comments explaining every part. Start here!
 ---
 
 ### 2. **Alert Message** (`alert-message.js`)
-**Perfect for:** Understanding the basics  
-**Complexity:** ⭐ Beginner
+**Perfect for:** Understanding the basics
+**Complexity:** Beginner
 
 The simplest possible working action - just shows an alert.
 
@@ -39,22 +41,16 @@ The simplest possible working action - just shows an alert.
 ---
 
 ### 3. **Toggle Visibility** (`toggle-visibility.js`)
-**Perfect for:** Show/hide interactions  
-**Complexity:** ⭐⭐ Intermediate
+**Perfect for:** Show/hide interactions
+**Complexity:** Intermediate
 
 Toggles the visibility of a target element.
 
 **What it does:**
 - Shows/hides element by ID
-- Tracks visibility state
+- Tracks visibility state in context
 - Updates button text dynamically
 - Error handling for missing elements
-
-**Learn from this:**
-- State management
-- DOM manipulation
-- Error handling patterns
-- Data attributes for configuration
 
 **Use cases:**
 - Toggle navigation menus
@@ -65,22 +61,16 @@ Toggles the visibility of a target element.
 ---
 
 ### 4. **Copy to Clipboard** (`copy-to-clipboard.js`)
-**Perfect for:** Browser API interaction  
-**Complexity:** ⭐⭐ Intermediate
+**Perfect for:** Browser API interaction
+**Complexity:** Intermediate
 
 Copies text to user's clipboard with visual feedback.
 
 **What it does:**
 - Uses Clipboard API
-- Async/await pattern
+- Generator function for async flow
 - Success/error feedback
 - Temporary button styling
-
-**Learn from this:**
-- Async operations
-- Error handling with try/catch
-- Visual feedback techniques
-- Modern browser APIs
 
 **Use cases:**
 - Copy coupon codes
@@ -91,8 +81,8 @@ Copies text to user's clipboard with visual feedback.
 ---
 
 ### 5. **Smooth Scroll** (`smooth-scroll.js`)
-**Perfect for:** Navigation actions  
-**Complexity:** ⭐⭐ Intermediate
+**Perfect for:** Navigation actions
+**Complexity:** Intermediate
 
 Smoothly scrolls to a target element on the page.
 
@@ -101,12 +91,6 @@ Smoothly scrolls to a target element on the page.
 - Optional offset for fixed headers
 - Loading state feedback
 - Error handling
-
-**Learn from this:**
-- Position calculations
-- Scroll API usage
-- Timing feedback
-- Configuration via data attributes
 
 **Use cases:**
 - Jump to section links
@@ -117,8 +101,8 @@ Smoothly scrolls to a target element on the page.
 ---
 
 ### 6. **Modal Toggle** (`modal-toggle.js`)
-**Perfect for:** Complex interactions  
-**Complexity:** ⭐⭐⭐ Advanced
+**Perfect for:** Complex interactions
+**Complexity:** Advanced
 
 Opens and closes modals with accessibility features.
 
@@ -129,12 +113,6 @@ Opens and closes modals with accessibility features.
 - Body scroll lock
 - Accessibility attributes
 
-**Learn from this:**
-- Complex event management
-- Accessibility patterns
-- Focus handling
-- Multiple interaction methods
-
 **Use cases:**
 - Contact forms
 - Image lightboxes
@@ -143,35 +121,7 @@ Opens and closes modals with accessibility features.
 
 ---
 
-### 7. **Homepage Carousel** (`homepage-carousel.js` / `homepage-carousel-enhanced.js`)
-**Perfect for:** Continuous animations  
-**Complexity:** ⭐⭐⭐⭐ Advanced
-
-Continuously scrolling carousel with cloning for seamless loops.
-
-**What it does:**
-- Infinite scroll animation
-- Opacity effects based on position
-- Automatic cloning for seamless loop
-- Window resize handling
-- requestAnimationFrame for smooth performance
-
-**Learn from this:**
-- Animation loops
-- DOM cloning
-- Performance optimization
-- Position calculations
-- Cleanup patterns
-
-**Use cases:**
-- Hero sections
-- Logo carousels
-- Image galleries
-- Testimonial sliders
-
----
-
-## 📋 Quick Start Guide
+## Quick Start Guide
 
 ### Step 1: Choose an Example
 
@@ -198,8 +148,8 @@ cp /path/to/docs/examples/boilerplate-action.js actions/my-action.js
 ### Step 3: Customize
 
 1. Open the file in your editor
-2. Update the action ID and label at the bottom
-3. Modify the `init()` function with your logic
+2. Update the store namespace to match your action ID (`block-actions/my-action`)
+3. Modify the `actions` and `callbacks` with your logic
 4. Save the file
 
 ### Step 4: Test
@@ -212,148 +162,134 @@ cp /path/to/docs/examples/boilerplate-action.js actions/my-action.js
 
 ---
 
-## 🎯 Common Patterns
+## Common Patterns
 
 ### Reading Data Attributes
 
 ```javascript
-const customValue = element.getAttribute('data-custom-value');
-if (!customValue) {
-    action.log('error', 'Missing data-custom-value attribute');
-    return;
-}
+callbacks: {
+    init() {
+        const ctx = getContext();
+        const { ref } = getElement();
+        ctx.targetId = ref.getAttribute( 'data-target' );
+
+        if ( ! ctx.targetId ) {
+            log( 'error', 'Missing data-target attribute' );
+        }
+    },
+},
 ```
 
 ### Finding Target Elements
 
 ```javascript
-const targetId = element.getAttribute('data-target');
-const targetElement = document.getElementById(targetId);
-
-if (!targetElement) {
-    action.log('error', `Target element #${targetId} not found`);
+const targetElement = document.getElementById( ctx.targetId );
+if ( ! targetElement ) {
+    log( 'error', `Target element #${ ctx.targetId } not found` );
     return;
 }
-```
-
-### Providing User Feedback
-
-```javascript
-// Change button text temporarily
-const originalText = action.originalText;
-action.setTextContent('Success! ✓');
-setTimeout(() => action.setTextContent(originalText), 2000);
-
-// Change button color
-action.setStyle('backgroundColor', '#10b981'); // Green for success
-setTimeout(() => action.reset(), 2000);
 ```
 
 ### State Management
 
 ```javascript
-let isActive = false;
-
-action.target.addEventListener('click', (e) => {
-    e.preventDefault();
-    
-    action.executeWithRateLimit(() => {
-        isActive = !isActive;
-        element.classList.toggle('is-active', isActive);
-        action.log('info', `State changed to: ${isActive}`);
-    });
-});
+// Use context for per-instance state
+actions: {
+    handleClick( event ) {
+        event.preventDefault();
+        const ctx = getContext();
+        ctx.isActive = ! ctx.isActive;
+    },
+},
+state: {
+    get activeClass() {
+        return getContext().isActive ? 'is-active' : '';
+    },
+},
 ```
 
-### Cleanup on Unload
+### Cleanup on Destroy
 
 ```javascript
-function init(element) {
-    const action = new BaseAction(element);
-    
-    // Your setup code...
-    const myInterval = setInterval(() => { /* ... */ }, 1000);
-    
-    // Cleanup
-    window.addEventListener('beforeunload', () => {
-        clearInterval(myInterval);
-        action.log('info', 'Cleaned up resources');
-    });
-}
+callbacks: {
+    init() {
+        const { ref } = getElement();
+        const myInterval = setInterval( () => { /* ... */ }, 1000 );
+        const observer = new IntersectionObserver( /* ... */ );
+        observer.observe( ref );
+
+        return () => {
+            clearInterval( myInterval );
+            observer.disconnect();
+        };
+    },
+},
 ```
 
 ---
 
-## 📖 Full Documentation
+## Full Documentation
 
 For complete API reference and detailed guides, see:
 - [Theme Actions Guide](THEME-ACTIONS.md) - Complete documentation
 - [Main README](../README.md) - Plugin overview
+- [Carousel Action](carousel-action.md) - Detailed carousel documentation
 
 ---
 
-## 🎨 Example Combinations
+## Example Combinations
 
 ### "Read More" Expander
-Combine `toggle-visibility.js` pattern with custom text changes:
+Use reactive state to toggle text:
 ```javascript
-if (isVisible) {
-    action.setTextContent('Read Less ▲');
-} else {
-    action.setTextContent('Read More ▼');
-}
+state: {
+    get buttonText() {
+        return getContext().isVisible ? 'Read Less' : 'Read More';
+    },
+},
 ```
 
 ### Copy with Modal Confirmation
-Combine `copy-to-clipboard.js` with `modal-toggle.js`:
+Combine clipboard and modal patterns:
 ```javascript
-await navigator.clipboard.writeText(text);
-// Then open success modal
-document.getElementById('success-modal').removeAttribute('hidden');
-```
-
-### Scroll with Animation
-Enhance `smooth-scroll.js` with custom animations:
-```javascript
-window.scrollTo({ top: position, behavior: 'smooth' });
-element.classList.add('animating');
-setTimeout(() => element.classList.remove('animating'), 1000);
+actions: {
+    *handleCopyAndConfirm( event ) {
+        event.preventDefault();
+        yield navigator.clipboard.writeText( getContext().text );
+        getContext().showModal = true;
+    },
+},
 ```
 
 ---
 
-## 💡 Pro Tips
+## Pro Tips
 
-1. **Always use rate limiting** - Wrap actions in `executeWithRateLimit()`
-2. **Log everything** - Use `action.log('info', ...)` for debugging
+1. **Return cleanup functions** - Always clean up observers, timers, and listeners in `callbacks.init()`
+2. **Use context for state** - Per-instance state belongs in context, not module variables
 3. **Handle errors** - Check for missing elements and data attributes
-4. **Provide feedback** - Users need to know actions worked
-5. **Clean up** - Remove event listeners and intervals on unload
-6. **Test edge cases** - What if element doesn't exist? What if data is invalid?
-7. **Use data attributes** - Make actions configurable without code changes
+4. **Use generator functions** - For async operations, use `function*` with `yield`
+5. **Use rate limiting** - Import `getRateLimiter` for click handlers
+6. **Use data attributes** - Make actions configurable without code changes
 
 ---
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Action not appearing in editor?
 - Check filename matches action ID
 - Verify file is in `/wp-content/themes/[active-theme]/actions/`
+- Ensure `window.BlockActions.registerAction()` is called
 - Check browser console for errors
 - Try clearing browser cache
 
 ### Action not executing?
 - Check browser console for errors
 - Verify `data-action` attribute is on the block
+- Ensure store namespace matches `block-actions/<action-id>`
 - Enable `WP_DEBUG` to see logs
-- Check if rate limiting is blocking (try increasing delay)
 
 ### Target element not found?
 - Verify the element ID exists in your page HTML
 - Check spelling of `data-target` attribute
 - Use browser DevTools to inspect the DOM
-
----
-
-**Happy coding!** 🚀 If you create something cool, consider contributing it back as an example!
-

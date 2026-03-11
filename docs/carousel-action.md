@@ -73,19 +73,17 @@ Alternatively, the block itself can be the carousel container by adding the `car
 </div>
 ```
 
-### Alternative Class Names
+### Required Class Names
 
-For consistency with existing patterns, these alternative class names are also supported:
-
-| Component | Primary Class | Alternative Classes |
-|-----------|--------------|---------------------|
-| Container | `carousel-container` | `gallery-container` |
-| Slider | `carousel-slider` | `gallery-slider`, `gallery-images-wrapper` |
-| Slides | `carousel-image` | `gallery-image`, `gallery-image-container` |
-| Previous Button | `carousel-button-left` | `gallery-button-left` |
-| Next Button | `carousel-button-right` | `gallery-button-right` |
-| Thumbnails Container | `carousel-thumbnails` | `gallery-thumbnails` |
-| Thumbnail | `carousel-thumbnail` | `gallery-thumbnail`, `wp-block-image` (inside thumbnails container) |
+| Component | Class |
+|-----------|-------|
+| Container | `carousel-container` |
+| Slider | `carousel-slider` |
+| Slides | `carousel-slide` |
+| Previous Button | `carousel-button-left` |
+| Next Button | `carousel-button-right` |
+| Thumbnails Container | `carousel-thumbnails` |
+| Thumbnail | `carousel-thumbnail` |
 
 ## Container Queries
 
@@ -105,10 +103,10 @@ This approach ensures that your carousel works correctly even when nested inside
 <div class="wp-block-group product-carousel" data-action="carousel">
     <div class="carousel-container">
         <div class="carousel-slider">
-            <figure class="carousel-image">
+            <figure class="carousel-slide">
                 <img src="image1.jpg" alt="Product image 1" />
             </figure>
-            <figure class="carousel-image">
+            <figure class="carousel-slide">
                 <img src="image2.jpg" alt="Product image 2" />
             </figure>
         </div>
@@ -117,7 +115,7 @@ This approach ensures that your carousel works correctly even when nested inside
     <div class="carousel-button carousel-button-left">
         <svg><!-- Left arrow icon --></svg>
     </div>
-    
+
     <div class="carousel-button carousel-button-right">
         <svg><!-- Right arrow icon --></svg>
     </div>
@@ -128,24 +126,24 @@ This approach ensures that your carousel works correctly even when nested inside
 
 ```html
 <div class="wp-block-group gallery" data-action="carousel">
-    <div class="gallery-container">
-        <div class="gallery-slider">
-            <div class="gallery-image">
+    <div class="carousel-container">
+        <div class="carousel-slider">
+            <div class="carousel-slide">
                 <img src="image1.jpg" alt="Gallery image 1" />
                 <p class="gallery-caption">Caption 1</p>
             </div>
-            <div class="gallery-image">
+            <div class="carousel-slide">
                 <img src="image2.jpg" alt="Gallery image 2" />
                 <p class="gallery-caption">Caption 2</p>
             </div>
         </div>
     </div>
-    
-    <div class="gallery-thumbnails">
-        <div class="gallery-thumbnail">
+
+    <div class="carousel-thumbnails">
+        <div class="carousel-thumbnail">
             <img src="thumbnail1.jpg" alt="Thumbnail 1" />
         </div>
-        <div class="gallery-thumbnail">
+        <div class="carousel-thumbnail">
             <img src="thumbnail2.jpg" alt="Thumbnail 2" />
         </div>
     </div>
@@ -161,23 +159,23 @@ This approach ensures that your carousel works correctly even when nested inside
         <div class="carousel-button carousel-button-left">
             <a class="wp-block-button__link">←</a>
         </div>
-    
+
         <div class="carousel-slider">
-            <div class="carousel-image">
+            <div class="carousel-slide">
                 <img src="image1.jpg" alt="Magazine image 1" />
                 <p class="caption">Caption text 1</p>
             </div>
-            <div class="carousel-image">
+            <div class="carousel-slide">
                 <img src="image2.jpg" alt="Magazine image 2" />
                 <p class="caption">Caption text 2</p>
             </div>
         </div>
-        
+
         <div class="carousel-button carousel-button-right">
             <a class="wp-block-button__link">→</a>
         </div>
     </div>
-    
+
     <div class="carousel-thumbnails">
         <div class="carousel-thumbnail">
             <img src="thumbnail1.jpg" alt="Thumbnail 1" />
@@ -213,14 +211,14 @@ The carousel action handles the interactive functionality but relies on CSS for 
 }
 
 /* Slides */
-.carousel-image {
+.carousel-slide {
     width: 100cqw !important; /* Container query width unit */
     min-width: 100cqw;
     flex: 0 0 100cqw;
 }
 
 /* Images inside slides */
-.carousel-image img {
+.carousel-slide img {
     width: 100cqw;
     height: auto;
     object-fit: contain;
@@ -300,6 +298,54 @@ The carousel action is compatible with:
 - Mobile browsers (iOS Safari, Android Chrome)
 
 Note: Container queries are supported in all modern browsers, but for older browsers, you may need to provide fallbacks.
+
+## Interactivity API
+
+The carousel action uses a reactive Interactivity API store with server-side directive injection.
+
+### How It Works
+
+The PHP `Carousel` renderer (`includes/renderers/class-carousel.php`) injects Interactivity API directives into the block HTML at render time:
+
+- **Root element**: `data-wp-interactive="block-actions/carousel"`, `data-wp-context`, `data-wp-init`, `data-wp-on--keydown`
+- **Navigation buttons**: `data-wp-on--click="actions.prevSlide"` / `actions.nextSlide`
+- **Slides**: `data-wp-context` (per-slide index), `data-wp-class--active`, `data-wp-bind--aria-hidden`
+- **Thumbnails**: `data-wp-on--click="actions.goToSlide"`, `data-wp-class--active`
+- **Slider**: `data-wp-style--transform="state.sliderTransform"` (reactive CSS transform)
+
+### Reactive State
+
+The carousel store (`src/stores/carousel/view.js`) uses derived state getters:
+
+| Getter | Description |
+|--------|-------------|
+| `state.sliderTransform` | CSS `translateX()` value based on `currentIndex` |
+| `state.isPrevDisabled` | Whether previous button should be disabled |
+| `state.isNextDisabled` | Whether next button should be disabled |
+| `state.isSlideActive` | Whether the current slide matches context `slideIndex` |
+
+### Hybrid Approach
+
+The carousel uses a hybrid of reactive directives and imperative setup:
+- **Reactive**: Slide transforms, active states, disabled buttons (via directives)
+- **Imperative** (in `callbacks.init`): Accessibility attributes, touch event listeners, IntersectionObserver for lazy loading, RAF-based animation
+
+This approach provides the best of both worlds: declarative reactivity where it simplifies code, and imperative control for complex DOM setup that directives can't express.
+
+### Context
+
+The initial context injected by the PHP renderer:
+
+```json
+{
+    "currentIndex": 0,
+    "isAnimating": false,
+    "totalSlides": 0,
+    "wrapAround": true
+}
+```
+
+`totalSlides` is set dynamically by `callbacks.init()` from the DOM.
 
 ## Best Practices
 

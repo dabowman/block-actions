@@ -36,17 +36,11 @@ jest.mock('lodash', () => ({
     assign: Object.assign
 }));
 
-// Mock actions registry
-jest.mock('../src/actions', () => [
-    { id: 'scroll-to-top', label: 'Scroll To Top', init: jest.fn() },
-    { id: 'carousel', label: 'Carousel', init: jest.fn() }
+// Mock action registry
+jest.mock('../src/action-registry', () => [
+    { id: 'scroll-to-top', label: 'Scroll To Top' },
+    { id: 'carousel', label: 'Carousel' }
 ]);
-
-jest.mock('../src/actions/base-action', () => ({
-    BaseAction: class MockBaseAction {
-        constructor(el) { this.element = el; }
-    }
-}));
 
 describe('block-extensions', () => {
     let consoleSpy;
@@ -82,15 +76,10 @@ describe('block-extensions', () => {
         jest.mock('@wordpress/components', () => ({ TextControl: 'TextControl', ComboboxControl: 'ComboboxControl' }));
         jest.mock('@wordpress/i18n', () => ({ __: (text) => text }));
         jest.mock('lodash', () => ({ assign: Object.assign }));
-        jest.mock('../src/actions', () => [
-            { id: 'scroll-to-top', label: 'Scroll To Top', init: jest.fn() },
-            { id: 'carousel', label: 'Carousel', init: jest.fn() }
+        jest.mock('../src/action-registry', () => [
+            { id: 'scroll-to-top', label: 'Scroll To Top' },
+            { id: 'carousel', label: 'Carousel' }
         ]);
-        jest.mock('../src/actions/base-action', () => ({
-            BaseAction: class MockBaseAction {
-                constructor(el) { this.element = el; }
-            }
-        }));
     });
 
     afterEach(() => {
@@ -119,7 +108,6 @@ describe('block-extensions', () => {
         expect(window.BlockActions).toBeDefined();
         expect(window.BlockActions.registerAction).toBeInstanceOf(Function);
         expect(window.BlockActions.getRegisteredActions).toBeInstanceOf(Function);
-        expect(window.BlockActions.BaseAction).toBeDefined();
     });
 
     describe('registerEditorAction', () => {
@@ -518,10 +506,7 @@ describe('block-extensions', () => {
             jest.mock('@wordpress/components', () => ({ TextControl: 'TextControl', ComboboxControl: 'ComboboxControl' }));
             jest.mock('@wordpress/i18n', () => ({ __: (text) => text }));
             jest.mock('lodash', () => ({ assign: Object.assign }));
-            jest.mock('../src/actions', () => []);
-            jest.mock('../src/actions/base-action', () => ({
-                BaseAction: class {}
-            }));
+            jest.mock('../src/action-registry', () => []);
 
             require('../src/block-extensions');
 
