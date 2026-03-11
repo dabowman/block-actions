@@ -11,7 +11,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "zip": "git ls-files -z | xargs -0 -I{} sh -c 'mkdir -p dist && rm -f dist/block-actions.zip && zip -r dist/block-actions.zip block-actions.php build README.md docs || true'"
+    "zip": "mkdir -p dist && rm -f dist/block-actions.zip && zip -r dist/block-actions.zip block-actions.php includes build README.md docs"
   },
   "author": "dabowman",
   "license": "GPL-2.0-or-later",
