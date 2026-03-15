@@ -21,18 +21,18 @@ const limiters = new WeakMap();
  * @return {Object} Rate limiter with canExecute() method.
  */
 export function createRateLimiter( maxPerSecond = 5 ) {
-    return {
-        timestamps: [],
-        canExecute() {
-            const now = Date.now();
-            this.timestamps = this.timestamps.filter( ( t ) => now - t < 1000 );
-            if ( this.timestamps.length >= maxPerSecond ) {
-                return false;
-            }
-            this.timestamps.push( now );
-            return true;
-        },
-    };
+	return {
+		timestamps: [],
+		canExecute() {
+			const now = Date.now();
+			this.timestamps = this.timestamps.filter( ( t ) => now - t < 1000 );
+			if ( this.timestamps.length >= maxPerSecond ) {
+				return false;
+			}
+			this.timestamps.push( now );
+			return true;
+		},
+	};
 }
 
 /**
@@ -42,13 +42,13 @@ export function createRateLimiter( maxPerSecond = 5 ) {
  *
  * @since 2.0.0
  *
- * @param {HTMLElement} element       The DOM element to rate-limit.
+ * @param {HTMLElement} element      The DOM element to rate-limit.
  * @param {number}      maxPerSecond Maximum executions per second.
  * @return {Object} Rate limiter with canExecute() method.
  */
 export function getRateLimiter( element, maxPerSecond = 5 ) {
-    if ( ! limiters.has( element ) ) {
-        limiters.set( element, createRateLimiter( maxPerSecond ) );
-    }
-    return limiters.get( element );
+	if ( ! limiters.has( element ) ) {
+		limiters.set( element, createRateLimiter( maxPerSecond ) );
+	}
+	return limiters.get( element );
 }

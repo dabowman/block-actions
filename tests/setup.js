@@ -4,17 +4,17 @@ import '@testing-library/jest-dom';
 // Mock WordPress globals
 global.wp = {
 	i18n: {
-		__: (text) => text,
-		_x: (text) => text,
-		sprintf: (text) => text
-	}
+		__: ( text ) => text,
+		_x: ( text ) => text,
+		sprintf: ( text ) => text,
+	},
 };
 
 // Mock window.blockActions
 window.blockActions = {
-    nonce: 'test-nonce',
-    debug: true,
-    restUrl: 'http://example.test/wp-json/'
+	nonce: 'test-nonce',
+	debug: true,
+	restUrl: 'http://example.test/wp-json/',
 };
 
 // Setup fetch mock

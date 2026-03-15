@@ -20,123 +20,124 @@ const privateState = new WeakMap();
  * @since 2.0.0
  *
  * @param {Object}      ctx   Store context.
- * @param {HTMLElement}  modal The modal element.
+ * @param {HTMLElement} modal The modal element.
  */
 function closeModal( ctx, modal ) {
-    modal.setAttribute( 'hidden', '' );
-    modal.classList.remove( 'is-open' );
-    document.body.style.overflow = '';
-    ctx.isOpen = false;
+	modal.setAttribute( 'hidden', '' );
+	modal.classList.remove( 'is-open' );
+	document.body.style.overflow = '';
+	ctx.isOpen = false;
 }
 
 store( 'block-actions/modal-toggle', {
-    actions: {
-        toggle( event ) {
-            event.preventDefault();
-            const { ref } = getElement();
-            const limiter = getRateLimiter( ref );
-            if ( ! limiter.canExecute() ) {
-                return;
-            }
+	actions: {
+		toggle( event ) {
+			event.preventDefault();
+			const { ref } = getElement();
+			const limiter = getRateLimiter( ref );
+			if ( ! limiter.canExecute() ) {
+				return;
+			}
 
-            const ctx = getContext();
-            if ( ! ctx.modalId ) {
-                return;
-            }
+			const ctx = getContext();
+			if ( ! ctx.modalId ) {
+				return;
+			}
 
-            const modal = document.getElementById( ctx.modalId );
-            if ( ! modal ) {
-                return;
-            }
+			const modal = document.getElementById( ctx.modalId );
+			if ( ! modal ) {
+				return;
+			}
 
-            if ( ctx.isOpen ) {
-                closeModal( ctx, modal );
-            } else {
-                // Open modal.
-                modal.removeAttribute( 'hidden' );
-                modal.classList.add( 'is-open' );
-                document.body.style.overflow = 'hidden';
-                modal.setAttribute( 'tabindex', '-1' );
-                modal.focus();
-                ctx.isOpen = true;
-            }
-        },
+			if ( ctx.isOpen ) {
+				closeModal( ctx, modal );
+			} else {
+				// Open modal.
+				modal.removeAttribute( 'hidden' );
+				modal.classList.add( 'is-open' );
+				document.body.style.overflow = 'hidden';
+				modal.setAttribute( 'tabindex', '-1' );
+				modal.focus();
+				ctx.isOpen = true;
+			}
+		},
 
-        handleKeydown( event ) {
-            if ( event.key !== 'Escape' ) {
-                return;
-            }
-            const ctx = getContext();
-            if ( ! ctx.isOpen || ! ctx.modalId ) {
-                return;
-            }
+		handleKeydown( event ) {
+			if ( event.key !== 'Escape' ) {
+				return;
+			}
+			const ctx = getContext();
+			if ( ! ctx.isOpen || ! ctx.modalId ) {
+				return;
+			}
 
-            const modal = document.getElementById( ctx.modalId );
-            if ( ! modal ) {
-                return;
-            }
+			const modal = document.getElementById( ctx.modalId );
+			if ( ! modal ) {
+				return;
+			}
 
-            closeModal( ctx, modal );
-        },
-    },
-    callbacks: {
-        init() {
-            const ctx = getContext();
-            const { ref } = getElement();
+			closeModal( ctx, modal );
+		},
+	},
+	callbacks: {
+		init() {
+			const ctx = getContext();
 
-            if ( ! ctx.modalId ) {
-                return;
-            }
+			if ( ! ctx.modalId ) {
+				return;
+			}
 
-            const modal = document.getElementById( ctx.modalId );
-            if ( ! modal ) {
-                return;
-            }
+			const modal = document.getElementById( ctx.modalId );
+			if ( ! modal ) {
+				return;
+			}
 
-            const handleCloseClick = () => {
-                closeModal( ctx, modal );
-            };
+			const { ref } = getElement();
 
-            const handleBackdropClick = ( e ) => {
-                if ( e.target === modal ) {
-                    closeModal( ctx, modal );
-                }
-            };
+			const handleCloseClick = () => {
+				closeModal( ctx, modal );
+			};
 
-            const closeButtons = modal.querySelectorAll(
-                '.modal-close, [data-modal-close]'
-            );
-            closeButtons.forEach( ( button ) => {
-                button.addEventListener( 'click', handleCloseClick );
-            } );
+			const handleBackdropClick = ( e ) => {
+				if ( e.target === modal ) {
+					closeModal( ctx, modal );
+				}
+			};
 
-            modal.addEventListener( 'click', handleBackdropClick );
+			const closeButtons = modal.querySelectorAll(
+				'.modal-close, [data-modal-close]'
+			);
+			closeButtons.forEach( ( button ) => {
+				button.addEventListener( 'click', handleCloseClick );
+			} );
 
-            // Store references for cleanup.
-            privateState.set( ref, {
-                closeButtons,
-                handleCloseClick,
-                handleBackdropClick,
-                modal,
-            } );
+			modal.addEventListener( 'click', handleBackdropClick );
 
-            return () => {
-                const priv = privateState.get( ref );
-                if ( ! priv ) {
-                    return;
-                }
-                priv.closeButtons.forEach( ( button ) => {
-                    button.removeEventListener(
-                        'click',
-                        priv.handleCloseClick
-                    );
-                } );
-                priv.modal.removeEventListener(
-                    'click',
-                    priv.handleBackdropClick
-                );
-                privateState.delete( ref );
-            };
-        },
-    },
+			// Store references for cleanup.
+			privateState.set( ref, {
+				closeButtons,
+				handleCloseClick,
+				handleBackdropClick,
+				modal,
+			} );
+
+			return () => {
+				const priv = privateState.get( ref );
+				if ( ! priv ) {
+					return;
+				}
+				priv.closeButtons.forEach( ( button ) => {
+					button.removeEventListener(
+						'click',
+						priv.handleCloseClick
+					);
+				} );
+				priv.modal.removeEventListener(
+					'click',
+					priv.handleBackdropClick
+				);
+				privateState.delete( ref );
+			};
+		},
+	},
 } );

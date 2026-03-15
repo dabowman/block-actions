@@ -8,13 +8,13 @@
  * @since 2.0.0
  *
  * @typedef {Object} ActionField
- * @property {string}                key           Internal identifier used as key in actionData.
- * @property {'text'|'number'|'toggle'} type        Control type to render in the inspector.
- * @property {string}                label         Human-readable label for the control.
- * @property {string}                [help]        Optional help text.
- * @property {string}                dataAttribute HTML data attribute name (e.g. 'data-target').
- * @property {boolean}               [required]    Whether the field must be filled.
- * @property {string|number|boolean} [default]     Default value.
+ * @property {string}                   key           Internal identifier used as key in actionData.
+ * @property {'text'|'number'|'toggle'} type          Control type to render in the inspector.
+ * @property {string}                   label         Human-readable label for the control.
+ * @property {string}                   [help]        Optional help text.
+ * @property {string}                   dataAttribute HTML data attribute name (e.g. 'data-target').
+ * @property {boolean}                  [required]    Whether the field must be filled.
+ * @property {string|number|boolean}    [default]     Default value.
  *
  * @type {Array<{id: string, label: string, fields: ActionField[]}>}
  */
