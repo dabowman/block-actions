@@ -56,5 +56,35 @@ describe( 'Sanitize Utility', () => {
 				validateStyle( 'backgroundColor', 'url(javascript:alert(1))' )
 			).toBeNull();
 		} );
+
+		it( 'should allow valid rgb colors', () => {
+			expect(
+				validateStyle( 'backgroundColor', 'rgb(255, 128, 0)' )
+			).toBe( 'rgb(255, 128, 0)' );
+		} );
+
+		it( 'should reject out-of-range rgb values', () => {
+			expect(
+				validateStyle( 'backgroundColor', 'rgb(256, 0, 0)' )
+			).toBeNull();
+			expect(
+				validateStyle( 'backgroundColor', 'rgb(999, 999, 999)' )
+			).toBeNull();
+		} );
+
+		it( 'should allow valid rgba colors', () => {
+			expect(
+				validateStyle( 'backgroundColor', 'rgba(255, 128, 0, 0.5)' )
+			).toBe( 'rgba(255, 128, 0, 0.5)' );
+			expect(
+				validateStyle( 'color', 'rgba(0, 0, 0, 1)' )
+			).toBe( 'rgba(0, 0, 0, 1)' );
+		} );
+
+		it( 'should reject rgba with out-of-range alpha', () => {
+			expect(
+				validateStyle( 'backgroundColor', 'rgba(0, 0, 0, 1.5)' )
+			).toBeNull();
+		} );
 	} );
 } );

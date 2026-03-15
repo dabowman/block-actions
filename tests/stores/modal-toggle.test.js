@@ -34,6 +34,12 @@ describe( 'Modal Toggle Store', () => {
 	} );
 
 	afterEach( () => {
+		// Close the modal if still open so the module-level openModalCount
+		// stays in sync across tests.
+		if ( mockContext.isOpen ) {
+			const event = { preventDefault: jest.fn() };
+			storeDefinition.actions.toggle( event );
+		}
 		document.body.removeChild( modalElement );
 		document.body.style.overflow = '';
 	} );
@@ -56,9 +62,10 @@ describe( 'Modal Toggle Store', () => {
 	} );
 
 	it( 'should close modal on toggle when open', () => {
-		mockContext.isOpen = true;
-		modalElement.removeAttribute( 'hidden' );
-		modalElement.classList.add( 'is-open' );
+		// Open first so the counter is tracked properly.
+		const openEvent = { preventDefault: jest.fn() };
+		storeDefinition.actions.toggle( openEvent );
+		expect( mockContext.isOpen ).toBe( true );
 
 		const event = { preventDefault: jest.fn() };
 		storeDefinition.actions.toggle( event );
@@ -69,9 +76,44 @@ describe( 'Modal Toggle Store', () => {
 		expect( document.body.style.overflow ).toBe( '' );
 	} );
 
+	it( 'should keep body overflow hidden when closing one of multiple open modals', () => {
+		// Open the first modal.
+		const event1 = { preventDefault: jest.fn() };
+		storeDefinition.actions.toggle( event1 );
+		expect( document.body.style.overflow ).toBe( 'hidden' );
+
+		// Simulate a second modal opening by creating a second context/modal.
+		const modal2 = document.createElement( 'div' );
+		modal2.id = 'test-modal-2';
+		modal2.setAttribute( 'hidden', '' );
+		modal2.focus = jest.fn();
+		document.body.appendChild( modal2 );
+
+		const ctx2 = { modalId: 'test-modal-2', isOpen: false };
+		interactivityMock.__setContext( ctx2 );
+		const event2 = { preventDefault: jest.fn() };
+		storeDefinition.actions.toggle( event2 );
+		expect( ctx2.isOpen ).toBe( true );
+
+		// Close the second modal — body should stay locked.
+		storeDefinition.actions.toggle( event2 );
+		expect( ctx2.isOpen ).toBe( false );
+		expect( document.body.style.overflow ).toBe( 'hidden' );
+
+		// Close the first modal — body should unlock.
+		interactivityMock.__setContext( mockContext );
+		storeDefinition.actions.toggle( event1 );
+		expect( mockContext.isOpen ).toBe( false );
+		expect( document.body.style.overflow ).toBe( '' );
+
+		document.body.removeChild( modal2 );
+	} );
+
 	it( 'should close on Escape key', () => {
-		mockContext.isOpen = true;
-		modalElement.removeAttribute( 'hidden' );
+		// Open first so counter is tracked.
+		const openEvent = { preventDefault: jest.fn() };
+		storeDefinition.actions.toggle( openEvent );
+		expect( mockContext.isOpen ).toBe( true );
 
 		storeDefinition.actions.handleKeydown( { key: 'Escape' } );
 
@@ -90,6 +132,21 @@ describe( 'Modal Toggle Store', () => {
 
 	describe( 'init callback', () => {
 		it( 'should return a cleanup function', () => {
+			const cleanup = storeDefinition.callbacks.init();
+			expect( typeof cleanup ).toBe( 'function' );
+		} );
+
+		it( 'should return a cleanup function when modalId is missing', () => {
+			interactivityMock.__setContext( { modalId: '', isOpen: false } );
+			const cleanup = storeDefinition.callbacks.init();
+			expect( typeof cleanup ).toBe( 'function' );
+		} );
+
+		it( 'should return a cleanup function when modal element not found', () => {
+			interactivityMock.__setContext( {
+				modalId: 'nonexistent',
+				isOpen: false,
+			} );
 			const cleanup = storeDefinition.callbacks.init();
 			expect( typeof cleanup ).toBe( 'function' );
 		} );

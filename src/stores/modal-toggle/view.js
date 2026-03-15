@@ -15,6 +15,14 @@ import { getRateLimiter } from '../utils/rate-limiter';
 const privateState = new WeakMap();
 
 /**
+ * Track the number of currently open modals to manage body overflow.
+ * Only restore body scroll when all modals are closed.
+ *
+ * @type {number}
+ */
+let openModalCount = 0;
+
+/**
  * Close the given modal and reset context state.
  *
  * @since 2.0.0
@@ -23,9 +31,15 @@ const privateState = new WeakMap();
  * @param {HTMLElement} modal The modal element.
  */
 function closeModal( ctx, modal ) {
+	if ( ! ctx.isOpen ) {
+		return;
+	}
 	modal.setAttribute( 'hidden', '' );
 	modal.classList.remove( 'is-open' );
-	document.body.style.overflow = '';
+	openModalCount = Math.max( 0, openModalCount - 1 );
+	if ( openModalCount === 0 ) {
+		document.body.style.overflow = '';
+	}
 	ctx.isOpen = false;
 }
 
@@ -55,6 +69,7 @@ store( 'block-actions/modal-toggle', {
 				// Open modal.
 				modal.removeAttribute( 'hidden' );
 				modal.classList.add( 'is-open' );
+				openModalCount++;
 				document.body.style.overflow = 'hidden';
 				modal.setAttribute( 'tabindex', '-1' );
 				modal.focus();
@@ -84,12 +99,12 @@ store( 'block-actions/modal-toggle', {
 			const ctx = getContext();
 
 			if ( ! ctx.modalId ) {
-				return;
+				return () => {};
 			}
 
 			const modal = document.getElementById( ctx.modalId );
 			if ( ! modal ) {
-				return;
+				return () => {};
 			}
 
 			const { ref } = getElement();

@@ -271,6 +271,17 @@ if ( typeof window !== 'undefined' ) {
 	window.BlockActions = window.BlockActions || {};
 	window.BlockActions.registerAction = registerEditorAction;
 	window.BlockActions.getRegisteredActions = getEditorRegisteredActions;
+
+	// Auto-register theme actions passed via wp_localize_script from PHP.
+	// This replaces the previous approach of loading theme action ES modules
+	// as classic scripts (which failed due to ES module syntax).
+	if ( Array.isArray( window.blockActionsThemeActions ) ) {
+		window.blockActionsThemeActions.forEach( ( action ) => {
+			if ( action.id && action.label ) {
+				registerEditorAction( action.id, action.label, () => {} );
+			}
+		} );
+	}
 }
 
 /**

@@ -72,4 +72,29 @@ describe( 'Copy to Clipboard Store', () => {
 		const cleanup = storeDefinition.callbacks.init();
 		expect( typeof cleanup ).toBe( 'function' );
 	} );
+
+	it( 'should preserve existing inline styles on restore', () => {
+		storeDefinition.callbacks.init();
+		const link = mockElement.querySelector( 'a' );
+		link.style.padding = '10px';
+		link.style.backgroundColor = 'blue';
+
+		const event = { preventDefault: jest.fn() };
+		const gen = storeDefinition.actions.copy( event );
+
+		// Run through generator: first next starts, yield on clipboard write.
+		const { value: clipboardPromise } = gen.next();
+		// Resolve the clipboard promise.
+		gen.next();
+
+		// Background color should be changed to success color.
+		expect( link.style.backgroundColor ).not.toBe( 'blue' );
+
+		// Run the timer to trigger restore.
+		jest.advanceTimersByTime( 2000 );
+
+		// Background color should be restored to original, padding preserved.
+		expect( link.style.backgroundColor ).toBe( 'blue' );
+		expect( link.style.padding ).toBe( '10px' );
+	} );
 } );

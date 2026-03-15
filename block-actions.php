@@ -73,16 +73,20 @@ function enqueue_block_editor_assets(): void {
 		true
 	);
 
-	// Enqueue theme actions in editor so they appear in the action selector.
+	// Pass discovered theme action IDs to the editor script so they appear
+	// in the action selector. Theme action JS files are ES modules and
+	// cannot be loaded as classic scripts in the editor; instead we pass
+	// their metadata and let block-extensions.js register them.
 	$theme_actions = discover_theme_actions();
+	$editor_actions = array();
 	foreach ( $theme_actions as $action ) {
-		wp_enqueue_script(
-			'block-action-editor-' . $action['id'],
-			$action['url'],
-			array( 'block-actions-editor' ),
-			filemtime( $action['path'] ),
-			true
+		$editor_actions[] = array(
+			'id'    => sanitize_key( $action['id'] ),
+			'label' => ucwords( str_replace( '-', ' ', $action['id'] ) ),
 		);
+	}
+	if ( ! empty( $editor_actions ) ) {
+		wp_localize_script( 'block-actions-editor', 'blockActionsThemeActions', $editor_actions );
 	}
 }
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_editor_assets' );
@@ -127,11 +131,19 @@ function get_action_directories(): array {
 /**
  * Discover action files in registered directories.
  *
+ * Results are cached in a static variable to avoid repeated
+ * filesystem lookups when called multiple times per request.
+ *
  * @since 1.0.0
  *
  * @return array Array of action file information with 'id', 'path', and 'url'.
  */
 function discover_theme_actions(): array {
+	static $cached = null;
+	if ( null !== $cached ) {
+		return $cached;
+	}
+
 	$directories = get_action_directories();
 	$actions = array();
 
@@ -173,6 +185,7 @@ function discover_theme_actions(): array {
 		}
 	}
 
+	$cached = $actions;
 	return $actions;
 }
 
@@ -192,8 +205,10 @@ function add_security_headers(): void {
 	$enable_csp = (bool) apply_filters( 'block_actions_enable_csp', (bool) $settings['enable_csp'] );
 
 	if ( $enable_csp ) {
-		// Example policy; adjust via filter for production as needed.
-		$csp = (string) apply_filters( 'block_actions_csp_header', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' https:; object-src 'none'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests; block-all-mixed-content;" );
+		// Default policy keeps 'unsafe-inline' for style-src (WordPress core
+		// requirement) but omits 'unsafe-eval' which is unnecessary and
+		// dangerous. Customize via the block_actions_csp_header filter.
+		$csp = (string) apply_filters( 'block_actions_csp_header', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' https:; object-src 'none'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests; block-all-mixed-content;" );
 		header( 'Content-Security-Policy: ' . $csp );
 	}
 

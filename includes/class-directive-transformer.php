@@ -71,33 +71,40 @@ class Directive_Transformer {
 			return $block_content;
 		}
 
-		$renderer  = $this->renderers[ $action_id ];
-		$namespace = 'block-actions/' . $action_id;
+		try {
+			$renderer  = $this->renderers[ $action_id ];
+			$namespace = 'block-actions/' . $action_id;
 
-		// Set the interactive namespace.
-		$processor->set_attribute( 'data-wp-interactive', $namespace );
+			// Set the interactive namespace.
+			$processor->set_attribute( 'data-wp-interactive', $namespace );
 
-		// Inject initial context from the renderer.
-		$context = $renderer->get_initial_context( $processor, $block );
-		if ( ! empty( $context ) ) {
-			$processor->set_attribute(
-				'data-wp-context',
-				wp_json_encode( $context, JSON_HEX_TAG | JSON_HEX_AMP )
-			);
+			// Inject initial context from the renderer.
+			$context = $renderer->get_initial_context( $processor, $block );
+			if ( ! empty( $context ) ) {
+				$processor->set_attribute(
+					'data-wp-context',
+					wp_json_encode( $context, JSON_HEX_TAG | JSON_HEX_AMP )
+				);
+			}
+
+			// Apply action-specific directives to the root element.
+			$renderer->apply_directives( $processor, $block );
+
+			// Enqueue the view script module.
+			$renderer->enqueue_view_script( $action_id );
+
+			$html = $processor->get_updated_html();
+
+			// Allow the renderer to post-process for child element directives.
+			$html = $renderer->post_process_html( $html );
+
+			return $html;
+		} catch ( \Throwable $e ) {
+			// Log the error but return original content so the page still renders.
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log( sprintf( '[Block Actions] Renderer error for action "%s": %s', $action_id, $e->getMessage() ) );
+			return $block_content;
 		}
-
-		// Apply action-specific directives to the root element.
-		$renderer->apply_directives( $processor, $block );
-
-		// Enqueue the view script module.
-		$renderer->enqueue_view_script( $action_id );
-
-		$html = $processor->get_updated_html();
-
-		// Allow the renderer to post-process for child element directives.
-		$html = $renderer->post_process_html( $html );
-
-		return $html;
 	}
 
 	/**

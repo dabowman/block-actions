@@ -109,4 +109,33 @@ describe( 'Toggle Visibility Store', () => {
 		const cleanup = storeDefinition.callbacks.init();
 		expect( typeof cleanup ).toBe( 'function' );
 	} );
+
+	it( 'should set aria-controls on init', () => {
+		storeDefinition.callbacks.init();
+		expect( mockElement.getAttribute( 'aria-controls' ) ).toBe(
+			'test-target'
+		);
+	} );
+
+	it( 'should set aria-expanded to true on init when visible', () => {
+		storeDefinition.callbacks.init();
+		expect( mockElement.getAttribute( 'aria-expanded' ) ).toBe( 'true' );
+	} );
+
+	it( 'should set aria-expanded to false on init when hidden', () => {
+		targetElement.classList.add( 'is-hidden' );
+		storeDefinition.callbacks.init();
+		expect( mockElement.getAttribute( 'aria-expanded' ) ).toBe( 'false' );
+	} );
+
+	it( 'should update aria-expanded on toggle', () => {
+		storeDefinition.callbacks.init();
+		const event = { preventDefault: jest.fn() };
+
+		storeDefinition.actions.toggle( event );
+		expect( mockElement.getAttribute( 'aria-expanded' ) ).toBe( 'false' );
+
+		storeDefinition.actions.toggle( event );
+		expect( mockElement.getAttribute( 'aria-expanded' ) ).toBe( 'true' );
+	} );
 } );

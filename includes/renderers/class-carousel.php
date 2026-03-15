@@ -62,48 +62,35 @@ class Carousel extends Action_Renderer {
 	 * @return string Modified HTML with child directives.
 	 */
 	public function post_process_html( string $html ): string {
-		// Add directives to prev button.
-		$p = new \WP_HTML_Tag_Processor( $html );
-		while ( $p->next_tag( array( 'class_name' => 'carousel-button-left' ) ) ) {
-			$p->set_attribute( 'data-wp-on--click', 'actions.prevSlide' );
-		}
-
-		// Add directives to next button.
-		$p = new \WP_HTML_Tag_Processor( $p->get_updated_html() );
-		while ( $p->next_tag( array( 'class_name' => 'carousel-button-right' ) ) ) {
-			$p->set_attribute( 'data-wp-on--click', 'actions.nextSlide' );
-		}
-
-		// Add per-slide context and directives.
-		$p          = new \WP_HTML_Tag_Processor( $p->get_updated_html() );
+		$p           = new \WP_HTML_Tag_Processor( $html );
 		$slide_index = 0;
-		while ( $p->next_tag( array( 'class_name' => 'carousel-slide' ) ) ) {
-			$p->set_attribute(
-				'data-wp-context',
-				wp_json_encode( array( 'slideIndex' => $slide_index ), JSON_HEX_TAG | JSON_HEX_AMP )
-			);
-			$p->set_attribute( 'data-wp-class--active', 'state.isSlideActive' );
-			$p->set_attribute( 'data-wp-bind--aria-hidden', 'state.isSlideAriaHidden' );
-			$slide_index++;
-		}
-
-		// Add directives to thumbnails.
-		$p           = new \WP_HTML_Tag_Processor( $p->get_updated_html() );
 		$thumb_index = 0;
-		while ( $p->next_tag( array( 'class_name' => 'carousel-thumbnail' ) ) ) {
-			$p->set_attribute(
-				'data-wp-context',
-				wp_json_encode( array( 'slideIndex' => $thumb_index ), JSON_HEX_TAG | JSON_HEX_AMP )
-			);
-			$p->set_attribute( 'data-wp-on--click', 'actions.goToSlide' );
-			$p->set_attribute( 'data-wp-class--active', 'state.isSlideActive' );
-			$thumb_index++;
-		}
 
-		// Add directives to slider for transform.
-		$p = new \WP_HTML_Tag_Processor( $p->get_updated_html() );
-		while ( $p->next_tag( array( 'class_name' => 'carousel-slider' ) ) ) {
-			$p->set_attribute( 'data-wp-style--transform', 'state.sliderTransform' );
+		// Single pass: match each tag by class and apply appropriate directives.
+		while ( $p->next_tag() ) {
+			if ( $p->has_class( 'carousel-button-left' ) ) {
+				$p->set_attribute( 'data-wp-on--click', 'actions.prevSlide' );
+			} elseif ( $p->has_class( 'carousel-button-right' ) ) {
+				$p->set_attribute( 'data-wp-on--click', 'actions.nextSlide' );
+			} elseif ( $p->has_class( 'carousel-slide' ) ) {
+				$p->set_attribute(
+					'data-wp-context',
+					wp_json_encode( array( 'slideIndex' => $slide_index ), JSON_HEX_TAG | JSON_HEX_AMP )
+				);
+				$p->set_attribute( 'data-wp-class--active', 'state.isSlideActive' );
+				$p->set_attribute( 'data-wp-bind--aria-hidden', 'state.isSlideAriaHidden' );
+				$slide_index++;
+			} elseif ( $p->has_class( 'carousel-thumbnail' ) ) {
+				$p->set_attribute(
+					'data-wp-context',
+					wp_json_encode( array( 'slideIndex' => $thumb_index ), JSON_HEX_TAG | JSON_HEX_AMP )
+				);
+				$p->set_attribute( 'data-wp-on--click', 'actions.goToSlide' );
+				$p->set_attribute( 'data-wp-class--active', 'state.isSlideActive' );
+				$thumb_index++;
+			} elseif ( $p->has_class( 'carousel-slider' ) ) {
+				$p->set_attribute( 'data-wp-style--transform', 'state.sliderTransform' );
+			}
 		}
 
 		return $p->get_updated_html();

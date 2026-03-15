@@ -33,6 +33,7 @@ store( 'block-actions/copy-to-clipboard', {
 			}
 
 			const target = ref.querySelector( 'a' ) || ref;
+			const originalBg = target.style.backgroundColor;
 
 			try {
 				yield navigator.clipboard.writeText( ctx.copyText );
@@ -55,7 +56,7 @@ store( 'block-actions/copy-to-clipboard', {
 						: c.copyFailedText || 'Copy failed',
 				duration: 2000,
 				onRestore( c ) {
-					target.removeAttribute( 'style' );
+					target.style.backgroundColor = originalBg;
 					c.status = 'idle';
 				},
 			} );

@@ -30,15 +30,25 @@ store( 'block-actions/toggle-visibility', {
 			link.textContent = ctx.isVisible
 				? ctx.hideLabel || 'Hide'
 				: ctx.showLabel || 'Show';
+
+			// Update ARIA state for accessibility.
+			ref.setAttribute( 'aria-expanded', String( ctx.isVisible ) );
 		},
 	},
 	callbacks: {
 		init() {
 			const ctx = getContext();
+			const { ref } = getElement();
 			const target = document.getElementById( ctx.targetId );
 			if ( target ) {
 				ctx.isVisible = ! target.classList.contains( 'is-hidden' );
 			}
+
+			// Set initial ARIA attributes.
+			if ( ctx.targetId ) {
+				ref.setAttribute( 'aria-controls', ctx.targetId );
+			}
+			ref.setAttribute( 'aria-expanded', String( ctx.isVisible ) );
 
 			return () => {};
 		},

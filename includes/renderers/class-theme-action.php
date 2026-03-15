@@ -40,7 +40,17 @@ class Theme_Action extends Action_Renderer {
 		$attrs   = $block['attrs'] ?? array();
 
 		if ( ! empty( $attrs['customData'] ) ) {
-			$context['customData'] = sanitize_text_field( $attrs['customData'] );
+			// Use wp_kses_post instead of sanitize_text_field to preserve
+			// structured data (e.g. JSON strings) that themes may pass.
+			$context['customData'] = wp_kses_post( $attrs['customData'] );
+		}
+
+		// Forward actionData fields as context so theme actions
+		// can access data-* attribute values set in the editor.
+		if ( ! empty( $attrs['actionData'] ) && is_array( $attrs['actionData'] ) ) {
+			foreach ( $attrs['actionData'] as $key => $value ) {
+				$context[ sanitize_key( $key ) ] = is_string( $value ) ? wp_kses_post( $value ) : $value;
+			}
 		}
 
 		return $context;
