@@ -1,139 +1,123 @@
 /**
- * Modal Toggle Action Example
+ * Modal Toggle Action
  *
- * Opens and closes a modal/dialog when clicked.
- * Use data-modal attribute to specify the modal element ID.
+ * Opens and closes a modal/dialog when clicked. Includes accessibility
+ * features: ESC key close, backdrop click, focus management, and body
+ * scroll lock.
  *
  * Usage:
- * 1. Copy this file to: wp-content/themes/your-theme/actions/modal-toggle.js
- * 2. Add data-modal="my-modal-id" to your button block
- * 3. Select "Modal Toggle" action in the block editor
- * 4. Create a modal element with matching ID
+ * 1. Copy to: wp-content/themes/your-theme/actions/modal-toggle.js
+ * 2. Add to a Button block in the editor
+ * 3. Add data-modal="my-modal-id" attribute to the button
+ * 4. Create a modal element with matching ID:
  *
- * Example block HTML:
- * <div class="wp-block-button" data-action="modal-toggle" data-modal="contact-modal">
- *   <a class="wp-block-button__link">Open Contact Form</a>
- * </div>
- *
- * Example modal HTML:
- * <div id="contact-modal" class="modal" hidden>
- *   <div class="modal-content">
- *     <!-- Your content -->
- *     <button class="modal-close">×</button>
- *   </div>
- * </div>
+ *    <div id="my-modal-id" class="modal" hidden>
+ *      <div class="modal-content">
+ *        <!-- Your content -->
+ *        <button class="modal-close">&times;</button>
+ *      </div>
+ *    </div>
  */
 
-( function () {
-	'use strict';
+import { store, getContext, getElement } from '@wordpress/interactivity';
 
-	const { BaseAction } = window.BlockActions;
-
-	/**
-	 * Initialize the modal toggle action.
-	 *
-	 * @param {HTMLElement} element The block element.
-	 */
-	function init( element ) {
-		const action = new BaseAction( element );
-
-		action.target.addEventListener( 'click', ( e ) => {
-			e.preventDefault();
-
-			action.executeWithRateLimit( () => {
-				const modalId = element.getAttribute( 'data-modal' );
-
-				if ( ! modalId ) {
-					action.log( 'error', 'No data-modal attribute specified' );
-					return;
-				}
-
-				const modal = document.getElementById( modalId );
-
-				if ( ! modal ) {
-					action.log( 'error', `Modal #${ modalId } not found` );
-					return;
-				}
-
-				// Toggle modal visibility
-				const isHidden = modal.hasAttribute( 'hidden' );
-
-				if ( isHidden ) {
-					// Show modal
-					modal.removeAttribute( 'hidden' );
-					modal.classList.add( 'is-open' );
-					document.body.style.overflow = 'hidden'; // Prevent background scroll
-
-					// Set focus to modal for accessibility
-					modal.setAttribute( 'tabindex', '-1' );
-					modal.focus();
-
-					action.log( 'info', `Opened modal #${ modalId }` );
-
-					// Setup close handlers
-					setupCloseHandlers( modal, action );
-				} else {
-					// Close modal
-					closeModal( modal, action );
-				}
-			} );
-		} );
+/**
+ * Close a modal and reset state.
+ */
+function closeModal( ctx, modal ) {
+	if ( ! ctx.isOpen ) {
+		return;
 	}
+	modal.setAttribute( 'hidden', '' );
+	modal.classList.remove( 'is-open' );
+	document.body.style.overflow = '';
+	ctx.isOpen = false;
+}
 
-	/**
-	 * Setup event handlers to close the modal.
-	 *
-	 * @param {HTMLElement} modal  The modal element.
-	 * @param {Object}      action The action instance.
-	 */
-	function setupCloseHandlers( modal, action ) {
-		// Close on close button click
-		const closeButtons = modal.querySelectorAll(
-			'.modal-close, [data-modal-close]'
-		);
-		closeButtons.forEach( ( button ) => {
-			button.addEventListener(
-				'click',
-				() => closeModal( modal, action ),
-				{ once: true }
-			);
-		} );
+store( 'block-actions/modal-toggle', {
+	actions: {
+		handleClick( event ) {
+			event.preventDefault();
+			const ctx = getContext();
 
-		// Close on backdrop click
-		modal.addEventListener(
-			'click',
-			( e ) => {
-				if ( e.target === modal ) {
-					closeModal( modal, action );
-				}
-			},
-			{ once: true }
-		);
-
-		// Close on Escape key
-		const escapeHandler = ( e ) => {
-			if ( e.key === 'Escape' ) {
-				closeModal( modal, action );
-				document.removeEventListener( 'keydown', escapeHandler );
+			if ( ! ctx.modalId ) {
+				return;
 			}
-		};
-		document.addEventListener( 'keydown', escapeHandler );
-	}
 
-	/**
-	 * Close a modal.
-	 *
-	 * @param {HTMLElement} modal  The modal element.
-	 * @param {Object}      action The action instance.
-	 */
-	function closeModal( modal, action ) {
-		modal.setAttribute( 'hidden', '' );
-		modal.classList.remove( 'is-open' );
-		document.body.style.overflow = ''; // Restore scrolling
+			const modal = document.getElementById( ctx.modalId );
+			if ( ! modal ) {
+				return;
+			}
 
-		action.log( 'info', `Closed modal #${ modal.id }` );
-	}
+			if ( ctx.isOpen ) {
+				closeModal( ctx, modal );
+			} else {
+				// Open modal
+				modal.removeAttribute( 'hidden' );
+				modal.classList.add( 'is-open' );
+				document.body.style.overflow = 'hidden';
+				modal.setAttribute( 'tabindex', '-1' );
+				modal.focus();
+				ctx.isOpen = true;
+			}
+		},
 
-	// Register the action
-	window.BlockActions.registerAction( 'modal-toggle', 'Modal Toggle', init );
-} )();
+		handleKeydown( event ) {
+			if ( event.key !== 'Escape' ) {
+				return;
+			}
+			const ctx = getContext();
+			if ( ! ctx.isOpen || ! ctx.modalId ) {
+				return;
+			}
+
+			const modal = document.getElementById( ctx.modalId );
+			if ( modal ) {
+				closeModal( ctx, modal );
+			}
+		},
+	},
+	callbacks: {
+		init() {
+			const ctx = getContext();
+			const { ref } = getElement();
+
+			// Read modal ID from data attribute
+			ctx.modalId = ref.getAttribute( 'data-modal' ) || '';
+			ctx.isOpen = false;
+
+			if ( ! ctx.modalId ) {
+				return () => {};
+			}
+
+			const modal = document.getElementById( ctx.modalId );
+			if ( ! modal ) {
+				return () => {};
+			}
+
+			// Setup close button listeners
+			const handleCloseClick = () => closeModal( ctx, modal );
+			const handleBackdropClick = ( e ) => {
+				if ( e.target === modal ) {
+					closeModal( ctx, modal );
+				}
+			};
+
+			const closeButtons = modal.querySelectorAll(
+				'.modal-close, [data-modal-close]'
+			);
+			closeButtons.forEach( ( button ) => {
+				button.addEventListener( 'click', handleCloseClick );
+			} );
+			modal.addEventListener( 'click', handleBackdropClick );
+
+			// Cleanup on removal
+			return () => {
+				closeButtons.forEach( ( button ) => {
+					button.removeEventListener( 'click', handleCloseClick );
+				} );
+				modal.removeEventListener( 'click', handleBackdropClick );
+			};
+		},
+	},
+} );

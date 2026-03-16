@@ -1,94 +1,65 @@
 /**
- * Smooth Scroll Action Example
+ * Smooth Scroll Action
  *
  * Smoothly scrolls to a target element when clicked.
- * Use data-target attribute to specify the target element ID.
+ * Supports an optional pixel offset for fixed headers.
  *
  * Usage:
- * 1. Copy this file to: wp-content/themes/your-theme/actions/smooth-scroll.js
- * 2. Add data-target="element-id" to your button block
- * 3. Select "Smooth Scroll" action in the block editor
- *
- * Example block HTML:
- * <div class="wp-block-button" data-action="smooth-scroll" data-target="contact-section">
- *   <a class="wp-block-button__link">Scroll to Contact</a>
- * </div>
+ * 1. Copy to: wp-content/themes/your-theme/actions/smooth-scroll.js
+ * 2. Add to a Button block in the editor
+ * 3. Add data-target="element-id" attribute to specify the scroll target
+ * 4. Optionally add data-offset="80" for fixed header offset (in pixels)
  */
 
-( function () {
-	'use strict';
+import { store, getContext, getElement } from '@wordpress/interactivity';
 
-	// Get BaseAction class from global API
-	const { BaseAction } = window.BlockActions;
+store( 'block-actions/smooth-scroll', {
+	actions: {
+		handleClick( event ) {
+			event.preventDefault();
+			const ctx = getContext();
+			const { ref } = getElement();
 
-	/**
-	 * Initialize the smooth scroll action.
-	 *
-	 * @param {HTMLElement} element The block element.
-	 */
-	function init( element ) {
-		const action = new BaseAction( element );
+			if ( ! ctx.targetId ) {
+				return;
+			}
 
-		action.target.addEventListener( 'click', ( e ) => {
-			e.preventDefault();
+			const target = document.getElementById( ctx.targetId );
+			if ( ! target ) {
+				return;
+			}
 
-			action.executeWithRateLimit( () => {
-				// Get target element ID from data attribute
-				const targetId = element.getAttribute( 'data-target' );
+			// Calculate scroll position with offset
+			const top =
+				target.getBoundingClientRect().top +
+				window.pageYOffset -
+				ctx.offset;
 
-				if ( ! targetId ) {
-					action.log( 'error', 'No data-target attribute specified' );
-					action.setTextContent( 'Error: No target' );
-					setTimeout( () => action.reset(), 2000 );
-					return;
-				}
+			window.scrollTo( { top, behavior: 'smooth' } );
 
-				// Find the target element
-				const targetElement = document.getElementById( targetId );
+			// Show temporary feedback
+			const link = ref.querySelector( 'a' ) || ref;
+			const originalText = link.textContent;
+			link.textContent = 'Scrolling...';
 
-				if ( ! targetElement ) {
-					action.log(
-						'error',
-						`Target element #${ targetId } not found`
-					);
-					action.setTextContent( 'Error: Target not found' );
-					setTimeout( () => action.reset(), 2000 );
-					return;
-				}
+			setTimeout( () => {
+				link.textContent = originalText;
+			}, 1000 );
+		},
+	},
+	callbacks: {
+		init() {
+			const ctx = getContext();
+			const { ref } = getElement();
 
-				// Calculate position with optional offset
-				const offset = parseInt(
-					element.getAttribute( 'data-offset' ) || '0',
-					10
-				);
-				const targetPosition =
-					targetElement.getBoundingClientRect().top +
-					window.pageYOffset -
-					offset;
+			// Read configuration from data attributes
+			ctx.targetId = ref.getAttribute( 'data-target' ) || '';
+			ctx.offset = parseInt(
+				ref.getAttribute( 'data-offset' ) || '0',
+				10
+			);
 
-				// Smooth scroll to target
-				window.scrollTo( {
-					top: targetPosition,
-					behavior: 'smooth',
-				} );
-
-				// Optional: Update button text temporarily
-				const originalText = action.originalText;
-				action.setTextContent( 'Scrolling...' );
-
-				// Reset after scroll (approximate time)
-				setTimeout( () => {
-					action.setTextContent( originalText );
-					action.log( 'info', `Scrolled to #${ targetId }` );
-				}, 1000 );
-			} );
-		} );
-	}
-
-	// Register the action with Block Actions
-	window.BlockActions.registerAction(
-		'smooth-scroll', // Action ID (must match filename)
-		'Smooth Scroll', // Label shown in block editor
-		init // Initialization function
-	);
-} )();
+			return () => {};
+		},
+	},
+} );

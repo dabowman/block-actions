@@ -1,8 +1,8 @@
 /**
  * Toggle Visibility Action
  *
- * A simple action that toggles the visibility of a target element.
- * Perfect example for learning the basics of theme actions.
+ * Toggles the visibility of a target element by ID.
+ * Demonstrates context state, DOM manipulation, and ARIA attributes.
  *
  * Usage:
  * 1. Copy to: wp-content/themes/your-theme/actions/toggle-visibility.js
@@ -10,67 +10,59 @@
  * 3. Add data-target="my-element-id" attribute to the button
  * 4. Create an element with id="my-element-id" on your page
  * 5. Clicking the button will show/hide the target element
- *
  */
 
-( function () {
-	'use strict';
+import { store, getContext, getElement } from '@wordpress/interactivity';
 
-	const { BaseAction } = window.BlockActions;
+store( 'block-actions/toggle-visibility', {
+	actions: {
+		handleClick( event ) {
+			event.preventDefault();
+			const ctx = getContext();
+			const { ref } = getElement();
 
-	function init( element ) {
-		const action = new BaseAction( element );
+			if ( ! ctx.targetId ) {
+				return;
+			}
 
-		// Get target element ID from data attribute
-		const targetId = element.getAttribute( 'data-target' );
+			const target = document.getElementById( ctx.targetId );
+			if ( ! target ) {
+				return;
+			}
 
-		if ( ! targetId ) {
-			action.log(
-				'error',
-				'Toggle Visibility: No data-target attribute specified'
-			);
-			return;
-		}
+			// Toggle visibility state
+			ctx.isVisible = ! ctx.isVisible;
+			target.classList.toggle( 'is-hidden', ! ctx.isVisible );
 
-		const targetElement = document.getElementById( targetId );
+			// Update button text
+			const link = ref.querySelector( 'a' ) || ref;
+			link.textContent = ctx.isVisible ? 'Hide' : 'Show';
 
-		if ( ! targetElement ) {
-			action.log(
-				'error',
-				`Toggle Visibility: Target element #${ targetId } not found`
-			);
-			return;
-		}
+			// Update ARIA state
+			ref.setAttribute( 'aria-expanded', String( ctx.isVisible ) );
+		},
+	},
+	callbacks: {
+		init() {
+			const ctx = getContext();
+			const { ref } = getElement();
 
-		// Track visibility state
-		let isVisible = targetElement.style.display !== 'none';
+			// Read target ID from data attribute
+			ctx.targetId = ref.getAttribute( 'data-target' ) || '';
+			ctx.isVisible = true;
 
-		// Handle clicks
-		action.target.addEventListener( 'click', ( e ) => {
-			e.preventDefault();
+			const target = document.getElementById( ctx.targetId );
+			if ( target ) {
+				ctx.isVisible = ! target.classList.contains( 'is-hidden' );
+			}
 
-			action.executeWithRateLimit( () => {
-				// Toggle visibility
-				isVisible = ! isVisible;
+			// Set initial ARIA attributes
+			if ( ctx.targetId ) {
+				ref.setAttribute( 'aria-controls', ctx.targetId );
+			}
+			ref.setAttribute( 'aria-expanded', String( ctx.isVisible ) );
 
-				if ( isVisible ) {
-					targetElement.style.display = '';
-					action.setTextContent( 'Hide' );
-					action.log( 'info', `Showing #${ targetId }` );
-				} else {
-					targetElement.style.display = 'none';
-					action.setTextContent( 'Show' );
-					action.log( 'info', `Hiding #${ targetId }` );
-				}
-			} );
-		} );
-
-		action.log( 'info', 'Toggle Visibility action initialized' );
-	}
-
-	window.BlockActions.registerAction(
-		'toggle-visibility',
-		'Toggle Visibility',
-		init
-	);
-} )();
+			return () => {};
+		},
+	},
+} );

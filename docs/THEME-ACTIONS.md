@@ -61,68 +61,83 @@ store( 'block-actions/smooth-toggle', {
 } );
 ```
 
-### 3. Register for the Editor
-
-To make the action appear in the block editor's action dropdown, add a script that calls `registerAction()`:
-
-```javascript
-// This runs in the editor context (enqueued separately or inline)
-window.BlockActions.registerAction(
-    'smooth-toggle',           // ID (must match filename)
-    'Smooth Toggle',           // Label (appears in editor)
-    () => {}                   // Placeholder (not used on frontend)
-);
-```
-
-### 4. That's It!
+### 3. That's It!
 
 The plugin will automatically:
-- Discover your action file
-- Enqueue it on the frontend as a script module
-- Make it available in the block editor's action selector (via `registerAction()`)
+- Discover your action file in the theme's `/actions` directory
+- Register it in the block editor's action dropdown (label is derived from the filename)
+- Enqueue it on the frontend as an ES script module
 - Process directives via the `Theme_Action` PHP renderer
 
-No rebuild needed!
+No rebuild needed! No editor registration code required.
+
+> **Custom labels or fields:** If you need a custom label (instead of the auto-generated one from the filename) or want to add inspector fields for your action, you can optionally call `window.BlockActions.registerAction()` from a separate editor script. See the [API Reference](#global-api) below.
 
 ---
 
 ## API Reference
 
-### Global API
+### Editor Auto-Registration
 
-The plugin exposes a global `window.BlockActions` object:
+Theme actions are **automatically registered** in the editor dropdown when the plugin discovers `.js` files in your theme's `/actions` directory. The label is derived from the filename (e.g., `smooth-toggle.js` → "Smooth Toggle").
 
-#### `BlockActions.registerAction(id, label, init)`
+No manual registration is needed for basic use cases.
 
-Register a custom action for the editor dropdown.
+### Global API (Optional)
+
+The plugin exposes a global `window.BlockActions` object for advanced use cases such as custom labels or adding inspector fields.
+
+#### `BlockActions.registerAction(id, label, fieldsOrInit, [init])`
+
+Manually register a custom action for the editor dropdown. Supports two call signatures:
 
 ```javascript
+// Simple: just ID, label, and placeholder init
 window.BlockActions.registerAction(
-    'my-action',        // Unique ID
+    'my-action',        // Unique ID (must match filename)
     'My Custom Action', // Label for editor
     () => {}            // Placeholder init function
+);
+
+// With fields: adds inspector controls for configuring data attributes
+window.BlockActions.registerAction(
+    'my-action',
+    'My Custom Action',
+    [
+        {
+            key: 'target',
+            type: 'text',              // 'text', 'number', or 'toggle'
+            label: 'Target Element ID',
+            help: 'The ID of the element to target.',
+            dataAttribute: 'data-target', // Maps to HTML attribute
+            required: true,
+            default: '',
+        },
+    ],
+    () => {}
 );
 ```
 
 **Parameters:**
 - `id` (string): Unique identifier, must match filename
 - `label` (string): Human-readable label shown in editor
-- `init` (function): Placeholder function (frontend behavior is handled by the Interactivity API store)
+- `fieldsOrInit` (Array|Function): Field definitions array, or init function if no fields
+- `init` (Function, optional): Init function when fields are provided as 3rd argument
 
-**Returns:** `true` if registered successfully, `false` if ID already exists
+**Returns:** `true` if registered successfully, `false` if ID already exists or validation fails
 
-### Store Utilities
+### Store Utilities (Built-in Actions Only)
 
-When building stores, these shared utilities are available:
+The following utilities are used by the plugin's built-in action stores. They are imported via relative paths within the webpack build and are **not directly available to theme actions** (which are standalone ES modules).
 
-| Module | Export | Description |
-|--------|--------|-------------|
-| `utils/rate-limiter` | `getRateLimiter(element)` | WeakMap-based per-element rate limiting (auto GC) |
-| `utils/rate-limiter` | `createRateLimiter(maxPerSecond)` | Create a standalone rate limiter instance |
-| `utils/sanitize` | `sanitizeText(text)` | Strip HTML via DOMPurify |
-| `utils/sanitize` | `validateStyle(property, value)` | Validate CSS values against allowlist |
-| `utils/api` | `apiRequest(endpoint, data)` | Nonce-authenticated WordPress REST API fetch |
-| `utils/api` | `log(type, message, error)` | Centralized logging utility |
+If your theme action needs similar functionality, implement it directly in your action file. See the example files in `/docs/examples/` for patterns.
+
+| Utility | Description |
+|---------|-------------|
+| Rate limiting | Use a simple timestamp check (see built-in `src/stores/utils/rate-limiter.js`) |
+| Text sanitization | Use `textContent` (not `innerHTML`) to prevent XSS |
+| Style validation | Validate against known-safe patterns before setting styles |
+| Async actions | Use generator functions (`function*` with `yield`) |
 
 ---
 
@@ -132,29 +147,30 @@ When building stores, these shared utilities are available:
 
 ```javascript
 import { store, getContext, getElement } from '@wordpress/interactivity';
-import { getRateLimiter } from '../utils/rate-limiter';
 
 store( 'block-actions/my-click-action', {
     actions: {
         handleClick( event ) {
             event.preventDefault();
-            const { ref } = getElement();
-            const limiter = getRateLimiter( ref );
-            if ( ! limiter.canExecute() ) return;
-
             const ctx = getContext();
             ctx.clicked = true;
             // Your action code here
         },
     },
+    callbacks: {
+        init() {
+            return () => {};
+        },
+    },
 } );
 ```
 
-### API Request Example
+### Async API Request (Generator Function)
+
+Use `function*` with `yield` for async operations. **Do not use `async/await`** — it breaks the Interactivity API's scope tracking.
 
 ```javascript
-import { store, getContext, getElement } from '@wordpress/interactivity';
-import { apiRequest, log } from '../utils/api';
+import { store, getContext } from '@wordpress/interactivity';
 
 store( 'block-actions/my-api-action', {
     actions: {
@@ -163,11 +179,14 @@ store( 'block-actions/my-api-action', {
             const ctx = getContext();
 
             try {
-                const response = yield apiRequest( '/myplugin/v1/endpoint', { data: 'value' } );
-                log( 'info', 'API request successful' );
-                ctx.result = response;
+                const response = yield fetch( '/wp-json/myplugin/v1/endpoint', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify( { data: 'value' } ),
+                } );
+                ctx.result = yield response.json();
             } catch ( error ) {
-                log( 'error', 'API request failed', error );
+                console.error( '[Block Actions] API request failed', error );
             }
         },
     },
@@ -280,16 +299,21 @@ callbacks: {
 },
 ```
 
-### 2. Use Rate Limiting
+### 2. Prevent Rapid Clicks
 
-Use `getRateLimiter()` for click handlers to prevent spam:
+Implement simple rate limiting in your action to prevent spam:
 
 ```javascript
-import { getRateLimiter } from '../utils/rate-limiter';
-
-const { ref } = getElement();
-const limiter = getRateLimiter( ref );
-if ( ! limiter.canExecute() ) return;
+let lastClick = 0;
+actions: {
+    handleClick( event ) {
+        event.preventDefault();
+        const now = Date.now();
+        if ( now - lastClick < 200 ) return; // 200ms throttle
+        lastClick = now;
+        // Your action code...
+    },
+},
 ```
 
 ### 3. Use Context for State
@@ -308,13 +332,12 @@ isActive = ! isActive;
 
 ### 4. Sanitize User Input
 
-If your action accepts data attributes, validate and sanitize:
+If your action displays user-provided data, always use `textContent` (not `innerHTML`) to prevent XSS:
 
 ```javascript
-import { sanitizeText } from '../utils/sanitize';
-
-const userValue = ref.getAttribute( 'data-user-value' );
-const clean = sanitizeText( userValue );
+const userValue = ref.getAttribute( 'data-user-value' ) || '';
+const link = ref.querySelector( 'a' ) || ref;
+link.textContent = userValue; // Safe — textContent never parses HTML
 ```
 
 ### 5. Use Generator Functions for Async
@@ -340,9 +363,9 @@ actions: {
 
 1. Check that the file is in `/wp-content/themes/[active-theme]/actions/`
 2. Verify the filename doesn't start with `_` or `.`
-3. Ensure `window.BlockActions.registerAction()` is called in the editor context
-4. Clear your browser cache
-5. Check the browser console for errors
+3. Clear your browser cache
+4. Check the browser console for errors
+5. If using a custom label, ensure `window.BlockActions.registerAction()` is called from an editor-enqueued script
 
 ### Action Not Executing
 
