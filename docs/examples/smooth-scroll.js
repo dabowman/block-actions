@@ -18,7 +18,6 @@ store( 'block-actions/smooth-scroll', {
 		handleClick( event ) {
 			event.preventDefault();
 			const ctx = getContext();
-			const { ref } = getElement();
 
 			if ( ! ctx.targetId ) {
 				return;
@@ -38,6 +37,7 @@ store( 'block-actions/smooth-scroll', {
 			window.scrollTo( { top, behavior: 'smooth' } );
 
 			// Show temporary feedback
+			const { ref } = getElement();
 			const link = ref.querySelector( 'a' ) || ref;
 			const originalText = link.textContent;
 			link.textContent = 'Scrolling...';
@@ -50,7 +50,7 @@ store( 'block-actions/smooth-scroll', {
 	callbacks: {
 		init() {
 			const ctx = getContext();
-			const { ref } = getElement();
+			const { ref } = getElement(); // eslint-disable-line @wordpress/no-unused-vars-before-return
 
 			// Read configuration from data attributes
 			ctx.targetId = ref.getAttribute( 'data-target' ) || '';

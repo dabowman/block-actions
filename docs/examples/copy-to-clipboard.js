@@ -22,16 +22,18 @@ store( 'block-actions/copy-to-clipboard', {
 		 *
 		 * Uses a generator function (function*) for async clipboard access.
 		 * This is required by the Interactivity API — do NOT use async/await.
+		 *
+		 * @param {Event} event The click event.
 		 */
 		*handleClick( event ) {
 			event.preventDefault();
 			const ctx = getContext();
-			const { ref } = getElement();
 
 			if ( ! ctx.copyText ) {
 				return;
 			}
 
+			const { ref } = getElement();
 			const link = ref.querySelector( 'a' ) || ref;
 			const originalText = link.textContent;
 			const originalBg = link.style.backgroundColor;
@@ -58,7 +60,7 @@ store( 'block-actions/copy-to-clipboard', {
 	callbacks: {
 		init() {
 			const ctx = getContext();
-			const { ref } = getElement();
+			const { ref } = getElement(); // eslint-disable-line @wordpress/no-unused-vars-before-return
 
 			// Read text to copy from data attribute
 			ctx.copyText = ref.getAttribute( 'data-copy-text' ) || '';

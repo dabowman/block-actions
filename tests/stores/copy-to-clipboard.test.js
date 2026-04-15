@@ -83,7 +83,7 @@ describe( 'Copy to Clipboard Store', () => {
 		const gen = storeDefinition.actions.copy( event );
 
 		// Run through generator: first next starts, yield on clipboard write.
-		const { value: clipboardPromise } = gen.next();
+		gen.next();
 		// Resolve the clipboard promise.
 		gen.next();
 

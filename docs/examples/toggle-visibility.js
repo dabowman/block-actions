@@ -19,7 +19,6 @@ store( 'block-actions/toggle-visibility', {
 		handleClick( event ) {
 			event.preventDefault();
 			const ctx = getContext();
-			const { ref } = getElement();
 
 			if ( ! ctx.targetId ) {
 				return;
@@ -29,6 +28,8 @@ store( 'block-actions/toggle-visibility', {
 			if ( ! target ) {
 				return;
 			}
+
+			const { ref } = getElement();
 
 			// Toggle visibility state
 			ctx.isVisible = ! ctx.isVisible;
@@ -45,7 +46,7 @@ store( 'block-actions/toggle-visibility', {
 	callbacks: {
 		init() {
 			const ctx = getContext();
-			const { ref } = getElement();
+			const { ref } = getElement(); // eslint-disable-line @wordpress/no-unused-vars-before-return
 
 			// Read target ID from data attribute
 			ctx.targetId = ref.getAttribute( 'data-target' ) || '';

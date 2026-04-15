@@ -21,6 +21,8 @@ store( 'block-actions/boilerplate-action', {
 		 *
 		 * The Theme_Action PHP renderer injects data-wp-on--click="actions.handleClick"
 		 * on the root element, so this is called automatically on click.
+		 *
+		 * @param {Event} event The click event.
 		 */
 		handleClick( event ) {
 			event.preventDefault();
@@ -56,7 +58,6 @@ store( 'block-actions/boilerplate-action', {
 		 */
 		init() {
 			const ctx = getContext();
-			const { ref } = getElement();
 
 			// Read configuration from data attributes if needed
 			ctx.clicked = false;

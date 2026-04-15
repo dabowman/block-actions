@@ -33,6 +33,7 @@
     "@wordpress/compose": "^7.41.0",
     "@wordpress/element": "^6.41.0",
     "@wordpress/hooks": "^4.41.0",
+    "@wordpress/i18n": "^5.41.0",
     "@wordpress/interactivity": "^6.41.0",
     "dompurify": "^3.0.5",
     "lodash": "^4.17.21"

@@ -23,6 +23,9 @@ import { store, getContext, getElement } from '@wordpress/interactivity';
 
 /**
  * Close a modal and reset state.
+ *
+ * @param {Object}      ctx   The Interactivity API context.
+ * @param {HTMLElement} modal The modal element.
  */
 function closeModal( ctx, modal ) {
 	if ( ! ctx.isOpen ) {

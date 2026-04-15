@@ -76,9 +76,9 @@ describe( 'Sanitize Utility', () => {
 			expect(
 				validateStyle( 'backgroundColor', 'rgba(255, 128, 0, 0.5)' )
 			).toBe( 'rgba(255, 128, 0, 0.5)' );
-			expect(
-				validateStyle( 'color', 'rgba(0, 0, 0, 1)' )
-			).toBe( 'rgba(0, 0, 0, 1)' );
+			expect( validateStyle( 'color', 'rgba(0, 0, 0, 1)' ) ).toBe(
+				'rgba(0, 0, 0, 1)'
+			);
 		} );
 
 		it( 'should reject rgba with out-of-range alpha', () => {
