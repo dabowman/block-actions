@@ -17,7 +17,7 @@ const getElement = jest.fn( () => currentElement );
  * @param {Object} ctx The context object.
  */
 function __setContext( ctx ) {
-    currentContext = ctx;
+	currentContext = ctx;
 }
 
 /**
@@ -26,25 +26,25 @@ function __setContext( ctx ) {
  * @param {HTMLElement} el The DOM element.
  */
 function __setElement( el ) {
-    currentElement = { ref: el };
+	currentElement = { ref: el };
 }
 
 /**
  * Reset all mocks to defaults.
  */
 function __reset() {
-    currentContext = {};
-    currentElement = { ref: document.createElement( 'div' ) };
-    store.mockClear();
-    getContext.mockClear();
-    getElement.mockClear();
+	currentContext = {};
+	currentElement = { ref: document.createElement( 'div' ) };
+	store.mockClear();
+	getContext.mockClear();
+	getElement.mockClear();
 }
 
 module.exports = {
-    store,
-    getContext,
-    getElement,
-    __setContext,
-    __setElement,
-    __reset,
+	store,
+	getContext,
+	getElement,
+	__setContext,
+	__setElement,
+	__reset,
 };

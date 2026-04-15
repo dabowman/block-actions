@@ -134,15 +134,20 @@ To add actions that ship with the plugin:
 ### Available Actions
 
 **Built-in Actions** (shipped with plugin):
-- `carousel`: Unified carousel action for image galleries with buttons, thumbnails, or both
-- `scroll-to-top`: Provides smooth scroll-to-top functionality
+- `scroll-to-top`: Smooth scroll-to-top functionality
+- `carousel`: Image galleries with buttons, thumbnails, or both
+- `toggle-visibility`: Show/hide any element by ID
+- `modal-toggle`: Open/close modals and dialogs with backdrop, ESC key, and focus management
+- `smooth-scroll`: Smooth scrolling to page sections with configurable offset
+- `copy-to-clipboard`: Copy text to clipboard with visual feedback
 
-**Example Actions** (available in `/docs/examples/`):
-- `smooth-scroll`: Smooth scrolling to page sections
-- `modal-toggle`: Open/close modals and dialogs
+**Example/Reference Actions** (in `/src/stores/`):
+- `test-action`: Demonstrates the feedback action pattern
+- `example-rate-limited`: Demonstrates per-element rate limiting
+
+**Copy-paste templates** are also available in `/docs/examples/`.
 
 **Additional Resources:**
-- Source examples: `example-rate-limited`, `test-action` (in `/src/stores/`)
 - [Create your own theme actions](docs/THEME-ACTIONS.md)
 
 ## Architecture

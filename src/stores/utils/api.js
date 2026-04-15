@@ -16,23 +16,23 @@
  * @return {Promise<Object>} Promise resolving to the JSON response.
  */
 export async function apiRequest( endpoint, data = {} ) {
-    const nonce = window?.blockActions?.nonce || '';
+	const nonce = window?.blockActions?.nonce || '';
 
-    const response = await fetch( endpoint, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-WP-Nonce': nonce,
-        },
-        body: JSON.stringify( data ),
-        credentials: 'same-origin',
-    } );
+	const response = await fetch( endpoint, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'X-WP-Nonce': nonce,
+		},
+		body: JSON.stringify( data ),
+		credentials: 'same-origin',
+	} );
 
-    if ( ! response.ok ) {
-        throw new Error( `API request failed: ${ response.statusText }` );
-    }
+	if ( ! response.ok ) {
+		throw new Error( `API request failed: ${ response.statusText }` );
+	}
 
-    return await response.json();
+	return await response.json();
 }
 
 /**
@@ -40,25 +40,25 @@ export async function apiRequest( endpoint, data = {} ) {
  *
  * @since 2.0.0
  *
- * @param {string}      type    Log type: 'error', 'warning', or 'info'.
- * @param {string}      message Log message.
- * @param {Error|null} [error]  Optional error object.
+ * @param {string}     type    Log type: 'error', 'warning', or 'info'.
+ * @param {string}     message Log message.
+ * @param {Error|null} [error] Optional error object.
  * @return {void}
  */
 export function log( type, message, error = null ) {
-    const prefix = '[Block Actions]';
-    const debug = !! window?.blockActions?.debug;
+	const prefix = '[Block Actions]';
+	const debug = !! window?.blockActions?.debug;
 
-    if ( type === 'error' ) {
-        console.error( `${ prefix } ${ message }`, error || '' );
-        return;
-    }
+	if ( type === 'error' ) {
+		console.error( `${ prefix } ${ message }`, error || '' );
+		return;
+	}
 
-    if ( debug ) {
-        if ( type === 'warning' ) {
-            console.warn( `${ prefix } ${ message }` );
-        } else {
-            console.log( `${ prefix } ${ message }` );
-        }
-    }
+	if ( debug ) {
+		if ( type === 'warning' ) {
+			console.warn( `${ prefix } ${ message }` );
+		} else {
+			console.log( `${ prefix } ${ message }` );
+		}
+	}
 }

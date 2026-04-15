@@ -17,10 +17,10 @@ import DOMPurify from 'dompurify';
  * @return {string} Sanitized text with all tags removed.
  */
 export function sanitizeText( text ) {
-    if ( typeof text !== 'string' ) {
-        return '';
-    }
-    return DOMPurify.sanitize( text, { ALLOWED_TAGS: [] } );
+	if ( typeof text !== 'string' ) {
+		return '';
+	}
+	return DOMPurify.sanitize( text, { ALLOWED_TAGS: [] } );
 }
 
 /**
@@ -33,16 +33,27 @@ export function sanitizeText( text ) {
  * @return {string|null} The value if valid, null otherwise.
  */
 export function validateStyle( property, value ) {
-    const allowedStyles = {
-        backgroundColor:
-            /^(#[0-9A-Fa-f]{6}|rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)|[a-zA-Z]+)$/,
-        color: /^(#[0-9A-Fa-f]{6}|rgb\(\d{1,3},\s*\d{1,3},\s*\d{1,3}\)|[a-zA-Z]+)$/,
-        opacity: /^(0(\.\d+)?|1(\.0+)?)$/,
-    };
+	// RGB channel: 0-9, 10-99, 100-199, 200-249, 250-255
+	const channel = '([0-9]|[1-9]\\d|1\\d{2}|2[0-4]\\d|25[0-5])';
+	const rgb = `rgb\\(${ channel },\\s*${ channel },\\s*${ channel }\\)`;
+	const alpha = '(0(\\.\\d+)?|1(\\.0+)?)';
+	const rgba = `rgba\\(${ channel },\\s*${ channel },\\s*${ channel },\\s*${ alpha }\\)`;
+	const colorPattern = new RegExp(
+		`^(#[0-9A-Fa-f]{6}|${ rgb }|${ rgba }|[a-zA-Z]+)$`
+	);
 
-    if ( ! allowedStyles[ property ] || ! allowedStyles[ property ].test( value ) ) {
-        return null;
-    }
+	const allowedStyles = {
+		backgroundColor: colorPattern,
+		color: colorPattern,
+		opacity: /^(0(\.\d+)?|1(\.0+)?)$/,
+	};
 
-    return value;
+	if (
+		! allowedStyles[ property ] ||
+		! allowedStyles[ property ].test( value )
+	) {
+		return null;
+	}
+
+	return value;
 }

@@ -1,76 +1,71 @@
 /**
  * Copy to Clipboard Action
- * 
+ *
  * Copies text to the user's clipboard when clicked.
- * Shows how to interact with browser APIs and provide user feedback.
- * 
+ * Demonstrates generator functions for async operations and visual feedback.
+ *
  * Usage:
  * 1. Copy to: wp-content/themes/your-theme/actions/copy-to-clipboard.js
  * 2. Add to a Button block
  * 3. Add data-copy-text="Text to copy" attribute to the button
  * 4. Clicking will copy the text and show feedback
- * 
- * @param {HTMLElement} element The button block element.
+ *
+ * Note: The Clipboard API requires HTTPS (or localhost).
  */
 
-(function() {
-	'use strict';
+import { store, getContext, getElement } from '@wordpress/interactivity';
 
-	const { BaseAction } = window.BlockActions;
+store( 'block-actions/copy-to-clipboard', {
+	actions: {
+		/**
+		 * Copy text to clipboard.
+		 *
+		 * Uses a generator function (function*) for async clipboard access.
+		 * This is required by the Interactivity API — do NOT use async/await.
+		 *
+		 * @param {Event} event The click event.
+		 */
+		*handleClick( event ) {
+			event.preventDefault();
+			const ctx = getContext();
 
-	function init(element) {
-		const action = new BaseAction(element);
+			if ( ! ctx.copyText ) {
+				return;
+			}
 
-		// Get text to copy from data attribute
-		const textToCopy = element.getAttribute('data-copy-text');
+			const { ref } = getElement();
+			const link = ref.querySelector( 'a' ) || ref;
+			const originalText = link.textContent;
+			const originalBg = link.style.backgroundColor;
 
-		if (!textToCopy) {
-			action.log('error', 'Copy to Clipboard: No data-copy-text attribute specified');
-			return;
-		}
+			try {
+				yield navigator.clipboard.writeText( ctx.copyText );
 
-		action.target.addEventListener('click', async (e) => {
-			e.preventDefault();
+				// Success feedback
+				link.textContent = 'Copied! \u2713';
+				link.style.backgroundColor = '#10b981';
+			} catch ( error ) {
+				// Error feedback
+				link.textContent = 'Copy failed';
+				link.style.backgroundColor = '#ef4444';
+			}
 
-			action.executeWithRateLimit(async () => {
-				try {
-					// Copy to clipboard using modern API
-					await navigator.clipboard.writeText(textToCopy);
+			// Restore after 2 seconds
+			setTimeout( () => {
+				link.textContent = originalText;
+				link.style.backgroundColor = originalBg;
+			}, 2000 );
+		},
+	},
+	callbacks: {
+		init() {
+			const ctx = getContext();
+			const { ref } = getElement(); // eslint-disable-line @wordpress/no-unused-vars-before-return
 
-					// Success feedback
-					const originalText = action.originalText;
-					action.setTextContent('Copied! ✓');
-					action.setStyle('backgroundColor', '#10b981'); // Green
-					
-					action.log('info', `Copied to clipboard: ${textToCopy}`);
+			// Read text to copy from data attribute
+			ctx.copyText = ref.getAttribute( 'data-copy-text' ) || '';
 
-					// Reset after 2 seconds
-					setTimeout(() => {
-						action.reset();
-					}, 2000);
-
-				} catch (error) {
-					// Error feedback
-					action.setTextContent('Copy failed');
-					action.setStyle('backgroundColor', '#ef4444'); // Red
-					action.log('error', 'Failed to copy to clipboard', error);
-
-					// Reset after 2 seconds
-					setTimeout(() => {
-						action.reset();
-					}, 2000);
-				}
-			});
-		});
-
-		action.log('info', 'Copy to Clipboard action initialized');
-	}
-
-	window.BlockActions.registerAction(
-		'copy-to-clipboard',
-		'Copy to Clipboard',
-		init
-	);
-
-})();
-
+			return () => {};
+		},
+	},
+} );

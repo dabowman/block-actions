@@ -14,9 +14,9 @@ The essential template with detailed comments explaining every part. Start here!
 
 **What it does:**
 - Provides complete structure with comments
-- Shows basic click handling
-- Demonstrates rate limiting
-- Includes logging examples
+- Shows basic click handling with context state
+- Demonstrates CSS class toggling
+- Shows cleanup function pattern
 
 **Copy this when:** You're creating a brand new action from scratch.
 
@@ -50,7 +50,7 @@ Toggles the visibility of a target element.
 - Shows/hides element by ID
 - Tracks visibility state in context
 - Updates button text dynamically
-- Error handling for missing elements
+- Sets `aria-controls` and `aria-expanded` for accessibility
 
 **Use cases:**
 - Toggle navigation menus
@@ -171,11 +171,9 @@ callbacks: {
     init() {
         const ctx = getContext();
         const { ref } = getElement();
-        ctx.targetId = ref.getAttribute( 'data-target' );
+        ctx.targetId = ref.getAttribute( 'data-target' ) || '';
 
-        if ( ! ctx.targetId ) {
-            log( 'error', 'Missing data-target attribute' );
-        }
+        return () => {};
     },
 },
 ```
@@ -183,10 +181,9 @@ callbacks: {
 ### Finding Target Elements
 
 ```javascript
-const targetElement = document.getElementById( ctx.targetId );
-if ( ! targetElement ) {
-    log( 'error', `Target element #${ ctx.targetId } not found` );
-    return;
+const target = document.getElementById( ctx.targetId );
+if ( ! target ) {
+    return; // Silently skip if target doesn't exist
 }
 ```
 
@@ -267,9 +264,9 @@ actions: {
 
 1. **Return cleanup functions** - Always clean up observers, timers, and listeners in `callbacks.init()`
 2. **Use context for state** - Per-instance state belongs in context, not module variables
-3. **Handle errors** - Check for missing elements and data attributes
-4. **Use generator functions** - For async operations, use `function*` with `yield`
-5. **Use rate limiting** - Import `getRateLimiter` for click handlers
+3. **Handle missing elements** - Check for null from `getElementById()` before using
+4. **Use generator functions** - For async operations, use `function*` with `yield` (never `async/await`)
+5. **Use `textContent`** - Never use `innerHTML` for user-provided data
 6. **Use data attributes** - Make actions configurable without code changes
 
 ---
@@ -279,7 +276,6 @@ actions: {
 ### Action not appearing in editor?
 - Check filename matches action ID
 - Verify file is in `/wp-content/themes/[active-theme]/actions/`
-- Ensure `window.BlockActions.registerAction()` is called
 - Check browser console for errors
 - Try clearing browser cache
 
