@@ -131,24 +131,22 @@ describe( 'Modal Toggle Store', () => {
 	} );
 
 	describe( 'init callback', () => {
-		it( 'should return a cleanup function', () => {
+		it( 'returns a cleanup function when a modal is wired up', () => {
 			const cleanup = storeDefinition.callbacks.init();
 			expect( typeof cleanup ).toBe( 'function' );
 		} );
 
-		it( 'should return a cleanup function when modalId is missing', () => {
+		it( 'returns nothing when modalId is missing', () => {
 			interactivityMock.__setContext( { modalId: '', isOpen: false } );
-			const cleanup = storeDefinition.callbacks.init();
-			expect( typeof cleanup ).toBe( 'function' );
+			expect( storeDefinition.callbacks.init() ).toBeUndefined();
 		} );
 
-		it( 'should return a cleanup function when modal element not found', () => {
+		it( 'returns nothing when modal element is not found', () => {
 			interactivityMock.__setContext( {
 				modalId: 'nonexistent',
 				isOpen: false,
 			} );
-			const cleanup = storeDefinition.callbacks.init();
-			expect( typeof cleanup ).toBe( 'function' );
+			expect( storeDefinition.callbacks.init() ).toBeUndefined();
 		} );
 
 		it( 'should register close button listeners in init', () => {
