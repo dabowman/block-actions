@@ -14,6 +14,7 @@ import {
 	getContext,
 	getElement,
 	withSyncEvent,
+	withScope,
 } from '@wordpress/interactivity';
 import { getRateLimiter } from '../utils/rate-limiter';
 
@@ -247,7 +248,10 @@ const { state } = store( 'block-actions/carousel', {
 					priv.touchStartX = e.changedTouches[ 0 ].screenX;
 				};
 
-				priv.handleTouchEnd = ( e ) => {
+				// Wrap in withScope so getContext()/getElement() inside
+				// prevSlide/nextSlide resolve to this carousel instance
+				// when fired from an external DOM event listener.
+				priv.handleTouchEnd = withScope( ( e ) => {
 					const touchEndX = e.changedTouches[ 0 ].screenX;
 					const threshold = 50;
 
@@ -256,7 +260,7 @@ const { state } = store( 'block-actions/carousel', {
 					} else if ( touchEndX > priv.touchStartX + threshold ) {
 						store( 'block-actions/carousel' ).actions.prevSlide();
 					}
-				};
+				} );
 
 				container.addEventListener(
 					'touchstart',
