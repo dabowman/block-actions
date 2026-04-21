@@ -31,9 +31,11 @@ class Smooth_Scroll extends Action_Renderer {
 	 * @return array Initial context data.
 	 */
 	public function get_initial_context( \WP_HTML_Tag_Processor $processor, array $block ): array {
+		$target = $processor->get_attribute( 'data-target' );
+		$offset = $processor->get_attribute( 'data-offset' );
 		return array(
-			'targetId'      => $processor->get_attribute( 'data-target' ) ?? '',
-			'offset'        => (int) ( $processor->get_attribute( 'data-offset' ) ?? 0 ),
+			'targetId'      => is_string( $target ) ? $target : '',
+			'offset'        => is_string( $offset ) ? (int) $offset : 0,
 			'originalText'  => '',
 			'isScrolling'   => false,
 			'scrollingText' => __( 'Scrolling...', 'block-actions' ),
@@ -52,5 +54,24 @@ class Smooth_Scroll extends Action_Renderer {
 	public function apply_directives( \WP_HTML_Tag_Processor $processor, array $block ): void {
 		$processor->set_attribute( 'data-wp-on--click', 'actions.scrollToTarget' );
 		$processor->set_attribute( 'data-wp-init', 'callbacks.init' );
+	}
+
+	/**
+	 * Bind button label to state.buttonText on the inner anchor.
+	 *
+	 * @since 2.1.0
+	 *
+	 * @param string $html The block HTML.
+	 * @return string Modified HTML.
+	 */
+	public function post_process_html( string $html ): string {
+		$p = new \WP_HTML_Tag_Processor( $html );
+		while ( $p->next_tag() ) {
+			if ( 'A' === $p->get_tag() ) {
+				$p->set_attribute( 'data-wp-text', 'state.buttonText' );
+				break;
+			}
+		}
+		return $p->get_updated_html();
 	}
 }

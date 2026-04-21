@@ -1,30 +1,39 @@
 /**
  * Feedback Store Utilities
  *
- * Shared helpers for stores that follow the "feedback action" pattern:
- * click → perform action → show temporary text → restore after timeout.
+ * Helpers for the "transient feedback" pattern — click an action, run a
+ * side effect, flip context.isScrolling for a duration, then flip back.
+ * The view's text/style is driven declaratively by state getters that
+ * read context.isScrolling, so no DOM mutation happens here.
  *
  * @since 2.0.0
  */
 
-import { getContext, getElement, withSyncEvent } from '@wordpress/interactivity';
-import { getRateLimiter } from './rate-limiter';
+import {
+	getContext,
+	getElement,
+	withSyncEvent,
+	withScope,
+} from '@wordpress/interactivity';
 
 /**
- * Create an init callback that captures original text and returns a cleanup
- * function for pending timers.
+ * Init callback that captures the button's initial text into
+ * context.originalText and returns a cleanup function that cancels
+ * any pending feedback timer.
  *
  * @since 2.0.0
  *
  * @param {WeakMap} timers WeakMap tracking setTimeout IDs per element.
- * @return {Function} An init callback for use in a store's callbacks object.
+ * @return {Function} An init callback.
  */
 export function createFeedbackInit( timers ) {
 	return function init() {
 		const ctx = getContext();
 		const { ref } = getElement();
 		const target = ref.querySelector( 'a' ) || ref;
-		ctx.originalText = target.textContent;
+		if ( ! ctx.originalText ) {
+			ctx.originalText = target.textContent;
+		}
 
 		return () => {
 			const timer = timers.get( ref );
@@ -37,67 +46,61 @@ export function createFeedbackInit( timers ) {
 }
 
 /**
- * Create a synchronous action handler with rate limiting, feedback text,
- * and automatic timer-based restoration.
+ * Create an action handler that performs a side effect and flips
+ * context.isScrolling for a configurable duration. Wrapped in
+ * withSyncEvent so event.preventDefault() is safe in WP 6.8+.
  *
  * @since 2.0.0
  *
- * @param {WeakMap}  timers              WeakMap tracking setTimeout IDs per element.
- * @param {Object}   config              Action configuration.
- * @param {Function} config.perform      Called with ( ctx, ref, target ) to execute the action.
- * @param {Function} config.feedbackText Called with ( ctx ) to get the temporary feedback string.
- * @param {number}   config.duration     Milliseconds before restoring original text.
- * @param {Function} [config.onRestore]  Optional callback ( ctx, target ) on restore.
- * @return {Function} An action handler for use in a store's actions object.
+ * @param {WeakMap}  timers             WeakMap tracking setTimeout IDs per element.
+ * @param {Object}   config             Action configuration.
+ * @param {Function} config.perform     Called with ( ctx ) to execute the side effect.
+ * @param {number}   config.duration    Milliseconds before flipping isScrolling back to false.
+ * @param {Function} [config.onRestore] Optional callback ( ctx ) on restore.
+ * @return {Function} An action handler.
  */
 export function createFeedbackAction( timers, config ) {
 	return withSyncEvent( function action( event ) {
 		event.preventDefault();
-		const { ref } = getElement();
-		const limiter = getRateLimiter( ref );
-		if ( ! limiter.canExecute() ) {
-			return;
-		}
-
 		const ctx = getContext();
-		const target = ref.querySelector( 'a' ) || ref;
+		const { ref } = getElement();
 
-		config.perform( ctx, ref, target );
+		config.perform( ctx );
+		ctx.isScrolling = true;
 
-		setFeedbackTimer( ref, timers, target, ctx, config );
+		const existing = timers.get( ref );
+		if ( existing ) {
+			clearTimeout( existing );
+		}
+		timers.set(
+			ref,
+			setTimeout(
+				withScope( () => {
+					ctx.isScrolling = false;
+					if ( config.onRestore ) {
+						config.onRestore( ctx );
+					}
+					timers.delete( ref );
+				} ),
+				config.duration
+			)
+		);
 	} );
 }
 
 /**
- * Set a feedback timer that shows temporary text and restores the original
- * after a delay. Clears any existing timer for the element.
+ * Derived state helper. Given a context, return the button label that
+ * should be rendered: the transient feedback string while scrolling,
+ * otherwise the captured original text.
  *
- * @since 2.0.0
+ * @since 2.1.0
  *
- * @param {HTMLElement} ref                 The element reference (WeakMap key).
- * @param {WeakMap}     timers              WeakMap tracking setTimeout IDs per element.
- * @param {HTMLElement} target              The DOM element whose text is updated.
- * @param {Object}      ctx                 Store context with originalText property.
- * @param {Object}      config              Timer configuration.
- * @param {Function}    config.feedbackText Called with ( ctx ) to get the temporary string.
- * @param {number}      config.duration     Milliseconds before restoring.
- * @param {Function}    [config.onRestore]  Optional callback ( ctx, target ) on restore.
+ * @param {Object} ctx Store context.
+ * @return {string} Text to render.
  */
-export function setFeedbackTimer( ref, timers, target, ctx, config ) {
-	target.textContent = config.feedbackText( ctx );
-
-	const existingTimer = timers.get( ref );
-	if ( existingTimer ) {
-		clearTimeout( existingTimer );
+export function feedbackButtonText( ctx ) {
+	if ( ctx.isScrolling ) {
+		return ctx.scrollingText || 'Scrolling...';
 	}
-	timers.set(
-		ref,
-		setTimeout( () => {
-			target.textContent = ctx.originalText;
-			if ( config.onRestore ) {
-				config.onRestore( ctx, target );
-			}
-			timers.delete( ref );
-		}, config.duration )
-	);
+	return ctx.originalText || '';
 }

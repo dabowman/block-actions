@@ -4,13 +4,13 @@
 
 const interactivityMock = require( '@wordpress/interactivity' );
 
-let createFeedbackInit, createFeedbackAction, setFeedbackTimer;
+let createFeedbackInit, createFeedbackAction, feedbackButtonText;
 
 beforeAll( () => {
 	const mod = require( '../../../src/stores/utils/create-feedback-store' );
 	createFeedbackInit = mod.createFeedbackInit;
 	createFeedbackAction = mod.createFeedbackAction;
-	setFeedbackTimer = mod.setFeedbackTimer;
+	feedbackButtonText = mod.feedbackButtonText;
 } );
 
 describe( 'createFeedbackInit', () => {
@@ -36,39 +36,36 @@ describe( 'createFeedbackInit', () => {
 		jest.useRealTimers();
 	} );
 
-	it( 'should return an init function', () => {
-		const init = createFeedbackInit( timers );
-		expect( typeof init ).toBe( 'function' );
+	it( 'returns an init function', () => {
+		expect( typeof createFeedbackInit( timers ) ).toBe( 'function' );
 	} );
 
-	it( 'should capture original text', () => {
-		const init = createFeedbackInit( timers );
-		init();
+	it( 'captures original text', () => {
+		createFeedbackInit( timers )();
 		expect( mockContext.originalText ).toBe( 'Click me' );
 	} );
 
-	it( 'should return a cleanup function', () => {
-		const init = createFeedbackInit( timers );
-		const cleanup = init();
+	it( 'does not overwrite originalText if already set', () => {
+		mockContext.originalText = 'Preserved';
+		createFeedbackInit( timers )();
+		expect( mockContext.originalText ).toBe( 'Preserved' );
+	} );
+
+	it( 'returns a cleanup function', () => {
+		const cleanup = createFeedbackInit( timers )();
 		expect( typeof cleanup ).toBe( 'function' );
 	} );
 
-	it( 'should clear pending timer on cleanup', () => {
-		const init = createFeedbackInit( timers );
-		const cleanup = init();
-
-		// Simulate a pending timer.
+	it( 'clears pending timer on cleanup', () => {
+		const cleanup = createFeedbackInit( timers )();
 		const timerId = setTimeout( () => {}, 1000 );
 		timers.set( mockElement, timerId );
-
 		cleanup();
-
 		expect( timers.has( mockElement ) ).toBe( false );
 	} );
 
-	it( 'should handle cleanup with no pending timer', () => {
-		const init = createFeedbackInit( timers );
-		const cleanup = init();
+	it( 'handles cleanup with no pending timer', () => {
+		const cleanup = createFeedbackInit( timers )();
 		expect( () => cleanup() ).not.toThrow();
 	} );
 } );
@@ -87,7 +84,7 @@ describe( 'createFeedbackAction', () => {
 		link.textContent = 'Original';
 		mockElement.appendChild( link );
 
-		mockContext = { originalText: 'Original' };
+		mockContext = { originalText: 'Original', isScrolling: false };
 		interactivityMock.__setContext( mockContext );
 		interactivityMock.__setElement( mockElement );
 	} );
@@ -96,19 +93,17 @@ describe( 'createFeedbackAction', () => {
 		jest.useRealTimers();
 	} );
 
-	it( 'should return an action function', () => {
+	it( 'returns an action function', () => {
 		const action = createFeedbackAction( timers, {
 			perform() {},
-			feedbackText: () => 'Done',
 			duration: 500,
 		} );
 		expect( typeof action ).toBe( 'function' );
 	} );
 
-	it( 'should call event.preventDefault', () => {
+	it( 'calls event.preventDefault', () => {
 		const action = createFeedbackAction( timers, {
 			perform() {},
-			feedbackText: () => 'Done',
 			duration: 500,
 		} );
 		const event = { preventDefault: jest.fn() };
@@ -116,131 +111,79 @@ describe( 'createFeedbackAction', () => {
 		expect( event.preventDefault ).toHaveBeenCalled();
 	} );
 
-	it( 'should call perform with ctx, ref, and target', () => {
+	it( 'calls perform with ctx', () => {
 		const perform = jest.fn();
-		const action = createFeedbackAction( timers, {
-			perform,
-			feedbackText: () => 'Done',
-			duration: 500,
-		} );
+		const action = createFeedbackAction( timers, { perform, duration: 500 } );
 		action( { preventDefault: jest.fn() } );
-		expect( perform ).toHaveBeenCalledWith(
-			mockContext,
-			mockElement,
-			mockElement.querySelector( 'a' )
-		);
+		expect( perform ).toHaveBeenCalledWith( mockContext );
 	} );
 
-	it( 'should set feedback text and restore after duration', () => {
+	it( 'flips isScrolling true and back after duration', () => {
 		const action = createFeedbackAction( timers, {
 			perform() {},
-			feedbackText: () => 'Working...',
 			duration: 1000,
 		} );
-		const link = mockElement.querySelector( 'a' );
-
 		action( { preventDefault: jest.fn() } );
-		expect( link.textContent ).toBe( 'Working...' );
+		expect( mockContext.isScrolling ).toBe( true );
 
 		jest.advanceTimersByTime( 1000 );
-		expect( link.textContent ).toBe( 'Original' );
+		expect( mockContext.isScrolling ).toBe( false );
 	} );
 
-	it( 'should call onRestore when timer fires', () => {
+	it( 'calls onRestore when timer fires', () => {
 		const onRestore = jest.fn();
 		const action = createFeedbackAction( timers, {
 			perform() {},
-			feedbackText: () => 'Done',
 			duration: 500,
 			onRestore,
 		} );
-
 		action( { preventDefault: jest.fn() } );
 		jest.advanceTimersByTime( 500 );
-
-		expect( onRestore ).toHaveBeenCalledWith(
-			mockContext,
-			mockElement.querySelector( 'a' )
-		);
+		expect( onRestore ).toHaveBeenCalledWith( mockContext );
 	} );
 
-	it( 'should clear existing timer on repeated calls', () => {
+	it( 'cancels a pending timer on repeated calls', () => {
 		const action = createFeedbackAction( timers, {
 			perform() {},
-			feedbackText: () => 'Working...',
 			duration: 1000,
 		} );
-		const link = mockElement.querySelector( 'a' );
-
 		action( { preventDefault: jest.fn() } );
 		jest.advanceTimersByTime( 500 );
 
-		// Second call before first timer fires.
 		action( { preventDefault: jest.fn() } );
 		jest.advanceTimersByTime( 500 );
-
-		// First timer should have been cancelled; text is still feedback.
-		expect( link.textContent ).toBe( 'Working...' );
+		// Would have fired if the first timer had not been cancelled.
+		expect( mockContext.isScrolling ).toBe( true );
 
 		jest.advanceTimersByTime( 500 );
-		expect( link.textContent ).toBe( 'Original' );
+		expect( mockContext.isScrolling ).toBe( false );
 	} );
 } );
 
-describe( 'setFeedbackTimer', () => {
-	let timers;
-	let ref;
-	let target;
-	let ctx;
-
-	beforeEach( () => {
-		jest.useFakeTimers();
-		timers = new WeakMap();
-		ref = document.createElement( 'div' );
-		target = document.createElement( 'a' );
-		target.textContent = 'Original';
-		ctx = { originalText: 'Original' };
+describe( 'feedbackButtonText', () => {
+	it( 'returns scrollingText when isScrolling', () => {
+		expect(
+			feedbackButtonText( {
+				isScrolling: true,
+				scrollingText: 'Working…',
+				originalText: 'Go',
+			} )
+		).toBe( 'Working…' );
 	} );
 
-	afterEach( () => {
-		jest.useRealTimers();
+	it( 'falls back to default scrolling text', () => {
+		expect(
+			feedbackButtonText( { isScrolling: true, originalText: 'Go' } )
+		).toBe( 'Scrolling...' );
 	} );
 
-	it( 'should set feedback text immediately', () => {
-		setFeedbackTimer( ref, timers, target, ctx, {
-			feedbackText: () => 'Loading...',
-			duration: 500,
-		} );
-		expect( target.textContent ).toBe( 'Loading...' );
+	it( 'returns originalText when idle', () => {
+		expect(
+			feedbackButtonText( { isScrolling: false, originalText: 'Go' } )
+		).toBe( 'Go' );
 	} );
 
-	it( 'should restore original text after duration', () => {
-		setFeedbackTimer( ref, timers, target, ctx, {
-			feedbackText: () => 'Loading...',
-			duration: 500,
-		} );
-		jest.advanceTimersByTime( 500 );
-		expect( target.textContent ).toBe( 'Original' );
-	} );
-
-	it( 'should call onRestore callback', () => {
-		const onRestore = jest.fn();
-		setFeedbackTimer( ref, timers, target, ctx, {
-			feedbackText: () => 'Loading...',
-			duration: 500,
-			onRestore,
-		} );
-		jest.advanceTimersByTime( 500 );
-		expect( onRestore ).toHaveBeenCalledWith( ctx, target );
-	} );
-
-	it( 'should clean up timer from WeakMap after firing', () => {
-		setFeedbackTimer( ref, timers, target, ctx, {
-			feedbackText: () => 'Loading...',
-			duration: 500,
-		} );
-		expect( timers.has( ref ) ).toBe( true );
-		jest.advanceTimersByTime( 500 );
-		expect( timers.has( ref ) ).toBe( false );
+	it( 'returns empty string when idle and no originalText', () => {
+		expect( feedbackButtonText( { isScrolling: false } ) ).toBe( '' );
 	} );
 } );

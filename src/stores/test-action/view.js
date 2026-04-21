@@ -1,35 +1,39 @@
 /**
  * Test Action — Interactivity API Store
  *
+ * Demo action: click the button to briefly turn it red with
+ * "it worked!" text, then restore.
+ *
  * @since 2.0.0
  */
 
-import { store } from '@wordpress/interactivity';
+import { store, getContext } from '@wordpress/interactivity';
 import {
 	createFeedbackInit,
 	createFeedbackAction,
 } from '../utils/create-feedback-store';
-import { validateStyle } from '../utils/sanitize';
 
 const timers = new WeakMap();
 
-store( 'block-actions/test-action', {
+const { state } = store( 'block-actions/test-action', {
+	state: {
+		get buttonText() {
+			const ctx = getContext();
+			return ctx.isScrolling ? 'it worked!' : ctx.originalText;
+		},
+		get backgroundColor() {
+			return getContext().isScrolling ? 'red' : '';
+		},
+	},
 	actions: {
 		handleClick: createFeedbackAction( timers, {
-			perform( ctx, ref, target ) {
-				const activeColor = validateStyle( 'backgroundColor', 'red' );
-				if ( activeColor ) {
-					target.style.backgroundColor = activeColor;
-				}
-			},
-			feedbackText: () => 'it worked!',
+			perform() {},
 			duration: 2000,
-			onRestore( ctx, target ) {
-				target.removeAttribute( 'style' );
-			},
 		} ),
 	},
 	callbacks: {
 		init: createFeedbackInit( timers ),
 	},
 } );
+
+export { state };

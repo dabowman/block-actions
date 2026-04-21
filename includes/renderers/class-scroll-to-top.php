@@ -51,4 +51,23 @@ class Scroll_To_Top extends Action_Renderer {
 		$processor->set_attribute( 'data-wp-on--click', 'actions.scrollToTop' );
 		$processor->set_attribute( 'data-wp-init', 'callbacks.init' );
 	}
+
+	/**
+	 * Bind button label to state.buttonText on the inner anchor.
+	 *
+	 * @since 2.1.0
+	 *
+	 * @param string $html The block HTML.
+	 * @return string Modified HTML.
+	 */
+	public function post_process_html( string $html ): string {
+		$p = new \WP_HTML_Tag_Processor( $html );
+		while ( $p->next_tag() ) {
+			if ( 'A' === $p->get_tag() ) {
+				$p->set_attribute( 'data-wp-text', 'state.buttonText' );
+				break;
+			}
+		}
+		return $p->get_updated_html();
+	}
 }

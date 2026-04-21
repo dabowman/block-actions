@@ -38,6 +38,7 @@ describe( 'Smooth Scroll Store', () => {
 			offset: 0,
 			originalText: '',
 			isScrolling: false,
+			scrollingText: 'Scrolling...',
 		};
 		interactivityMock.__setContext( mockContext );
 		interactivityMock.__setElement( mockElement );
@@ -55,34 +56,33 @@ describe( 'Smooth Scroll Store', () => {
 		document.body.removeChild( targetElement );
 	} );
 
-	it( 'should register with correct namespace', () => {
+	it( 'registers with correct namespace', () => {
 		expect( interactivityMock.store ).toHaveBeenCalledWith(
 			'block-actions/smooth-scroll',
 			expect.any( Object )
 		);
 	} );
 
-	it( 'should store original text on init', () => {
+	it( 'captures original text on init', () => {
 		storeDefinition.callbacks.init();
 		expect( mockContext.originalText ).toBe( 'Scroll Down' );
 	} );
 
-	it( 'should scroll to target on action', () => {
+	it( 'scrolls to target and flips isScrolling true', () => {
 		storeDefinition.callbacks.init();
-		const event = { preventDefault: jest.fn() };
-		storeDefinition.actions.scrollToTarget( event );
+		storeDefinition.actions.scrollToTarget( { preventDefault: jest.fn() } );
 
 		expect( window.scrollTo ).toHaveBeenCalledWith( {
 			top: 500,
 			behavior: 'smooth',
 		} );
+		expect( mockContext.isScrolling ).toBe( true );
 	} );
 
-	it( 'should apply offset', () => {
+	it( 'applies offset', () => {
 		mockContext.offset = 50;
 		storeDefinition.callbacks.init();
-		const event = { preventDefault: jest.fn() };
-		storeDefinition.actions.scrollToTarget( event );
+		storeDefinition.actions.scrollToTarget( { preventDefault: jest.fn() } );
 
 		expect( window.scrollTo ).toHaveBeenCalledWith( {
 			top: 450,
@@ -90,41 +90,34 @@ describe( 'Smooth Scroll Store', () => {
 		} );
 	} );
 
-	it( 'should show scrolling text and reset', () => {
+	it( 'resets isScrolling false after the feedback duration', () => {
 		storeDefinition.callbacks.init();
-		const link = mockElement.querySelector( 'a' );
-		const event = { preventDefault: jest.fn() };
-
-		storeDefinition.actions.scrollToTarget( event );
-		expect( link.textContent ).toBe( 'Scrolling...' );
-
+		storeDefinition.actions.scrollToTarget( { preventDefault: jest.fn() } );
 		jest.advanceTimersByTime( 1000 );
-		expect( link.textContent ).toBe( 'Scroll Down' );
+		expect( mockContext.isScrolling ).toBe( false );
 	} );
 
-	it( 'should not scroll when targetId is empty', () => {
+	it( 'bails when targetId is empty', () => {
 		mockContext.targetId = '';
-		const event = { preventDefault: jest.fn() };
-		storeDefinition.actions.scrollToTarget( event );
+		storeDefinition.actions.scrollToTarget( { preventDefault: jest.fn() } );
 		expect( window.scrollTo ).not.toHaveBeenCalled();
 	} );
 
-	it( 'should return a cleanup function from init', () => {
-		const cleanup = storeDefinition.callbacks.init();
-		expect( typeof cleanup ).toBe( 'function' );
+	it( 'state.buttonText swaps between feedback and original', () => {
+		mockContext.originalText = 'Scroll Down';
+		mockContext.isScrolling = false;
+		expect( storeDefinition.state.buttonText ).toBe( 'Scroll Down' );
+		mockContext.isScrolling = true;
+		expect( storeDefinition.state.buttonText ).toBe( 'Scrolling...' );
 	} );
 
-	it( 'should cancel pending timeout on cleanup', () => {
+	it( 'init returns a cleanup function that cancels pending timers', () => {
 		const cleanup = storeDefinition.callbacks.init();
-		const link = mockElement.querySelector( 'a' );
-		const event = { preventDefault: jest.fn() };
-
-		storeDefinition.actions.scrollToTarget( event );
-		expect( link.textContent ).toBe( 'Scrolling...' );
+		storeDefinition.actions.scrollToTarget( { preventDefault: jest.fn() } );
+		expect( mockContext.isScrolling ).toBe( true );
 
 		cleanup();
 		jest.advanceTimersByTime( 1000 );
-
-		expect( link.textContent ).toBe( 'Scrolling...' );
+		expect( mockContext.isScrolling ).toBe( true );
 	} );
 } );
