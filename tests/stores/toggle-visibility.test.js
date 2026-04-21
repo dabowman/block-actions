@@ -1,5 +1,10 @@
 /**
  * Toggle Visibility Store Tests
+ *
+ * Tests the declarative store: state.buttonLabel getter, toggle action
+ * that mutates ctx.isVisible + target class, and init that reads
+ * initial state from the target element. aria-expanded / aria-controls
+ * are bound via PHP directives (data-wp-bind), not set in JS.
  */
 
 const interactivityMock = require( '@wordpress/interactivity' );
@@ -81,61 +86,47 @@ describe( 'Toggle Visibility Store', () => {
 		expect( targetElement.classList.contains( 'is-hidden' ) ).toBe( false );
 	} );
 
-	it( 'should update button text', () => {
-		const link = mockElement.querySelector( 'a' );
+	it( 'should bail when targetId is missing', () => {
+		mockContext.targetId = '';
 		const event = { preventDefault: jest.fn() };
-
+		const beforeVisibility = mockContext.isVisible;
 		storeDefinition.actions.toggle( event );
-		expect( link.textContent ).toBe( 'Show' );
-
-		storeDefinition.actions.toggle( event );
-		expect( link.textContent ).toBe( 'Hide' );
+		expect( mockContext.isVisible ).toBe( beforeVisibility );
 	} );
 
-	it( 'should use context labels for button text', () => {
-		mockContext.showLabel = 'Reveal';
-		mockContext.hideLabel = 'Conceal';
-		const link = mockElement.querySelector( 'a' );
+	it( 'should call preventDefault on the event', () => {
 		const event = { preventDefault: jest.fn() };
-
 		storeDefinition.actions.toggle( event );
-		expect( link.textContent ).toBe( 'Reveal' );
-
-		storeDefinition.actions.toggle( event );
-		expect( link.textContent ).toBe( 'Conceal' );
+		expect( event.preventDefault ).toHaveBeenCalled();
 	} );
 
-	it( 'should return a cleanup function from init', () => {
-		const cleanup = storeDefinition.callbacks.init();
-		expect( typeof cleanup ).toBe( 'function' );
-	} );
+	describe( 'state.buttonLabel', () => {
+		it( 'returns hideLabel when visible', () => {
+			mockContext.isVisible = true;
+			expect( storeDefinition.state.buttonLabel ).toBe( 'Hide' );
+		} );
 
-	it( 'should set aria-controls on init', () => {
-		storeDefinition.callbacks.init();
-		expect( mockElement.getAttribute( 'aria-controls' ) ).toBe(
-			'test-target'
-		);
-	} );
+		it( 'returns showLabel when hidden', () => {
+			mockContext.isVisible = false;
+			expect( storeDefinition.state.buttonLabel ).toBe( 'Show' );
+		} );
 
-	it( 'should set aria-expanded to true on init when visible', () => {
-		storeDefinition.callbacks.init();
-		expect( mockElement.getAttribute( 'aria-expanded' ) ).toBe( 'true' );
-	} );
+		it( 'falls back to defaults when labels missing', () => {
+			mockContext.showLabel = undefined;
+			mockContext.hideLabel = undefined;
+			mockContext.isVisible = true;
+			expect( storeDefinition.state.buttonLabel ).toBe( 'Hide' );
+			mockContext.isVisible = false;
+			expect( storeDefinition.state.buttonLabel ).toBe( 'Show' );
+		} );
 
-	it( 'should set aria-expanded to false on init when hidden', () => {
-		targetElement.classList.add( 'is-hidden' );
-		storeDefinition.callbacks.init();
-		expect( mockElement.getAttribute( 'aria-expanded' ) ).toBe( 'false' );
-	} );
-
-	it( 'should update aria-expanded on toggle', () => {
-		storeDefinition.callbacks.init();
-		const event = { preventDefault: jest.fn() };
-
-		storeDefinition.actions.toggle( event );
-		expect( mockElement.getAttribute( 'aria-expanded' ) ).toBe( 'false' );
-
-		storeDefinition.actions.toggle( event );
-		expect( mockElement.getAttribute( 'aria-expanded' ) ).toBe( 'true' );
+		it( 'honours custom labels', () => {
+			mockContext.showLabel = 'Reveal';
+			mockContext.hideLabel = 'Conceal';
+			mockContext.isVisible = true;
+			expect( storeDefinition.state.buttonLabel ).toBe( 'Conceal' );
+			mockContext.isVisible = false;
+			expect( storeDefinition.state.buttonLabel ).toBe( 'Reveal' );
+		} );
 	} );
 } );
