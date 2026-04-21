@@ -72,25 +72,23 @@ abstract class Action_Renderer {
 	 */
 	public function enqueue_view_script( string $action_id ): void {
 		$handle     = "block-actions-{$action_id}-view";
-		$plugin_dir = plugin_dir_path( dirname( __FILE__ ) );
-		$plugin_url = plugin_dir_url( dirname( __FILE__ ) );
 		$js_path    = "build/actions/{$action_id}/view.js";
 		$asset_path = "build/actions/{$action_id}/view.asset.php";
 
-		if ( ! file_exists( $plugin_dir . $js_path ) ) {
+		if ( ! file_exists( DIR . $js_path ) ) {
 			return;
 		}
 
-		$asset = file_exists( $plugin_dir . $asset_path )
-			? include $plugin_dir . $asset_path
+		$asset = file_exists( DIR . $asset_path )
+			? include DIR . $asset_path
 			: array(
 				'dependencies' => array( 'wp-interactivity' ),
-				'version'      => filemtime( $plugin_dir . $js_path ),
+				'version'      => filemtime( DIR . $js_path ),
 			);
 
 		wp_enqueue_script(
 			$handle,
-			$plugin_url . $js_path,
+			URL . $js_path,
 			$asset['dependencies'],
 			$asset['version'],
 			true

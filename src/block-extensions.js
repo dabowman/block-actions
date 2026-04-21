@@ -24,24 +24,7 @@ import {
 	ToggleControl,
 } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
-import { assign } from 'lodash';
 import actions from './action-registry';
-
-/**
- * Simple telemetry tracking for block extensions.
- *
- * @since 1.0.0
- *
- * @type {Object}
- */
-const telemetry = {
-	initialized: false,
-	initTime: 0,
-	actionsRegistered: 0, // Will be updated on init
-	customBlocksRegistered: 0,
-	errorCount: 0,
-	lastActionSet: null,
-};
 
 /**
  * Registry for theme actions in editor context.
@@ -280,37 +263,18 @@ if ( typeof window !== 'undefined' ) {
  *
  * @since 1.0.0
  *
- * @param {string}     type    Log type: 'error', 'warning', or 'info'.
+ * @param {string}     type    Log type: 'error' or 'warning'.
  * @param {string}     message Log message to display.
  * @param {Error|null} [error] Optional error object for error logs.
  * @return {void}
  */
 function log( type, message, error = null ) {
 	const prefix = '[Block Actions]';
-
-	// Update telemetry on errors
 	if ( type === 'error' ) {
-		telemetry.errorCount++;
+		console.error( `${ prefix } ${ message }`, error || '' );
+	} else if ( type === 'warning' ) {
+		console.warn( `${ prefix } ${ message }` );
 	}
-
-	// Console logging based on type
-	switch ( type ) {
-		case 'error':
-			console.error( `${ prefix } ${ message }`, error || '' );
-			break;
-		case 'warning':
-			console.warn( `${ prefix } ${ message }` );
-			break;
-		case 'info':
-			// No-op: info logs removed. Use browser devtools or add
-			// temporary console.log while debugging.
-			break;
-		default:
-			console.log( `${ prefix } ${ message }` );
-	}
-
-	// In the editor, we don't send logs to the server directly,
-	// as WP has its own error logging mechanisms
 }
 
 /**
@@ -350,17 +314,17 @@ const BLOCKS_WITH_ACTIONS = {
  */
 function addCustomDataAttribute( settings ) {
 	try {
-		// Add the attribute
-		settings.attributes = assign( settings.attributes, {
+		settings.attributes = {
+			...settings.attributes,
 			customData: {
 				type: 'string',
 				default: '',
 			},
-		} );
+		};
 
-		// Add customAction and actionData attributes only to blocks that support actions
 		if ( BLOCKS_WITH_ACTIONS[ settings.name ] ) {
-			settings.attributes = assign( settings.attributes, {
+			settings.attributes = {
+				...settings.attributes,
 				customAction: {
 					type: 'string',
 					default: '',
@@ -369,8 +333,7 @@ function addCustomDataAttribute( settings ) {
 					type: 'object',
 					default: {},
 				},
-			} );
-			telemetry.customBlocksRegistered++;
+			};
 		}
 
 		return settings;
@@ -502,19 +465,6 @@ const withActionInspectorControl = createHigherOrderComponent(
 											customAction: value,
 											actionData: {},
 										} );
-										// Track last action set for telemetry
-										telemetry.lastActionSet = {
-											blockType: props.name,
-											action: value,
-											timestamp: Date.now(),
-										};
-										log(
-											'info',
-											`Action set to: ${
-												value ||
-												__( 'None', 'block-actions' )
-											} for block: ${ props.name }`
-										);
 									} catch ( error ) {
 										log(
 											'error',
@@ -590,8 +540,6 @@ function addCustomDataToSave( extraProps, blockType, attributes ) {
 					}
 				} );
 			}
-
-			log( 'info', `Saving block with action: ${ customAction }` );
 		}
 
 		return extraProps;
@@ -607,10 +555,7 @@ function addCustomDataToSave( extraProps, blockType, attributes ) {
 	}
 }
 
-// Register the filters
 try {
-	const startTime = performance.now();
-
 	addFilter(
 		'blocks.registerBlockType',
 		'block-actions/custom-data-attribute',
@@ -634,23 +579,6 @@ try {
 		'block-actions/custom-data-save',
 		addCustomDataToSave
 	);
-
-	// Update telemetry
-	telemetry.initialized = true;
-	telemetry.initTime = performance.now() - startTime;
-
-	// Wait a tick to let theme actions register
-	setTimeout( () => {
-		telemetry.actionsRegistered = getAllActions().length;
-		log(
-			'info',
-			`Block Actions initialized in ${ Math.round(
-				telemetry.initTime
-			) }ms with ${ telemetry.actionsRegistered } actions (${
-				actions.length
-			} built-in, ${ editorActionRegistry.length } theme)`
-		);
-	}, 0 );
 } catch ( error ) {
 	log( 'error', 'Failed to register Block Actions', error );
 }

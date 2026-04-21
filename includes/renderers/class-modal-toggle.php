@@ -31,8 +31,9 @@ class Modal_Toggle extends Action_Renderer {
 	 * @return array Initial context data.
 	 */
 	public function get_initial_context( \WP_HTML_Tag_Processor $processor, array $block ): array {
+		$modal = $processor->get_attribute( 'data-modal' );
 		return array(
-			'modalId' => $processor->get_attribute( 'data-modal' ) ?? '',
+			'modalId' => is_string( $modal ) ? $modal : '',
 			'isOpen'  => false,
 		);
 	}

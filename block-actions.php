@@ -17,6 +17,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
+const VERSION = '2.1.0';
+
+if ( ! defined( 'Block_Actions\\DIR' ) ) {
+	define( 'Block_Actions\\DIR', plugin_dir_path( __FILE__ ) );
+}
+if ( ! defined( 'Block_Actions\\URL' ) ) {
+	define( 'Block_Actions\\URL', plugin_dir_url( __FILE__ ) );
+}
+
 // Load Interactivity API infrastructure.
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-action-renderer.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-directive-transformer.php';
