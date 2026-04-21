@@ -104,14 +104,27 @@ Smoothly scrolls to a target element on the page.
 **Perfect for:** Complex interactions
 **Complexity:** Advanced
 
-Opens and closes modals with accessibility features.
+Opens and closes a native `<dialog>` element. The browser handles focus
+trap, ESC to close, and focus restore; the action layers on body scroll
+lock, backdrop-click to close, and close-button helpers.
+
+**Target markup** — the modal must be a `<dialog>`:
+
+```html
+<dialog id="my-modal">
+  <div class="modal-content">
+    <h2 id="my-modal-title">Title</h2>
+    <p>Body.</p>
+    <button class="modal-close">&times;</button>
+  </div>
+</dialog>
+```
 
 **What it does:**
-- Opens modal by ID
-- Multiple close methods (button, backdrop, escape key)
-- Focus management
-- Body scroll lock
-- Accessibility attributes
+- Opens the dialog via `showModal()` (modal semantics + top layer → free focus trap)
+- Closes via button click, backdrop click, ESC, or programmatic `close()`
+- Body scroll lock while any modal is open; original overflow restored when the last closes
+- Adds `aria-labelledby` pointing at the first heading if the author didn't set one
 
 **Use cases:**
 - Contact forms

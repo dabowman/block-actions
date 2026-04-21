@@ -1,5 +1,10 @@
 /**
  * Modal Toggle Store Tests
+ *
+ * Covers the native-<dialog>-based store. Focus trap, ESC to close, and
+ * focus restore are delegated to the browser and not exercised here —
+ * jsdom's dialog polyfill in tests/setup.js only implements enough to
+ * track open state and dispatch the close event.
  */
 
 const interactivityMock = require( '@wordpress/interactivity' );
@@ -21,11 +26,13 @@ describe( 'Modal Toggle Store', () => {
 	let modalElement;
 
 	beforeEach( () => {
-		mockElement = document.createElement( 'div' );
-		modalElement = document.createElement( 'div' );
+		// Reset module-level state so counter/overflow don't leak between cases.
+		storeDefinition.state.openCount = 0;
+		storeDefinition.state.priorBodyOverflow = '';
+
+		mockElement = document.createElement( 'button' );
+		modalElement = document.createElement( 'dialog' );
 		modalElement.id = 'test-modal';
-		modalElement.setAttribute( 'hidden', '' );
-		modalElement.focus = jest.fn();
 		document.body.appendChild( modalElement );
 
 		mockContext = { modalId: 'test-modal', isOpen: false };
@@ -34,104 +41,119 @@ describe( 'Modal Toggle Store', () => {
 	} );
 
 	afterEach( () => {
-		// Close the modal if still open so the module-level openModalCount
-		// stays in sync across tests.
-		if ( mockContext.isOpen ) {
-			const event = { preventDefault: jest.fn() };
-			storeDefinition.actions.toggle( event );
+		if ( modalElement.open ) {
+			modalElement.close();
 		}
 		document.body.removeChild( modalElement );
 		document.body.style.overflow = '';
 	} );
 
-	it( 'should register with correct namespace', () => {
+	it( 'registers with the correct namespace', () => {
 		expect( interactivityMock.store ).toHaveBeenCalledWith(
 			'block-actions/modal-toggle',
 			expect.any( Object )
 		);
 	} );
 
-	it( 'should open modal on toggle', () => {
-		const event = { preventDefault: jest.fn() };
-		storeDefinition.actions.toggle( event );
+	describe( 'toggle action', () => {
+		beforeEach( () => {
+			// Wire close listeners so the close path can sync state. In
+			// real usage `data-wp-init` guarantees this; tests need to
+			// reproduce it explicitly.
+			storeDefinition.callbacks.init();
+		} );
 
-		expect( mockContext.isOpen ).toBe( true );
-		expect( modalElement.hasAttribute( 'hidden' ) ).toBe( false );
-		expect( modalElement.classList.contains( 'is-open' ) ).toBe( true );
-		expect( document.body.style.overflow ).toBe( 'hidden' );
-	} );
+		it( 'opens the dialog and locks body scroll', () => {
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
 
-	it( 'should close modal on toggle when open', () => {
-		// Open first so the counter is tracked properly.
-		const openEvent = { preventDefault: jest.fn() };
-		storeDefinition.actions.toggle( openEvent );
-		expect( mockContext.isOpen ).toBe( true );
+			expect( modalElement.open ).toBe( true );
+			expect( mockContext.isOpen ).toBe( true );
+			expect( document.body.style.overflow ).toBe( 'hidden' );
+		} );
 
-		const event = { preventDefault: jest.fn() };
-		storeDefinition.actions.toggle( event );
+		it( 'closes the dialog on the second toggle and restores scroll', () => {
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
 
-		expect( mockContext.isOpen ).toBe( false );
-		expect( modalElement.hasAttribute( 'hidden' ) ).toBe( true );
-		expect( modalElement.classList.contains( 'is-open' ) ).toBe( false );
-		expect( document.body.style.overflow ).toBe( '' );
-	} );
+			expect( modalElement.open ).toBe( false );
+			expect( mockContext.isOpen ).toBe( false );
+			expect( document.body.style.overflow ).toBe( '' );
+		} );
 
-	it( 'should keep body overflow hidden when closing one of multiple open modals', () => {
-		// Open the first modal.
-		const event1 = { preventDefault: jest.fn() };
-		storeDefinition.actions.toggle( event1 );
-		expect( document.body.style.overflow ).toBe( 'hidden' );
+		it( 'no-ops when modalId is missing', () => {
+			interactivityMock.__setContext( { modalId: '', isOpen: false } );
 
-		// Simulate a second modal opening by creating a second context/modal.
-		const modal2 = document.createElement( 'div' );
-		modal2.id = 'test-modal-2';
-		modal2.setAttribute( 'hidden', '' );
-		modal2.focus = jest.fn();
-		document.body.appendChild( modal2 );
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
 
-		const ctx2 = { modalId: 'test-modal-2', isOpen: false };
-		interactivityMock.__setContext( ctx2 );
-		const event2 = { preventDefault: jest.fn() };
-		storeDefinition.actions.toggle( event2 );
-		expect( ctx2.isOpen ).toBe( true );
+			expect( modalElement.open ).toBe( false );
+		} );
 
-		// Close the second modal — body should stay locked.
-		storeDefinition.actions.toggle( event2 );
-		expect( ctx2.isOpen ).toBe( false );
-		expect( document.body.style.overflow ).toBe( 'hidden' );
+		it( 'no-ops when target is not a <dialog>', () => {
+			const div = document.createElement( 'div' );
+			div.id = 'not-a-dialog';
+			document.body.appendChild( div );
+			interactivityMock.__setContext( {
+				modalId: 'not-a-dialog',
+				isOpen: false,
+			} );
 
-		// Close the first modal — body should unlock.
-		interactivityMock.__setContext( mockContext );
-		storeDefinition.actions.toggle( event1 );
-		expect( mockContext.isOpen ).toBe( false );
-		expect( document.body.style.overflow ).toBe( '' );
+			expect( () =>
+				storeDefinition.actions.toggle( {
+					preventDefault: jest.fn(),
+				} )
+			).not.toThrow();
 
-		document.body.removeChild( modal2 );
-	} );
+			document.body.removeChild( div );
+		} );
 
-	it( 'should close on Escape key', () => {
-		// Open first so counter is tracked.
-		const openEvent = { preventDefault: jest.fn() };
-		storeDefinition.actions.toggle( openEvent );
-		expect( mockContext.isOpen ).toBe( true );
+		it( 'preserves body overflow when one of two modals closes', () => {
+			// Open the first (ctx1 was wired in the outer beforeEach init).
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( document.body.style.overflow ).toBe( 'hidden' );
 
-		storeDefinition.actions.handleKeydown( { key: 'Escape' } );
+			// Spin up a second trigger + dialog + context.
+			const trigger2 = document.createElement( 'button' );
+			const modal2 = document.createElement( 'dialog' );
+			modal2.id = 'test-modal-2';
+			document.body.appendChild( modal2 );
+			const ctx2 = { modalId: 'test-modal-2', isOpen: false };
+			interactivityMock.__setContext( ctx2 );
+			interactivityMock.__setElement( trigger2 );
+			storeDefinition.callbacks.init();
 
-		expect( mockContext.isOpen ).toBe( false );
-		expect( modalElement.hasAttribute( 'hidden' ) ).toBe( true );
-	} );
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( ctx2.isOpen ).toBe( true );
+			expect( modal2.open ).toBe( true );
 
-	it( 'should not close on non-Escape key', () => {
-		mockContext.isOpen = true;
-		modalElement.removeAttribute( 'hidden' );
+			// Close the second — body stays locked because the first is still open.
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( ctx2.isOpen ).toBe( false );
+			expect( document.body.style.overflow ).toBe( 'hidden' );
 
-		storeDefinition.actions.handleKeydown( { key: 'Enter' } );
+			// Close the first — body unlocks.
+			interactivityMock.__setContext( mockContext );
+			interactivityMock.__setElement( mockElement );
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( document.body.style.overflow ).toBe( '' );
 
-		expect( mockContext.isOpen ).toBe( true );
+			document.body.removeChild( modal2 );
+		} );
+
+		it( 'restores the prior body overflow value on close', () => {
+			document.body.style.overflow = 'scroll';
+
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( document.body.style.overflow ).toBe( 'hidden' );
+
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( document.body.style.overflow ).toBe( 'scroll' );
+
+			document.body.style.overflow = '';
+		} );
 	} );
 
 	describe( 'init callback', () => {
-		it( 'returns a cleanup function when a modal is wired up', () => {
+		it( 'returns a cleanup function when wired up', () => {
 			const cleanup = storeDefinition.callbacks.init();
 			expect( typeof cleanup ).toBe( 'function' );
 		} );
@@ -141,7 +163,7 @@ describe( 'Modal Toggle Store', () => {
 			expect( storeDefinition.callbacks.init() ).toBeUndefined();
 		} );
 
-		it( 'returns nothing when modal element is not found', () => {
+		it( 'returns nothing when target element is not found', () => {
 			interactivityMock.__setContext( {
 				modalId: 'nonexistent',
 				isOpen: false,
@@ -149,66 +171,107 @@ describe( 'Modal Toggle Store', () => {
 			expect( storeDefinition.callbacks.init() ).toBeUndefined();
 		} );
 
-		it( 'should register close button listeners in init', () => {
-			const closeBtn = document.createElement( 'button' );
-			closeBtn.classList.add( 'modal-close' );
-			modalElement.appendChild( closeBtn );
-			const addSpy = jest.spyOn( closeBtn, 'addEventListener' );
+		it( 'warns and returns nothing when target is not a <dialog>', () => {
+			const div = document.createElement( 'div' );
+			div.id = 'also-not-a-dialog';
+			document.body.appendChild( div );
+			interactivityMock.__setContext( {
+				modalId: 'also-not-a-dialog',
+				isOpen: false,
+			} );
+			const warnSpy = jest
+				.spyOn( console, 'warn' )
+				.mockImplementation( () => {} );
 
-			storeDefinition.callbacks.init();
+			const result = storeDefinition.callbacks.init();
 
-			expect( addSpy ).toHaveBeenCalledWith(
-				'click',
-				expect.any( Function )
+			expect( result ).toBeUndefined();
+			expect( warnSpy ).toHaveBeenCalledWith(
+				expect.stringContaining( 'not a <dialog> element' )
 			);
-			addSpy.mockRestore();
-			modalElement.removeChild( closeBtn );
+
+			warnSpy.mockRestore();
+			document.body.removeChild( div );
 		} );
 
-		it( 'should close modal via close button click', () => {
+		it( 'syncs context.isOpen when the dialog fires a native close event', () => {
+			storeDefinition.callbacks.init();
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( mockContext.isOpen ).toBe( true );
+
+			// Simulate ESC / form method="dialog" / programmatic close().
+			modalElement.close();
+
+			expect( mockContext.isOpen ).toBe( false );
+			expect( document.body.style.overflow ).toBe( '' );
+		} );
+
+		it( 'closes the dialog when a .modal-close button is clicked', () => {
 			const closeBtn = document.createElement( 'button' );
 			closeBtn.classList.add( 'modal-close' );
 			modalElement.appendChild( closeBtn );
 
 			storeDefinition.callbacks.init();
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( modalElement.open ).toBe( true );
 
-			// Open the modal first.
-			const event = { preventDefault: jest.fn() };
-			storeDefinition.actions.toggle( event );
-			expect( mockContext.isOpen ).toBe( true );
-
-			// Click close button.
 			closeBtn.click();
+
+			expect( modalElement.open ).toBe( false );
 			expect( mockContext.isOpen ).toBe( false );
 
 			modalElement.removeChild( closeBtn );
 		} );
 
-		it( 'should not accumulate listeners on repeated open/close', () => {
+		it( 'closes the dialog when [data-modal-close] is clicked', () => {
 			const closeBtn = document.createElement( 'button' );
-			closeBtn.classList.add( 'modal-close' );
+			closeBtn.setAttribute( 'data-modal-close', '' );
 			modalElement.appendChild( closeBtn );
 
 			storeDefinition.callbacks.init();
-			const addSpy = jest.spyOn( closeBtn, 'addEventListener' );
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
 
-			// Open, close via Escape, open again — should not add new listeners.
-			const event = { preventDefault: jest.fn() };
-			storeDefinition.actions.toggle( event );
-			storeDefinition.actions.handleKeydown( { key: 'Escape' } );
-			storeDefinition.actions.toggle( event );
+			closeBtn.click();
 
-			expect( addSpy ).not.toHaveBeenCalled();
-			addSpy.mockRestore();
+			expect( modalElement.open ).toBe( false );
+
 			modalElement.removeChild( closeBtn );
 		} );
 
-		it( 'should remove listeners on cleanup', () => {
+		it( 'closes on backdrop click (e.target === dialog)', () => {
+			storeDefinition.callbacks.init();
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( modalElement.open ).toBe( true );
+
+			modalElement.dispatchEvent(
+				new MouseEvent( 'click', { bubbles: true } )
+			);
+
+			expect( modalElement.open ).toBe( false );
+		} );
+
+		it( 'ignores clicks originating inside modal content', () => {
+			const content = document.createElement( 'div' );
+			modalElement.appendChild( content );
+
+			storeDefinition.callbacks.init();
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+
+			content.dispatchEvent(
+				new MouseEvent( 'click', { bubbles: true } )
+			);
+
+			expect( modalElement.open ).toBe( true );
+
+			modalElement.removeChild( content );
+		} );
+
+		it( 'removes all listeners on cleanup', () => {
 			const closeBtn = document.createElement( 'button' );
 			closeBtn.classList.add( 'modal-close' );
 			modalElement.appendChild( closeBtn );
-			const removeSpy = jest.spyOn( closeBtn, 'removeEventListener' );
-			const modalRemoveSpy = jest.spyOn(
+			const removeBtn = jest.spyOn( closeBtn, 'removeEventListener' );
+			const removeModal = jest.spyOn(
 				modalElement,
 				'removeEventListener'
 			);
@@ -216,17 +279,62 @@ describe( 'Modal Toggle Store', () => {
 			const cleanup = storeDefinition.callbacks.init();
 			cleanup();
 
-			expect( removeSpy ).toHaveBeenCalledWith(
+			expect( removeBtn ).toHaveBeenCalledWith(
 				'click',
 				expect.any( Function )
 			);
-			expect( modalRemoveSpy ).toHaveBeenCalledWith(
+			expect( removeModal ).toHaveBeenCalledWith(
 				'click',
 				expect.any( Function )
 			);
-			removeSpy.mockRestore();
-			modalRemoveSpy.mockRestore();
+			expect( removeModal ).toHaveBeenCalledWith(
+				'close',
+				expect.any( Function )
+			);
+
+			removeBtn.mockRestore();
+			removeModal.mockRestore();
 			modalElement.removeChild( closeBtn );
+		} );
+	} );
+
+	describe( 'aria-labelledby inference', () => {
+		it( 'wires aria-labelledby to the first heading with an id', () => {
+			const heading = document.createElement( 'h2' );
+			heading.id = 'demo-title';
+			modalElement.appendChild( heading );
+
+			storeDefinition.callbacks.init();
+
+			expect( modalElement.getAttribute( 'aria-labelledby' ) ).toBe(
+				'demo-title'
+			);
+
+			modalElement.removeChild( heading );
+		} );
+
+		it( 'generates a heading id when missing', () => {
+			const heading = document.createElement( 'h2' );
+			modalElement.appendChild( heading );
+
+			storeDefinition.callbacks.init();
+
+			expect( heading.id ).toBe( 'test-modal__heading' );
+			expect( modalElement.getAttribute( 'aria-labelledby' ) ).toBe(
+				'test-modal__heading'
+			);
+
+			modalElement.removeChild( heading );
+		} );
+
+		it( 'leaves aria-labelledby alone when the author set one', () => {
+			modalElement.setAttribute( 'aria-labelledby', 'author-label' );
+
+			storeDefinition.callbacks.init();
+
+			expect( modalElement.getAttribute( 'aria-labelledby' ) ).toBe(
+				'author-label'
+			);
 		} );
 	} );
 } );

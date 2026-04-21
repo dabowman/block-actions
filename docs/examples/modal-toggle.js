@@ -1,82 +1,60 @@
 /**
  * Modal Toggle Action
  *
- * Opens and closes a modal/dialog when clicked. Includes accessibility
- * features: ESC key close, backdrop click, focus management, and body
- * scroll lock.
+ * Opens and closes a native <dialog> element when the trigger is
+ * clicked. The browser provides focus trap, ESC to close, and focus
+ * restore; this action layers on body scroll lock, backdrop-click to
+ * close, and convenience close-button selectors.
  *
  * Usage:
  * 1. Copy to: wp-content/themes/your-theme/actions/modal-toggle.js
  * 2. Add to a Button block in the editor
- * 3. Add data-modal="my-modal-id" attribute to the button
- * 4. Create a modal element with matching ID:
+ * 3. Set data-modal="my-modal-id" on the button
+ * 4. Create a <dialog> element with the matching ID:
  *
- *    <div id="my-modal-id" class="modal" hidden>
+ *    <dialog id="my-modal-id">
  *      <div class="modal-content">
- *        <!-- Your content -->
+ *        <h2 id="my-modal-id-title">Title</h2>
+ *        <p>Body content.</p>
  *        <button class="modal-close">&times;</button>
  *      </div>
- *    </div>
+ *    </dialog>
+ *
+ * The store mirrors the built-in modal-toggle action, minus PHP-injected
+ * trigger ARIA; theme actions get all trigger ARIA via markup they write
+ * themselves.
  */
 
 import { store, getContext, getElement } from '@wordpress/interactivity';
 
-/**
- * Close a modal and reset state.
- *
- * @param {Object}      ctx   The Interactivity API context.
- * @param {HTMLElement} modal The modal element.
- */
-function closeModal( ctx, modal ) {
-	if ( ! ctx.isOpen ) {
-		return;
-	}
-	modal.setAttribute( 'hidden', '' );
-	modal.classList.remove( 'is-open' );
-	document.body.style.overflow = '';
-	ctx.isOpen = false;
-}
-
-store( 'block-actions/modal-toggle', {
+const { state } = store( 'block-actions/modal-toggle', {
+	state: {
+		openCount: 0,
+		priorBodyOverflow: '',
+	},
 	actions: {
 		handleClick( event ) {
 			event.preventDefault();
 			const ctx = getContext();
-
 			if ( ! ctx.modalId ) {
 				return;
 			}
 
 			const modal = document.getElementById( ctx.modalId );
-			if ( ! modal ) {
+			if ( ! modal || typeof modal.showModal !== 'function' ) {
 				return;
 			}
 
-			if ( ctx.isOpen ) {
-				closeModal( ctx, modal );
+			if ( modal.open ) {
+				modal.close();
 			} else {
-				// Open modal
-				modal.removeAttribute( 'hidden' );
-				modal.classList.add( 'is-open' );
+				if ( state.openCount === 0 ) {
+					state.priorBodyOverflow = document.body.style.overflow;
+				}
+				modal.showModal();
+				state.openCount++;
 				document.body.style.overflow = 'hidden';
-				modal.setAttribute( 'tabindex', '-1' );
-				modal.focus();
 				ctx.isOpen = true;
-			}
-		},
-
-		handleKeydown( event ) {
-			if ( event.key !== 'Escape' ) {
-				return;
-			}
-			const ctx = getContext();
-			if ( ! ctx.isOpen || ! ctx.modalId ) {
-				return;
-			}
-
-			const modal = document.getElementById( ctx.modalId );
-			if ( modal ) {
-				closeModal( ctx, modal );
 			}
 		},
 	},
@@ -85,7 +63,6 @@ store( 'block-actions/modal-toggle', {
 			const ctx = getContext();
 			const { ref } = getElement();
 
-			// Read modal ID from data attribute
 			ctx.modalId = ref.getAttribute( 'data-modal' ) || '';
 			ctx.isOpen = false;
 
@@ -94,16 +71,22 @@ store( 'block-actions/modal-toggle', {
 			}
 
 			const modal = document.getElementById( ctx.modalId );
-			if ( ! modal ) {
+			if ( ! modal || typeof modal.showModal !== 'function' ) {
 				return () => {};
 			}
 
-			// Setup close button listeners
-			const handleCloseClick = () => closeModal( ctx, modal );
+			const handleCloseClick = () => modal.close();
 			const handleBackdropClick = ( e ) => {
 				if ( e.target === modal ) {
-					closeModal( ctx, modal );
+					modal.close();
 				}
+			};
+			const handleNativeClose = () => {
+				state.openCount = Math.max( 0, state.openCount - 1 );
+				if ( state.openCount === 0 ) {
+					document.body.style.overflow = state.priorBodyOverflow;
+				}
+				ctx.isOpen = false;
 			};
 
 			const closeButtons = modal.querySelectorAll(
@@ -113,13 +96,14 @@ store( 'block-actions/modal-toggle', {
 				button.addEventListener( 'click', handleCloseClick );
 			} );
 			modal.addEventListener( 'click', handleBackdropClick );
+			modal.addEventListener( 'close', handleNativeClose );
 
-			// Cleanup on removal
 			return () => {
 				closeButtons.forEach( ( button ) => {
 					button.removeEventListener( 'click', handleCloseClick );
 				} );
 				modal.removeEventListener( 'click', handleBackdropClick );
+				modal.removeEventListener( 'close', handleNativeClose );
 			};
 		},
 	},

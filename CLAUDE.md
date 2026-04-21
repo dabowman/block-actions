@@ -210,6 +210,22 @@ Browser: Interactivity API processes directives, store hydrates
 - **`block_actions_enable_csp` / `block_actions_csp_header` filters (PHP)** — CSP header control
 - **`Action_Renderer` abstract class (PHP)** — Extend for custom action renderers
 
+### Modal Toggle — target markup contract
+
+The `modal-toggle` action operates on a native `<dialog>` element. Authors must use:
+
+```html
+<dialog id="my-modal">
+  <div class="modal-content">
+    <h2>Title</h2>
+    <p>Body.</p>
+    <button class="modal-close">Close</button>
+  </div>
+</dialog>
+```
+
+`<div hidden>` targets are rejected (store warns in the console). The browser provides focus trap / ESC / focus restore via `showModal()`; the store layers body scroll lock, backdrop-click close, and `.modal-close` / `[data-modal-close]` helpers.
+
 ### Adding a New Built-in Action
 
 1. Create `src/stores/your-action/view.js` with an Interactivity API `store()` call

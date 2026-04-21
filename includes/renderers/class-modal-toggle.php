@@ -41,6 +41,11 @@ class Modal_Toggle extends Action_Renderer {
 	/**
 	 * Apply directives to the root element.
 	 *
+	 * Static a11y attributes on the trigger are server-rendered:
+	 * - aria-haspopup="dialog" flags the control as a dialog opener.
+	 * - aria-controls points at the modal element id.
+	 * - aria-expanded is bound reactively to context.isOpen.
+	 *
 	 * @since 2.0.0
 	 *
 	 * @param \WP_HTML_Tag_Processor $processor The HTML tag processor.
@@ -50,6 +55,12 @@ class Modal_Toggle extends Action_Renderer {
 	public function apply_directives( \WP_HTML_Tag_Processor $processor, array $block ): void {
 		$processor->set_attribute( 'data-wp-on--click', 'actions.toggle' );
 		$processor->set_attribute( 'data-wp-init', 'callbacks.init' );
-		$processor->set_attribute( 'data-wp-on-document--keydown', 'actions.handleKeydown' );
+		$processor->set_attribute( 'data-wp-bind--aria-expanded', 'context.isOpen' );
+		$processor->set_attribute( 'aria-haspopup', 'dialog' );
+
+		$modal_id = $processor->get_attribute( 'data-modal' );
+		if ( is_string( $modal_id ) && '' !== $modal_id ) {
+			$processor->set_attribute( 'aria-controls', $modal_id );
+		}
 	}
 }
