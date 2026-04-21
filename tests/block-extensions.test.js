@@ -190,13 +190,13 @@ describe( 'block-extensions', () => {
 		expect( filterNames ).toContain( 'blocks.getSaveContent.extraProps' );
 	} );
 
-	test( 'registers the Modal Dialog variation of core/group', () => {
+	test( 'registers the Dialog variation of core/group', () => {
 		loadModule();
 		const { registerBlockVariation } = require( '@wordpress/blocks' );
 		expect( registerBlockVariation ).toHaveBeenCalledWith(
 			'core/group',
 			expect.objectContaining( {
-				name: 'block-actions-modal-dialog',
+				name: 'block-actions-dialog',
 				attributes: expect.objectContaining( { tagName: 'dialog' } ),
 			} )
 		);
