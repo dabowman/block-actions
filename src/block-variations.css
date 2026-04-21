@@ -52,16 +52,23 @@ dialog.block-actions-modal:not([open]):not(.block-editor-block-list__block) {
 	display: none !important;
 }
 
-/* Editor-only: force visible and reset UA dialog positioning so it
-   sits in normal block flow inside the canvas.
-   `position: relative` is deliberate — Gutenberg's selection outline
-   uses `::after { position: absolute; inset: 0 }` and needs a
-   positioned ancestor to size against. `static` would push the
-   outline up to the root container; `relative` keeps the element in
-   flow AND makes it the outline's containing block. */
+/* Editor-only: reset UA dialog positioning so it sits in normal
+   block flow, and take full parent width so Group's layout CSS
+   (flex-column for our default, or whatever the author picks)
+   behaves as it does on a normal Group block.
+   We intentionally don't set `display` — Group's `.is-layout-flex`
+   selector (specificity 0,2,0) already beats UA
+   `dialog:not([open])` (0,1,1), so the dialog renders as flex in
+   the editor automatically.
+   `position: relative` is deliberate — Gutenberg's selection
+   outline uses `::after { position: absolute; inset: 0 }` and needs
+   a positioned ancestor to size against. `static` would push the
+   outline up to the root container; `relative` keeps the element
+   in flow AND makes it the outline's containing block. */
 dialog.block-actions-modal.block-editor-block-list__block {
-	display: block;
 	position: relative;
 	margin: 0;
 	inset: auto;
+	width: auto;
+	max-width: none;
 }

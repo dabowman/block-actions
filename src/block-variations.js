@@ -42,6 +42,16 @@ export function registerModalDialogVariation() {
 		attributes: {
 			tagName: 'dialog',
 			className: 'block-actions-modal',
+			// Default to the Stack layout — flex-column, children are
+			// content-sized and flow top-to-bottom. That gives a
+			// natural modal feel where each child (heading, paragraph,
+			// form, close button) sits at its own width rather than
+			// stretching edge-to-edge of the dialog.
+			layout: {
+				type: 'flex',
+				flexWrap: 'nowrap',
+				orientation: 'vertical',
+			},
 		},
 		innerBlocks: [
 			[
@@ -71,7 +81,12 @@ export function registerModalDialogVariation() {
 		// the toolbar); full bidirectional isolation would require a
 		// standalone custom block.
 		scope: [ 'inserter' ],
-		isActive: ( blockAttributes ) =>
-			blockAttributes?.tagName === 'dialog',
+		// Array form of isActive — Gutenberg picks the variation with
+		// the most matching attribute paths when multiple match. We
+		// need three paths (tagName + layout.type + layout.orientation)
+		// to out-specify core Stack's two (layout.type +
+		// layout.orientation) so the block reads as "Dialog" in List
+		// View instead of "Stack".
+		isActive: [ 'tagName', 'layout.type', 'layout.orientation' ],
 	} );
 }
