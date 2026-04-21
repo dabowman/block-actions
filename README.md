@@ -182,6 +182,23 @@ To add actions that ship with the plugin:
 
 ## Development
 
+### Local WordPress environment
+
+The repo ships a [`@wordpress/env`](https://developer.wordpress.org/block-editor/reference-guides/packages/packages-env/) config that boots a sandboxed WordPress in Docker with this plugin pre-mounted.
+
+**Prereqs:** Docker Desktop running, and `wp-env` installed globally (`npm install -g @wordpress/env`).
+
+```bash
+npm run env:start      # first time takes ~1–2 min
+# → http://localhost:8888  (admin / password)
+
+npm run env:stop       # stop containers
+npm run env:destroy    # nuke containers + volumes
+npm run env:cli -- plugin list   # run wp-cli inside the container
+```
+
+Configure in `.wp-env.json`; copy to `.wp-env.override.json` (gitignored) for machine-local tweaks.
+
 ### Building
 
 ```bash

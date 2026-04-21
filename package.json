@@ -13,7 +13,15 @@
     "test:coverage": "jest --coverage",
     "lint": "wp-scripts lint-js",
     "lint:fix": "wp-scripts lint-js --fix",
-    "zip": "mkdir -p dist && rm -f dist/block-actions.zip && zip -r dist/block-actions.zip block-actions.php includes build README.md docs"
+    "zip": "mkdir -p dist && rm -f dist/block-actions.zip && zip -r dist/block-actions.zip block-actions.php includes build README.md docs",
+    "env": "wp-env",
+    "env:start": "wp-env start",
+    "env:stop": "wp-env stop",
+    "env:restart": "wp-env start --update",
+    "env:destroy": "wp-env destroy",
+    "env:clean": "wp-env clean all",
+    "env:logs": "wp-env logs",
+    "env:cli": "wp-env run cli wp"
   },
   "author": "dabowman",
   "license": "GPL-2.0-or-later",

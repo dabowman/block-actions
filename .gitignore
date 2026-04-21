@@ -52,3 +52,6 @@ coverage/
 # Build artifacts
 build/
 dist/
+
+# wp-env local override
+.wp-env.override.json

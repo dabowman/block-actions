@@ -87,6 +87,14 @@ npm run test:watch      # Jest in watch mode
 npm run test:coverage   # Jest with coverage report
 npm run create-action   # Interactive CLI to scaffold a new Interactivity API action
 npm run zip             # Create dist/block-actions.zip for distribution
+
+npm run env:start       # Boot @wordpress/env (Docker) with plugin mounted
+npm run env:stop        # Stop containers
+npm run env:restart     # Re-apply .wp-env.json (start --update)
+npm run env:destroy     # Delete containers + volumes
+npm run env:clean       # Reset DB only
+npm run env:logs        # Tail container logs
+npm run env:cli -- <args>  # wp-cli inside container (e.g. `npm run env:cli -- user list`)
 ```
 
 Build uses a custom `webpack.config.js` extending `@wordpress/scripts`. Nine entry points:
@@ -104,6 +112,17 @@ Build uses a custom `webpack.config.js` extending `@wordpress/scripts`. Nine ent
 | `actions/example-rate-limited/view` | `src/stores/example-rate-limited/view.js` | `build/actions/example-rate-limited/view.js` |
 
 Note: The `webpack.config.js` destructures away the default `entry` function from `@wordpress/scripts` config to avoid conflicts. Build scripts use `webpack --config webpack.config.js` directly instead of `wp-scripts build`.
+
+## Local Dev Environment (@wordpress/env)
+
+`.wp-env.json` boots a WordPress sandbox in Docker with this plugin mounted at `/wp-content/plugins/block-actions`.
+
+- **Requirements:** Docker Desktop running, global `wp-env` CLI (`npm i -g @wordpress/env`). It is *not* a devDependency — the `@wordpress/scripts ^31.6.0` peer range pins `@wordpress/env ^10`, and we use `^11` features; adding it locally breaks `npm install`. Scripts resolve the global binary via PATH.
+- **URL:** `http://localhost:8888` · **Admin:** `admin` / `password`
+- **Stack:** latest WP core (`"core": null`), PHP 8.2, `WP_DEBUG`/`SCRIPT_DEBUG` on, `WP_ENVIRONMENT_TYPE=local`.
+- **Tests environment disabled** (`"testsEnvironment": false`) — no PHPUnit in this repo, so we skip the second container and silence the wp-env deprecation warning.
+- **Dev loop:** `npm run env:start` once, `npm run start` (webpack watch) in another terminal, edit → refresh. PHP reflects instantly; JS waits on webpack.
+- **Local overrides:** create `.wp-env.override.json` (gitignored) to change port/PHP/etc without touching the committed config.
 
 ## CI Pipeline
 
