@@ -1,19 +1,42 @@
 /**
- * Modal Dialog variation — editor visibility override.
+ * Modal Dialog variation styles.
  *
- * Native <dialog> is `display: none` by UA when closed. That makes
- * the variation uneditable on the canvas, so we force it visible
- * inside the editor only. Scoped via `.block-editor-block-list__block`
- * (Gutenberg applies that class to every block inside the canvas)
- * so the frontend keeps UA-hidden-until-open semantics.
+ * Loaded on both the frontend and inside the block editor iframe via
+ * `enqueue_block_assets`. Two jobs:
  *
- * Loaded via `enqueue_block_assets` so it reaches the editor iframe
- * (WP 6.3+ renders the canvas in an iframe; `enqueue_block_editor_assets`
- * only reaches the outer admin page).
+ *   1. Reset UA <dialog> defaults (padding, border, background, color,
+ *      width) so normal Group block supports — background, padding,
+ *      spacing, border, typography, layout — can apply without being
+ *      drowned out. UA rules have specificity (0,0,1); class-scoped
+ *      rules here match Group's (0,1,0) class-level output.
+ *
+ *   2. Force the dialog visible inside the editor canvas so authors can
+ *      edit it inline. This rule is scoped via
+ *      `.block-editor-block-list__block` — a class Gutenberg only adds
+ *      in the editor — so the frontend stays `display: none` when the
+ *      dialog is closed, as the UA intends.
+ *
+ * Keeping UA positioning for open (frontend) state: showModal() places
+ * the dialog in the top layer and browsers use their own centering
+ * logic. We don't reset `position` / `margin` / `inset` frontend-wide
+ * so default centering still works; authors who want different
+ * placement can override via theme styles.
  *
  * @since 2.2.0
  */
 
+/* Shared (frontend + editor): make Group supports the source of truth. */
+.block-actions-modal {
+	background: transparent;
+	border: 0;
+	padding: 0;
+	color: inherit;
+	width: auto;
+	max-width: none;
+	max-height: none;
+}
+
+/* Editor-only: force visible + reset positioning so it lays out like a normal block. */
 dialog.block-actions-modal.block-editor-block-list__block {
 	display: block;
 	position: static;
