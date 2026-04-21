@@ -6,12 +6,17 @@
  * @since 2.0.0
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import {
+	store,
+	getContext,
+	getElement,
+	withSyncEvent,
+} from '@wordpress/interactivity';
 import { getRateLimiter } from '../utils/rate-limiter';
 
 store( 'block-actions/example-rate-limited', {
 	actions: {
-		handleClick( event ) {
+		handleClick: withSyncEvent( function ( event ) {
 			event.preventDefault();
 			const { ref } = getElement();
 			const limiter = getRateLimiter( ref );
@@ -30,7 +35,7 @@ store( 'block-actions/example-rate-limited', {
 				ref.classList.remove( 'is-active' );
 				target.textContent = ctx.originalText;
 			}
-		},
+		} ),
 	},
 	callbacks: {
 		init() {

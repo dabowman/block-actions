@@ -7,7 +7,12 @@
  * @since 2.0.0
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import {
+	store,
+	getContext,
+	getElement,
+	withSyncEvent,
+} from '@wordpress/interactivity';
 import { getRateLimiter } from '../utils/rate-limiter';
 import { validateStyle } from '../utils/sanitize';
 import {
@@ -19,7 +24,7 @@ const timers = new WeakMap();
 
 store( 'block-actions/copy-to-clipboard', {
 	actions: {
-		*copy( event ) {
+		copy: withSyncEvent( function* ( event ) {
 			event.preventDefault();
 			const { ref } = getElement();
 			const limiter = getRateLimiter( ref );
@@ -60,7 +65,7 @@ store( 'block-actions/copy-to-clipboard', {
 					c.status = 'idle';
 				},
 			} );
-		},
+		} ),
 	},
 	callbacks: {
 		init: createFeedbackInit( timers ),

@@ -4,12 +4,17 @@
  * @since 2.0.0
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import {
+	store,
+	getContext,
+	getElement,
+	withSyncEvent,
+} from '@wordpress/interactivity';
 import { getRateLimiter } from '../utils/rate-limiter';
 
 store( 'block-actions/toggle-visibility', {
 	actions: {
-		toggle( event ) {
+		toggle: withSyncEvent( function ( event ) {
 			event.preventDefault();
 			const { ref } = getElement();
 			const limiter = getRateLimiter( ref );
@@ -33,7 +38,7 @@ store( 'block-actions/toggle-visibility', {
 
 			// Update ARIA state for accessibility.
 			ref.setAttribute( 'aria-expanded', String( ctx.isVisible ) );
-		},
+		} ),
 	},
 	callbacks: {
 		init() {

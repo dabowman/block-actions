@@ -9,7 +9,12 @@
  * @since 2.0.0
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import {
+	store,
+	getContext,
+	getElement,
+	withSyncEvent,
+} from '@wordpress/interactivity';
 import { getRateLimiter } from '../utils/rate-limiter';
 
 /**
@@ -57,7 +62,7 @@ const { state } = store( 'block-actions/carousel', {
 	},
 
 	actions: {
-		nextSlide( event ) {
+		nextSlide: withSyncEvent( function ( event ) {
 			if ( event ) {
 				event.preventDefault();
 			}
@@ -86,9 +91,9 @@ const { state } = store( 'block-actions/carousel', {
 				ctx.currentIndex = next;
 				ctx.isAnimating = false;
 			} );
-		},
+		} ),
 
-		prevSlide( event ) {
+		prevSlide: withSyncEvent( function ( event ) {
 			if ( event ) {
 				event.preventDefault();
 			}
@@ -117,9 +122,9 @@ const { state } = store( 'block-actions/carousel', {
 				ctx.currentIndex = prev;
 				ctx.isAnimating = false;
 			} );
-		},
+		} ),
 
-		goToSlide( event ) {
+		goToSlide: withSyncEvent( function ( event ) {
 			if ( event ) {
 				event.preventDefault();
 			}
@@ -141,9 +146,9 @@ const { state } = store( 'block-actions/carousel', {
 				ctx.currentIndex = ctx.slideIndex;
 				ctx.isAnimating = false;
 			} );
-		},
+		} ),
 
-		handleKeydown( event ) {
+		handleKeydown: withSyncEvent( function ( event ) {
 			const ctx = getContext();
 			switch ( event.key ) {
 				case 'ArrowLeft':
@@ -165,7 +170,7 @@ const { state } = store( 'block-actions/carousel', {
 					ctx.currentIndex = ctx.totalSlides - 1;
 					break;
 			}
-		},
+		} ),
 	},
 
 	callbacks: {

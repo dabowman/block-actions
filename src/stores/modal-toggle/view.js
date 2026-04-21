@@ -4,7 +4,12 @@
  * @since 2.0.0
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import {
+	store,
+	getContext,
+	getElement,
+	withSyncEvent,
+} from '@wordpress/interactivity';
 import { getRateLimiter } from '../utils/rate-limiter';
 
 /**
@@ -45,7 +50,7 @@ function closeModal( ctx, modal ) {
 
 store( 'block-actions/modal-toggle', {
 	actions: {
-		toggle( event ) {
+		toggle: withSyncEvent( function ( event ) {
 			event.preventDefault();
 			const { ref } = getElement();
 			const limiter = getRateLimiter( ref );
@@ -75,9 +80,9 @@ store( 'block-actions/modal-toggle', {
 				modal.focus();
 				ctx.isOpen = true;
 			}
-		},
+		} ),
 
-		handleKeydown( event ) {
+		handleKeydown: withSyncEvent( function ( event ) {
 			if ( event.key !== 'Escape' ) {
 				return;
 			}
@@ -92,7 +97,7 @@ store( 'block-actions/modal-toggle', {
 			}
 
 			closeModal( ctx, modal );
-		},
+		} ),
 	},
 	callbacks: {
 		init() {

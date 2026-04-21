@@ -7,7 +7,7 @@
  * @since 2.0.0
  */
 
-import { getContext, getElement } from '@wordpress/interactivity';
+import { getContext, getElement, withSyncEvent } from '@wordpress/interactivity';
 import { getRateLimiter } from './rate-limiter';
 
 /**
@@ -51,7 +51,7 @@ export function createFeedbackInit( timers ) {
  * @return {Function} An action handler for use in a store's actions object.
  */
 export function createFeedbackAction( timers, config ) {
-	return function action( event ) {
+	return withSyncEvent( function action( event ) {
 		event.preventDefault();
 		const { ref } = getElement();
 		const limiter = getRateLimiter( ref );
@@ -65,7 +65,7 @@ export function createFeedbackAction( timers, config ) {
 		config.perform( ctx, ref, target );
 
 		setFeedbackTimer( ref, timers, target, ctx, config );
-	};
+	} );
 }
 
 /**

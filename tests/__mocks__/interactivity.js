@@ -11,6 +11,13 @@ const store = jest.fn( ( namespace, definition ) => definition );
 const getContext = jest.fn( () => currentContext );
 const getElement = jest.fn( () => currentElement );
 
+// Pass-through wrappers — the real implementations bind event scope and
+// preserve store scope in external callbacks. In jsdom tests we just
+// delegate to the underlying function; store/getContext mocks handle
+// scope via the module-level `currentContext`/`currentElement`.
+const withSyncEvent = jest.fn( ( fn ) => fn );
+const withScope = jest.fn( ( fn ) => fn );
+
 /**
  * Set the context returned by getContext() in tests.
  *
@@ -44,6 +51,8 @@ module.exports = {
 	store,
 	getContext,
 	getElement,
+	withSyncEvent,
+	withScope,
 	__setContext,
 	__setElement,
 	__reset,
