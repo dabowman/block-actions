@@ -1,5 +1,10 @@
 /**
  * Copy to Clipboard Store Tests
+ *
+ * The store no longer mutates DOM text or styles — those are driven
+ * from state.buttonText / state.backgroundColor via data-wp-text and
+ * data-wp-style--background-color. Tests assert context.status
+ * transitions and state getters rather than DOM inspection.
  */
 
 const interactivityMock = require( '@wordpress/interactivity' );
@@ -31,6 +36,8 @@ describe( 'Copy to Clipboard Store', () => {
 			copyText: 'text to copy',
 			originalText: '',
 			status: 'idle',
+			copiedText: 'Copied!',
+			copyFailedText: 'Copy failed',
 		};
 		interactivityMock.__setContext( mockContext );
 		interactivityMock.__setElement( mockElement );
@@ -44,23 +51,24 @@ describe( 'Copy to Clipboard Store', () => {
 		jest.useRealTimers();
 	} );
 
-	it( 'should register with correct namespace', () => {
+	it( 'registers with correct namespace', () => {
 		expect( interactivityMock.store ).toHaveBeenCalledWith(
 			'block-actions/copy-to-clipboard',
 			expect.any( Object )
 		);
 	} );
 
-	it( 'should store original text on init', () => {
+	it( 'captures original text on init', () => {
 		storeDefinition.callbacks.init();
 		expect( mockContext.originalText ).toBe( 'Copy' );
 	} );
 
-	it( 'should have a copy action (generator function)', () => {
-		expect( storeDefinition.actions.copy ).toBeDefined();
+	it( 'returns a cleanup function from init', () => {
+		const cleanup = storeDefinition.callbacks.init();
+		expect( typeof cleanup ).toBe( 'function' );
 	} );
 
-	it( 'should not copy when copyText is empty', () => {
+	it( 'does not invoke clipboard when copyText is empty', () => {
 		mockContext.copyText = '';
 		const event = { preventDefault: jest.fn() };
 		const gen = storeDefinition.actions.copy( event );
@@ -68,33 +76,69 @@ describe( 'Copy to Clipboard Store', () => {
 		expect( navigator.clipboard.writeText ).not.toHaveBeenCalled();
 	} );
 
-	it( 'should return a cleanup function from init', () => {
-		const cleanup = storeDefinition.callbacks.init();
-		expect( typeof cleanup ).toBe( 'function' );
-	} );
-
-	it( 'should preserve existing inline styles on restore', () => {
-		storeDefinition.callbacks.init();
-		const link = mockElement.querySelector( 'a' );
-		link.style.padding = '10px';
-		link.style.backgroundColor = 'blue';
-
+	it( 'sets status to success on successful copy', async () => {
 		const event = { preventDefault: jest.fn() };
 		const gen = storeDefinition.actions.copy( event );
-
-		// Run through generator: first next starts, yield on clipboard write.
+		const firstYield = gen.next();
+		await firstYield.value;
 		gen.next();
-		// Resolve the clipboard promise.
+		expect( mockContext.status ).toBe( 'success' );
+	} );
+
+	it( 'sets status to error on clipboard failure', () => {
+		// Return a pending promise and drive the generator manually so
+		// the rejected path can be exercised synchronously.
+		navigator.clipboard.writeText = jest.fn( () => new Promise( () => {} ) );
+		const event = { preventDefault: jest.fn() };
+		const gen = storeDefinition.actions.copy( event );
 		gen.next();
+		// Simulate the Interactivity runtime throwing the rejection
+		// back into the generator so the try/catch can handle it.
+		gen.throw( new Error( 'denied' ) );
+		expect( mockContext.status ).toBe( 'error' );
+	} );
 
-		// Background color should be changed to success color.
-		expect( link.style.backgroundColor ).not.toBe( 'blue' );
-
-		// Run the timer to trigger restore.
+	it( 'resets status to idle after the feedback timer', async () => {
+		const event = { preventDefault: jest.fn() };
+		const gen = storeDefinition.actions.copy( event );
+		const firstYield = gen.next();
+		await firstYield.value;
+		gen.next();
+		expect( mockContext.status ).toBe( 'success' );
 		jest.advanceTimersByTime( 2000 );
+		expect( mockContext.status ).toBe( 'idle' );
+	} );
 
-		// Background color should be restored to original, padding preserved.
-		expect( link.style.backgroundColor ).toBe( 'blue' );
-		expect( link.style.padding ).toBe( '10px' );
+	describe( 'state getters', () => {
+		it( 'buttonText falls back to originalText when idle', () => {
+			mockContext.status = 'idle';
+			mockContext.originalText = 'Copy link';
+			expect( storeDefinition.state.buttonText ).toBe( 'Copy link' );
+		} );
+
+		it( 'buttonText returns copiedText on success', () => {
+			mockContext.status = 'success';
+			expect( storeDefinition.state.buttonText ).toBe( 'Copied!' );
+		} );
+
+		it( 'buttonText returns copyFailedText on error', () => {
+			mockContext.status = 'error';
+			expect( storeDefinition.state.buttonText ).toBe( 'Copy failed' );
+		} );
+
+		it( 'backgroundColor is empty when idle', () => {
+			mockContext.status = 'idle';
+			expect( storeDefinition.state.backgroundColor ).toBe( '' );
+		} );
+
+		it( 'backgroundColor is green on success', () => {
+			mockContext.status = 'success';
+			expect( storeDefinition.state.backgroundColor ).toBe( '#10b981' );
+		} );
+
+		it( 'backgroundColor is red on error', () => {
+			mockContext.status = 'error';
+			expect( storeDefinition.state.backgroundColor ).toBe( '#ef4444' );
+		} );
 	} );
 } );

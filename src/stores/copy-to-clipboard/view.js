@@ -1,8 +1,10 @@
 /**
  * Copy to Clipboard — Interactivity API Store
  *
- * Uses a generator function for async clipboard access. Shares init and
- * timer management with the feedback store utilities.
+ * Declarative feedback: the renderer binds the anchor's text and
+ * background-color to state getters driven by context.status. The
+ * action flips status through 'success' | 'error' | 'idle' and the
+ * view follows reactively — no imperative DOM writes.
  *
  * @since 2.0.0
  */
@@ -12,33 +14,41 @@ import {
 	getContext,
 	getElement,
 	withSyncEvent,
+	withScope,
 } from '@wordpress/interactivity';
-import { getRateLimiter } from '../utils/rate-limiter';
-import { validateStyle } from '../utils/sanitize';
-import {
-	createFeedbackInit,
-	setFeedbackTimer,
-} from '../utils/create-feedback-store';
 
 const timers = new WeakMap();
 
-store( 'block-actions/copy-to-clipboard', {
+const { state } = store( 'block-actions/copy-to-clipboard', {
+	state: {
+		get buttonText() {
+			const ctx = getContext();
+			if ( ctx.status === 'success' ) {
+				return ctx.copiedText || 'Copied! \u2713';
+			}
+			if ( ctx.status === 'error' ) {
+				return ctx.copyFailedText || 'Copy failed';
+			}
+			return ctx.originalText;
+		},
+		get backgroundColor() {
+			const ctx = getContext();
+			if ( ctx.status === 'success' ) {
+				return '#10b981';
+			}
+			if ( ctx.status === 'error' ) {
+				return '#ef4444';
+			}
+			return '';
+		},
+	},
 	actions: {
 		copy: withSyncEvent( function* ( event ) {
 			event.preventDefault();
-			const { ref } = getElement();
-			const limiter = getRateLimiter( ref );
-			if ( ! limiter.canExecute() ) {
-				return;
-			}
-
 			const ctx = getContext();
 			if ( ! ctx.copyText ) {
 				return;
 			}
-
-			const target = ref.querySelector( 'a' ) || ref;
-			const originalBg = target.style.backgroundColor;
 
 			try {
 				yield navigator.clipboard.writeText( ctx.copyText );
@@ -47,27 +57,41 @@ store( 'block-actions/copy-to-clipboard', {
 				ctx.status = 'error';
 			}
 
-			const isSuccess = ctx.status === 'success';
-			const color = isSuccess ? '#10b981' : '#ef4444';
-			const validColor = validateStyle( 'backgroundColor', color );
-			if ( validColor ) {
-				target.style.backgroundColor = validColor;
+			const { ref } = getElement();
+			const existing = timers.get( ref );
+			if ( existing ) {
+				clearTimeout( existing );
 			}
-
-			setFeedbackTimer( ref, timers, target, ctx, {
-				feedbackText: ( c ) =>
-					isSuccess
-						? c.copiedText || 'Copied! \u2713'
-						: c.copyFailedText || 'Copy failed',
-				duration: 2000,
-				onRestore( c ) {
-					target.style.backgroundColor = originalBg;
-					c.status = 'idle';
-				},
-			} );
+			timers.set(
+				ref,
+				setTimeout(
+					withScope( () => {
+						ctx.status = 'idle';
+						timers.delete( ref );
+					} ),
+					2000
+				)
+			);
 		} ),
 	},
 	callbacks: {
-		init: createFeedbackInit( timers ),
+		init() {
+			const ctx = getContext();
+			const { ref } = getElement();
+			const target = ref.querySelector( 'a' ) || ref;
+			if ( ! ctx.originalText ) {
+				ctx.originalText = target.textContent;
+			}
+
+			return () => {
+				const timer = timers.get( ref );
+				if ( timer ) {
+					clearTimeout( timer );
+					timers.delete( ref );
+				}
+			};
+		},
 	},
 } );
+
+export { state };
