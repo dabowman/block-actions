@@ -25,6 +25,8 @@ import {
 } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import actions from './action-registry';
+import { registerModalDialogVariation } from './block-variations';
+import './block-variations.css';
 
 /**
  * Registry for theme actions in editor context.
@@ -579,6 +581,8 @@ try {
 		'block-actions/custom-data-save',
 		addCustomDataToSave
 	);
+
+	registerModalDialogVariation();
 } catch ( error ) {
 	log( 'error', 'Failed to register Block Actions', error );
 }

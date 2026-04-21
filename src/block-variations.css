@@ -1,0 +1,21 @@
+/**
+ * Modal Dialog variation — editor visibility override.
+ *
+ * Native <dialog> is `display: none` by UA when closed. That makes
+ * the variation uneditable on the canvas, so we force it visible
+ * inside the editor only. Scoped via `.block-editor-block-list__block`
+ * (Gutenberg applies that class to every block inside the canvas)
+ * so the frontend keeps UA-hidden-until-open semantics.
+ *
+ * Loaded via `enqueue_block_assets` so it reaches the editor iframe
+ * (WP 6.3+ renders the canvas in an iframe; `enqueue_block_editor_assets`
+ * only reaches the outer admin page).
+ *
+ * @since 2.2.0
+ */
+
+dialog.block-actions-modal.block-editor-block-list__block {
+	display: block;
+	position: static;
+	margin: 0;
+}

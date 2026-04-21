@@ -82,6 +82,9 @@ function enqueue_block_editor_assets(): void {
 		true
 	);
 
+	// CSS is enqueued separately via `enqueue_block_assets` so it reaches
+	// the block editor's iframe canvas (WP 6.3+). See enqueue_editor_iframe_styles().
+
 	// Pass discovered theme action IDs to the editor script so they appear
 	// in the action selector. Theme action JS files are ES modules and
 	// cannot be loaded as classic scripts in the editor; instead we pass
@@ -99,6 +102,36 @@ function enqueue_block_editor_assets(): void {
 	}
 }
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_editor_assets' );
+
+/**
+ * Enqueue Modal Dialog variation styles on the frontend and inside
+ * the block editor's iframe canvas.
+ *
+ * `enqueue_block_assets` fires on the frontend AND inside the editor
+ * iframe (unlike `enqueue_block_editor_assets`, which only reaches the
+ * outer admin page). The stylesheet contains two rule groups:
+ *   - Shared UA resets so Group block supports aren't overridden.
+ *   - Editor-only visibility overrides scoped via the
+ *     `.block-editor-block-list__block` class Gutenberg injects.
+ *
+ * @since 2.2.0
+ *
+ * @return void
+ */
+function enqueue_modal_dialog_styles(): void {
+	$css_path = plugin_dir_path( __FILE__ ) . 'build/block-extensions.css';
+	if ( ! file_exists( $css_path ) ) {
+		return;
+	}
+
+	wp_enqueue_style(
+		'block-actions-modal-dialog',
+		plugin_dir_url( __FILE__ ) . 'build/block-extensions.css',
+		array(),
+		(string) filemtime( $css_path )
+	);
+}
+add_action( 'enqueue_block_assets', __NAMESPACE__ . '\\enqueue_modal_dialog_styles' );
 
 /**
  * Get plugin settings with defaults.

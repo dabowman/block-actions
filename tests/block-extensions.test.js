@@ -7,6 +7,10 @@ jest.mock( '@wordpress/hooks', () => ( {
 	addFilter: jest.fn(),
 } ) );
 
+jest.mock( '@wordpress/blocks', () => ( {
+	registerBlockVariation: jest.fn(),
+} ) );
+
 jest.mock( '@wordpress/compose', () => ( {
 	createHigherOrderComponent: jest.fn( ( fn, name ) => {
 		const wrapped = fn;
@@ -184,6 +188,18 @@ describe( 'block-extensions', () => {
 		expect( filterNames ).toContain( 'blocks.registerBlockType' );
 		expect( filterNames ).toContain( 'editor.BlockEdit' );
 		expect( filterNames ).toContain( 'blocks.getSaveContent.extraProps' );
+	} );
+
+	test( 'registers the Modal Dialog variation of core/group', () => {
+		loadModule();
+		const { registerBlockVariation } = require( '@wordpress/blocks' );
+		expect( registerBlockVariation ).toHaveBeenCalledWith(
+			'core/group',
+			expect.objectContaining( {
+				name: 'block-actions-modal-dialog',
+				attributes: expect.objectContaining( { tagName: 'dialog' } ),
+			} )
+		);
 	} );
 
 	test( 'exposes global BlockActions API', () => {
