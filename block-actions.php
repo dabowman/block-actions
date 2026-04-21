@@ -365,6 +365,79 @@ function init_interactivity_api(): void {
 add_action( 'init', __NAMESPACE__ . '\\init_interactivity_api' );
 
 /**
+ * Register block patterns shipped with the plugin.
+ *
+ * Scans `patterns/*.php`, reads the standard pattern headers, and
+ * registers each via `register_block_pattern`. WP 6.4+ auto-discovers
+ * patterns from themes but not from plugins — plugins still need to
+ * register explicitly.
+ *
+ * @since 2.2.0
+ *
+ * @return void
+ */
+function register_block_patterns(): void {
+	if ( ! function_exists( 'register_block_pattern' ) ) {
+		return;
+	}
+
+	$files = glob( plugin_dir_path( __FILE__ ) . 'patterns/*.php' );
+	if ( ! $files ) {
+		return;
+	}
+
+	foreach ( $files as $file ) {
+		$headers = get_file_data(
+			$file,
+			array(
+				'title'       => 'Title',
+				'slug'        => 'Slug',
+				'description' => 'Description',
+				'categories'  => 'Categories',
+				'keywords'    => 'Keywords',
+				'blockTypes'  => 'Block Types',
+				'inserter'    => 'Inserter',
+				'viewport'    => 'Viewport Width',
+			)
+		);
+
+		if ( empty( $headers['slug'] ) || empty( $headers['title'] ) ) {
+			continue;
+		}
+
+		ob_start();
+		include $file;
+		$content = (string) ob_get_clean();
+
+		$args = array(
+			'title'   => $headers['title'],
+			'content' => $content,
+		);
+		if ( $headers['description'] ) {
+			$args['description'] = $headers['description'];
+		}
+		if ( $headers['categories'] ) {
+			$args['categories'] = array_map( 'trim', explode( ',', $headers['categories'] ) );
+		}
+		if ( $headers['keywords'] ) {
+			$args['keywords'] = array_map( 'trim', explode( ',', $headers['keywords'] ) );
+		}
+		if ( $headers['blockTypes'] ) {
+			$args['blockTypes'] = array_map( 'trim', explode( ',', $headers['blockTypes'] ) );
+		}
+		if ( 'no' === $headers['inserter'] || 'false' === $headers['inserter'] ) {
+			$args['inserter'] = false;
+		}
+		if ( $headers['viewport'] && is_numeric( $headers['viewport'] ) ) {
+			$args['viewportWidth'] = (int) $headers['viewport'];
+		}
+
+		register_block_pattern( $headers['slug'], $args );
+	}
+}
+add_action( 'init', __NAMESPACE__ . '\\register_block_patterns' );
+
+/**
  * Enqueue theme action script modules for the Interactivity API.
  *
  * Theme actions are enqueued as ES script modules with
