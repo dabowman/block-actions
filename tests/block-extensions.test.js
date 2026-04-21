@@ -694,20 +694,12 @@ describe( 'block-extensions', () => {
 			expect( consoleSpy.error ).toHaveBeenCalled();
 		} );
 
-		test( 'info log suppressed when debug is false', () => {
-			window.blockActions = { debug: false, nonce: '', restUrl: '' };
+		test( 'info-level log calls never reach the console', () => {
+			// window.blockActions was never populated by PHP — the debug
+			// gate was permanently off. Info calls are now a no-op.
 			loadModule();
-			expect( consoleSpy.log ).not.toHaveBeenCalled();
-		} );
-
-		test( 'info log shown when debug is true', () => {
-			window.blockActions = { debug: true, nonce: '', restUrl: '' };
-			loadModule();
-			// The module logs info about initialization via setTimeout
 			jest.advanceTimersByTime( 0 );
-			expect( consoleSpy.log ).toHaveBeenCalledWith(
-				expect.stringContaining( 'Block Actions initialized' )
-			);
+			expect( consoleSpy.log ).not.toHaveBeenCalled();
 		} );
 	} );
 

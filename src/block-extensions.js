@@ -123,20 +123,11 @@ function registerEditorAction( id, label, fieldsOrInit, maybeInit ) {
 
 	// Check if action already exists
 	if ( editorActionRegistry.some( ( a ) => a.id === id ) ) {
-		if ( window?.blockActions?.debug ) {
-			console.log(
-				`${ prefix } Action "${ id }" already registered in editor`
-			);
-		}
 		return false;
 	}
 
 	// Register the action (just for the dropdown, won't execute in editor)
 	editorActionRegistry.push( { id, label, fields, init } );
-
-	if ( window?.blockActions?.debug ) {
-		console.log( `${ prefix } Registered theme action in editor: ${ id }` );
-	}
 
 	return true;
 }
@@ -311,9 +302,8 @@ function log( type, message, error = null ) {
 			console.warn( `${ prefix } ${ message }` );
 			break;
 		case 'info':
-			if ( window?.blockActions?.debug ) {
-				console.log( `${ prefix } ${ message }` );
-			}
+			// No-op: info logs removed. Use browser devtools or add
+			// temporary console.log while debugging.
 			break;
 		default:
 			console.log( `${ prefix } ${ message }` );
