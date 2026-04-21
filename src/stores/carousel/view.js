@@ -176,68 +176,28 @@ const { state } = store( 'block-actions/carousel', {
 
 	callbacks: {
 		/**
-		 * Initialize carousel: count slides, set up accessibility, touch
-		 * gestures, and lazy-load observer.
+		 * Initialize carousel: count slides (for navigation math), wire up
+		 * touch swipe handlers, and attach a lazy-load IntersectionObserver.
+		 * Accessibility roles / aria-labels / tabindex are emitted by the
+		 * PHP renderer (class-carousel.php) so they are correct on first
+		 * paint and for no-JS users.
 		 *
 		 * @since 2.0.0
-		 * @return {Function} Cleanup function that cancels pending RAF and
-		 *                    disconnects the IntersectionObserver.
+		 * @return {Function} Cleanup function that cancels pending RAF,
+		 *                    disconnects the observer, and removes listeners.
 		 */
 		init() {
 			const ctx = getContext();
 			const { ref } = getElement();
 
-			// Count slides from DOM.
+			// Count slides from DOM so nav math has the right bounds.
 			const slides = ref.querySelectorAll( '.carousel-slide' );
 			ctx.totalSlides = slides.length;
 
-			// Setup accessibility attributes.
+			// Find the container element used for touch gestures.
 			const container = ref.classList.contains( 'carousel-container' )
 				? ref
 				: ref.querySelector( '.carousel-container' );
-			if ( container ) {
-				container.setAttribute( 'role', 'region' );
-				container.setAttribute( 'aria-label', 'Image carousel' );
-				container.setAttribute( 'tabindex', '0' );
-			}
-
-			slides.forEach( ( slide, i ) => {
-				slide.setAttribute( 'role', 'tabpanel' );
-				slide.setAttribute( 'aria-roledescription', 'slide' );
-				slide.setAttribute(
-					'aria-label',
-					`Slide ${ i + 1 } of ${ slides.length }`
-				);
-			} );
-
-			// Setup buttons accessibility.
-			const prevButton = ref.querySelector( '.carousel-button-left' );
-			const nextButton = ref.querySelector( '.carousel-button-right' );
-
-			if ( prevButton ) {
-				prevButton.setAttribute( 'role', 'button' );
-				prevButton.setAttribute( 'aria-label', 'Previous slide' );
-				prevButton.setAttribute( 'tabindex', '0' );
-			}
-
-			if ( nextButton ) {
-				nextButton.setAttribute( 'role', 'button' );
-				nextButton.setAttribute( 'aria-label', 'Next slide' );
-				nextButton.setAttribute( 'tabindex', '0' );
-			}
-
-			// Setup thumbnails accessibility.
-			const thumbnails = ref.querySelectorAll( '.carousel-thumbnail' );
-			thumbnails.forEach( ( thumb, i ) => {
-				thumb.setAttribute( 'role', 'tab' );
-				thumb.setAttribute( 'aria-label', `Show slide ${ i + 1 }` );
-				thumb.setAttribute( 'tabindex', '0' );
-			} );
-
-			// Activate first thumbnail.
-			if ( thumbnails.length > 0 ) {
-				thumbnails[ 0 ].classList.add( 'active' );
-			}
 
 			// Setup touch support.
 			if ( container ) {

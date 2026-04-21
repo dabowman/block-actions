@@ -120,28 +120,11 @@ describe( 'Carousel Store', () => {
 			expect( mockContext.totalSlides ).toBe( 3 );
 		} );
 
-		it( 'should set accessibility attributes on container', () => {
-			storeDefinition.callbacks.init();
-			const container = mockElement.querySelector(
-				'.carousel-container'
-			);
-			expect( container.getAttribute( 'role' ) ).toBe( 'region' );
-			expect( container.getAttribute( 'aria-label' ) ).toBe(
-				'Image carousel'
-			);
-			expect( container.getAttribute( 'tabindex' ) ).toBe( '0' );
-		} );
-
-		it( 'should set accessibility attributes on slides', () => {
-			storeDefinition.callbacks.init();
-			const slides = mockElement.querySelectorAll( '.carousel-slide' );
-			slides.forEach( ( slide, i ) => {
-				expect( slide.getAttribute( 'role' ) ).toBe( 'tabpanel' );
-				expect( slide.getAttribute( 'aria-label' ) ).toBe(
-					`Slide ${ i + 1 } of 3`
-				);
-			} );
-		} );
+		// Accessibility attributes (role, aria-label, aria-roledescription,
+		// tabindex) are now emitted by the PHP renderer
+		// (includes/renderers/class-carousel.php::post_process_html) so
+		// they are correct on first paint and for no-JS users. The init
+		// callback no longer sets them.
 
 		it( 'should return a cleanup function', () => {
 			const cleanup = storeDefinition.callbacks.init();
@@ -168,15 +151,6 @@ describe( 'Carousel Store', () => {
 			removeSpy.mockRestore();
 		} );
 
-		it( 'should set accessibility attributes on buttons', () => {
-			storeDefinition.callbacks.init();
-			const prev = mockElement.querySelector( '.carousel-button-left' );
-			const next = mockElement.querySelector( '.carousel-button-right' );
-			expect( prev.getAttribute( 'aria-label' ) ).toBe(
-				'Previous slide'
-			);
-			expect( next.getAttribute( 'aria-label' ) ).toBe( 'Next slide' );
-		} );
 	} );
 
 	describe( 'navigation actions', () => {
