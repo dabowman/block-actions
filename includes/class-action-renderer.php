@@ -60,10 +60,12 @@ abstract class Action_Renderer {
 	}
 
 	/**
-	 * Enqueue the view script for this action.
+	 * Enqueue the view script module for this action.
 	 *
-	 * Uses wp_enqueue_script() because the webpack build outputs IIFE bundles
-	 * that reference window.wp.interactivity, not ES modules.
+	 * The webpack build emits ES modules for the Interactivity API view
+	 * stores. They import '@wordpress/interactivity' and must be
+	 * registered with wp_enqueue_script_module() so core resolves the
+	 * external module import to its registered runtime.
 	 *
 	 * @since 2.0.0
 	 *
@@ -71,7 +73,7 @@ abstract class Action_Renderer {
 	 * @return void
 	 */
 	public function enqueue_view_script( string $action_id ): void {
-		$handle     = "block-actions-{$action_id}-view";
+		$module_id  = "block-actions/{$action_id}-view";
 		$js_path    = "build/actions/{$action_id}/view.js";
 		$asset_path = "build/actions/{$action_id}/view.asset.php";
 
@@ -82,16 +84,15 @@ abstract class Action_Renderer {
 		$asset = file_exists( DIR . $asset_path )
 			? include DIR . $asset_path
 			: array(
-				'dependencies' => array( 'wp-interactivity' ),
+				'dependencies' => array( '@wordpress/interactivity' ),
 				'version'      => filemtime( DIR . $js_path ),
 			);
 
-		wp_enqueue_script(
-			$handle,
+		wp_enqueue_script_module(
+			$module_id,
 			URL . $js_path,
 			$asset['dependencies'],
-			$asset['version'],
-			true
+			$asset['version']
 		);
 	}
 }

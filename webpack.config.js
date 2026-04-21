@@ -1,62 +1,70 @@
 /**
  * Webpack Configuration
  *
- * Multi-entry build: editor bundle + per-action view store modules.
+ * Dual build:
+ *   - Classic script bundle for the editor extensions (block-extensions.js).
+ *   - ES module bundles for the Interactivity API view stores, one per
+ *     action, enqueued on the frontend via wp_enqueue_script_module().
+ *
+ * Setting WP_EXPERIMENTAL_MODULES before requiring @wordpress/scripts
+ * makes the default config export [scriptConfig, moduleConfig]; we
+ * override the entries on each.
  *
  * @since 2.0.0
  */
 
-const defaultConfig = require( '@wordpress/scripts/config/webpack.config' );
+process.env.WP_EXPERIMENTAL_MODULES = 'true';
+
 const path = require( 'path' );
+const defaultConfig = require( '@wordpress/scripts/config/webpack.config' );
 
-// Remove the default entry function to prevent wp-scripts from using it.
-const { entry: _defaultEntry, ...configWithoutEntry } = defaultConfig;
+const [ defaultScriptConfig, defaultModuleConfig ] = defaultConfig;
 
-module.exports = {
-	...configWithoutEntry,
-	entry: {
-		// Editor.
-		'block-extensions': path.resolve(
-			__dirname,
-			'src/block-extensions.js'
-		),
+// Drop the default entry functions (they scan block.json / src/view); we
+// declare entries explicitly because this plugin extends core blocks.
+const { entry: _s, ...scriptBase } = defaultScriptConfig;
+const { entry: _m, ...moduleBase } = defaultModuleConfig;
 
-		// Interactivity API view stores (one per action).
-		'actions/scroll-to-top/view': path.resolve(
-			__dirname,
-			'src/stores/scroll-to-top/view.js'
-		),
-		'actions/carousel/view': path.resolve(
-			__dirname,
-			'src/stores/carousel/view.js'
-		),
-		'actions/toggle-visibility/view': path.resolve(
-			__dirname,
-			'src/stores/toggle-visibility/view.js'
-		),
-		'actions/modal-toggle/view': path.resolve(
-			__dirname,
-			'src/stores/modal-toggle/view.js'
-		),
-		'actions/smooth-scroll/view': path.resolve(
-			__dirname,
-			'src/stores/smooth-scroll/view.js'
-		),
-		'actions/copy-to-clipboard/view': path.resolve(
-			__dirname,
-			'src/stores/copy-to-clipboard/view.js'
-		),
-		'actions/test-action/view': path.resolve(
-			__dirname,
-			'src/stores/test-action/view.js'
-		),
-		'actions/example-rate-limited/view': path.resolve(
-			__dirname,
-			'src/stores/example-rate-limited/view.js'
-		),
+const ACTIONS = [
+	'scroll-to-top',
+	'carousel',
+	'toggle-visibility',
+	'modal-toggle',
+	'smooth-scroll',
+	'copy-to-clipboard',
+	'test-action',
+	'example-rate-limited',
+];
+
+const moduleEntries = Object.fromEntries(
+	ACTIONS.map( ( id ) => [
+		`actions/${ id }/view`,
+		path.resolve( __dirname, `src/stores/${ id }/view.js` ),
+	] )
+);
+
+const buildPath = path.resolve( __dirname, 'build' );
+
+module.exports = [
+	{
+		...scriptBase,
+		entry: {
+			'block-extensions': path.resolve(
+				__dirname,
+				'src/block-extensions.js'
+			),
+		},
+		output: {
+			...scriptBase.output,
+			path: buildPath,
+		},
 	},
-	output: {
-		...defaultConfig.output,
-		path: path.resolve( __dirname, 'build' ),
+	{
+		...moduleBase,
+		entry: moduleEntries,
+		output: {
+			...moduleBase.output,
+			path: buildPath,
+		},
 	},
-};
+];

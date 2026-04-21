@@ -272,4 +272,4 @@ All built-in stores follow the same declarative contract:
 - **Theme actions don't require rebuild:** They're ES module JS files auto-discovered by PHP
 - **Action IDs come from filenames:** `my-action.js` → action ID `my-action`
 - Files prefixed with `_` or `.` in theme action directories are skipped
-- **Script modules:** Interactivity API stores are enqueued via `wp_enqueue_script_module()` with `@wordpress/interactivity` as a dependency
+- **Script modules:** Interactivity API stores (built-in and theme) are enqueued via `wp_enqueue_script_module()` with `@wordpress/interactivity` as a dependency. The webpack config uses `@wordpress/scripts`' dual-config mode (`WP_EXPERIMENTAL_MODULES=true`) — `block-extensions.js` stays a classic script; every `actions/*/view.js` is an ES module.
