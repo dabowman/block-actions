@@ -438,6 +438,58 @@ function register_block_patterns(): void {
 add_action( 'init', __NAMESPACE__ . '\\register_block_patterns' );
 
 /**
+ * Defensive render-tag swap for Modal Dialog groups.
+ *
+ * Core Group's `tagName` attribute is a plain string at save/render
+ * time — the UI dropdown's allowed-options list is only a client-side
+ * convenience, and setting `tagName: 'dialog'` currently renders as
+ * `<dialog>`. If a future WordPress release ever clamps tagName to an
+ * enum that excludes `dialog`, our Modal Dialog variation would
+ * silently degrade to `<div>` and the modal-toggle action would fail.
+ *
+ * This filter treats the `block-actions-modal` className as the
+ * source of truth: any `core/group` with that class renders as a
+ * `<dialog>` element regardless of what tagName is set to. It's a
+ * no-op in the common case where the tag is already `<dialog>`.
+ *
+ * @since 2.2.0
+ *
+ * @param string $block_content Rendered block HTML.
+ * @param array  $block         Parsed block data.
+ * @return string Possibly tag-rewritten HTML.
+ */
+function force_dialog_for_modal_groups( string $block_content, array $block ): string {
+	if ( 'core/group' !== ( $block['blockName'] ?? '' ) ) {
+		return $block_content;
+	}
+	if ( '' === trim( $block_content ) ) {
+		return $block_content;
+	}
+	$class = (string) ( $block['attrs']['className'] ?? '' );
+	if ( false === strpos( $class, 'block-actions-modal' ) ) {
+		return $block_content;
+	}
+
+	$processor = new \WP_HTML_Tag_Processor( $block_content );
+	if ( ! $processor->next_tag() ) {
+		return $block_content;
+	}
+	$tag = $processor->get_tag();
+	if ( null === $tag || 'DIALOG' === $tag ) {
+		return $block_content;
+	}
+
+	// WP_HTML_Tag_Processor can't rewrite tag names; fall back to
+	// targeted regex on the outermost opening + closing tag.
+	$quoted = preg_quote( $tag, '/' );
+	$block_content = preg_replace( '/^(\s*)<' . $quoted . '\b/i', '$1<dialog', $block_content, 1 );
+	$block_content = preg_replace( '/<\/' . $quoted . '>(\s*)$/i', '</dialog>$1', $block_content, 1 );
+
+	return $block_content;
+}
+add_filter( 'render_block', __NAMESPACE__ . '\\force_dialog_for_modal_groups', 20, 2 );
+
+/**
  * Enqueue theme action script modules for the Interactivity API.
  *
  * Theme actions are enqueued as ES script modules with
