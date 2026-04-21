@@ -15,7 +15,6 @@ import {
 	getElement,
 	withSyncEvent,
 } from '@wordpress/interactivity';
-import { getRateLimiter } from '../utils/rate-limiter';
 
 /**
  * Per-trigger listener references for cleanup.
@@ -31,12 +30,6 @@ const { state } = store( 'block-actions/modal-toggle', {
 	actions: {
 		toggle: withSyncEvent( function ( event ) {
 			event.preventDefault();
-			const { ref } = getElement();
-			const limiter = getRateLimiter( ref );
-			if ( ! limiter.canExecute() ) {
-				return;
-			}
-
 			const ctx = getContext();
 			if ( ! ctx.modalId ) {
 				return;

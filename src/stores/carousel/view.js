@@ -16,7 +16,6 @@ import {
 	withSyncEvent,
 	withScope,
 } from '@wordpress/interactivity';
-import { getRateLimiter } from '../utils/rate-limiter';
 
 /**
  * Private state not exposed to directives.
@@ -68,12 +67,11 @@ const { state } = store( 'block-actions/carousel', {
 				event.preventDefault();
 			}
 			const ctx = getContext();
-			const { ref } = getElement();
-			const root = ref.closest( '[data-wp-interactive]' ) || ref;
-			const limiter = getRateLimiter( root );
-			if ( ! limiter.canExecute() || ctx.isAnimating ) {
+			if ( ctx.isAnimating ) {
 				return;
 			}
+			const { ref } = getElement();
+			const root = ref.closest( '[data-wp-interactive]' ) || ref;
 
 			ctx.isAnimating = true;
 			const priv = getPrivate( root );
@@ -99,12 +97,11 @@ const { state } = store( 'block-actions/carousel', {
 				event.preventDefault();
 			}
 			const ctx = getContext();
-			const { ref } = getElement();
-			const root = ref.closest( '[data-wp-interactive]' ) || ref;
-			const limiter = getRateLimiter( root );
-			if ( ! limiter.canExecute() || ctx.isAnimating ) {
+			if ( ctx.isAnimating ) {
 				return;
 			}
+			const { ref } = getElement();
+			const root = ref.closest( '[data-wp-interactive]' ) || ref;
 
 			ctx.isAnimating = true;
 			const priv = getPrivate( root );
@@ -130,12 +127,11 @@ const { state } = store( 'block-actions/carousel', {
 				event.preventDefault();
 			}
 			const ctx = getContext();
-			const { ref } = getElement();
-			const root = ref.closest( '[data-wp-interactive]' ) || ref;
-			const limiter = getRateLimiter( root );
-			if ( ! limiter.canExecute() || ctx.isAnimating ) {
+			if ( ctx.isAnimating ) {
 				return;
 			}
+			const { ref } = getElement();
+			const root = ref.closest( '[data-wp-interactive]' ) || ref;
 
 			ctx.isAnimating = true;
 			const priv = getPrivate( root );

@@ -39,17 +39,26 @@ class Theme_Action extends Action_Renderer {
 		$context = array();
 		$attrs   = $block['attrs'] ?? array();
 
-		if ( ! empty( $attrs['customData'] ) ) {
-			// Use wp_kses_post instead of sanitize_text_field to preserve
-			// structured data (e.g. JSON strings) that themes may pass.
-			$context['customData'] = wp_kses_post( $attrs['customData'] );
+		if ( isset( $attrs['customData'] ) && is_scalar( $attrs['customData'] ) ) {
+			$context['customData'] = is_string( $attrs['customData'] )
+				? sanitize_text_field( $attrs['customData'] )
+				: $attrs['customData'];
 		}
 
-		// Forward actionData fields as context so theme actions
-		// can access data-* attribute values set in the editor.
+		// Forward actionData fields as context so theme actions can read
+		// data set in the editor. Keys are validated (not normalised) so
+		// camelCase identifiers survive — theme JS expects exact keys.
 		if ( ! empty( $attrs['actionData'] ) && is_array( $attrs['actionData'] ) ) {
 			foreach ( $attrs['actionData'] as $key => $value ) {
-				$context[ sanitize_key( $key ) ] = is_string( $value ) ? wp_kses_post( $value ) : $value;
+				if ( ! is_string( $key ) || 1 !== preg_match( '/^[A-Za-z_][A-Za-z0-9_]*$/', $key ) ) {
+					continue;
+				}
+				if ( ! is_scalar( $value ) ) {
+					continue;
+				}
+				$context[ $key ] = is_string( $value )
+					? sanitize_text_field( $value )
+					: $value;
 			}
 		}
 
