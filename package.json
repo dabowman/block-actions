@@ -1,10 +1,10 @@
 {
   "name": "block-actions",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Lightweight JavaScript actions for WordPress core blocks",
   "main": "build/block-extensions.js",
   "scripts": {
-    "build": "NODE_ENV=production webpack --config webpack.config.js --mode production",
+    "build": "rm -rf build && NODE_ENV=production webpack --config webpack.config.js --mode production",
     "start": "webpack --config webpack.config.js --mode development --watch",
     "packages-update": "wp-scripts packages-update",
     "create-action": "node scripts/create-action.js",
@@ -13,7 +13,7 @@
     "test:coverage": "jest --coverage",
     "lint": "wp-scripts lint-js",
     "lint:fix": "wp-scripts lint-js --fix",
-    "zip": "mkdir -p dist && rm -f dist/block-actions.zip && zip -r dist/block-actions.zip block-actions.php includes build README.md docs",
+    "zip": "mkdir -p dist && rm -f dist/block-actions.zip && zip -r dist/block-actions.zip block-actions.php uninstall.php readme.txt includes build patterns README.md docs -x 'docs/plans/*'",
     "env": "wp-env",
     "env:start": "wp-env start",
     "env:stop": "wp-env stop",
@@ -34,16 +34,14 @@
     "jest-environment-jsdom": "^29.5.0"
   },
   "dependencies": {
-    "@wordpress/api-fetch": "^7.41.0",
     "@wordpress/block-editor": "^15.14.0",
     "@wordpress/blocks": "^15.14.0",
     "@wordpress/components": "^32.3.0",
     "@wordpress/compose": "^7.41.0",
     "@wordpress/element": "^6.41.0",
     "@wordpress/hooks": "^4.41.0",
-    "@wordpress/i18n": "^5.41.0",
-    "@wordpress/interactivity": "^6.41.0",
-    "dompurify": "^3.0.5"
+    "@wordpress/i18n": "^6.14.0",
+    "@wordpress/interactivity": "^6.41.0"
   },
   "jest": {
     "testEnvironment": "jsdom",

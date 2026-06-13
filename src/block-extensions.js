@@ -137,17 +137,6 @@ function getEditorRegisteredActions() {
 }
 
 /**
- * Get all registered actions (built-in + theme actions).
- *
- * @since 1.0.0
- *
- * @return {Array} Array of registered actions.
- */
-function getAllActions() {
-	return getEditorRegisteredActions();
-}
-
-/**
  * Get field definitions for a specific action.
  *
  * @since 2.1.0
@@ -159,7 +148,7 @@ function getFieldsForAction( actionId ) {
 	if ( ! actionId ) {
 		return [];
 	}
-	const allActions = getAllActions();
+	const allActions = getEditorRegisteredActions();
 	const action = allActions.find( ( a ) => a.id === actionId );
 	return action?.fields || [];
 }
@@ -418,8 +407,10 @@ const withActionInspectorControl = createHigherOrderComponent(
 				const blockConfig = BLOCKS_WITH_ACTIONS[ props.name ];
 				const fields = getFieldsForAction( customAction );
 
-				// Create action options from all registered actions (built-in + theme)
-				const allActions = getAllActions();
+				// Create action options from all registered actions
+				// (built-in + theme). ComboboxControl filters these
+				// internally as the user types.
+				const allActions = getEditorRegisteredActions();
 				const actionOptions = [
 					{ value: '', label: __( 'None', 'block-actions' ) },
 					...allActions.map( ( action ) => ( {
@@ -427,31 +418,6 @@ const withActionInspectorControl = createHigherOrderComponent(
 						label: action.label,
 					} ) ),
 				];
-
-				/**
-				 * Filters the action options based on user input.
-				 * Used by the ComboboxControl for search functionality.
-				 *
-				 * @since 1.0.0
-				 *
-				 * @param {string} inputValue User's search input.
-				 * @return {Array} Filtered options array.
-				 */
-				const getFilteredOptions = ( inputValue ) => {
-					try {
-						if ( ! inputValue ) {
-							return actionOptions;
-						}
-
-						const searchValue = inputValue.toLowerCase();
-						return actionOptions.filter( ( option ) =>
-							option.label.toLowerCase().includes( searchValue )
-						);
-					} catch ( error ) {
-						log( 'error', 'Error filtering action options', error );
-						return actionOptions; // Return all options on error
-					}
-				};
 
 				return (
 					<Fragment>
@@ -475,9 +441,6 @@ const withActionInspectorControl = createHigherOrderComponent(
 										);
 									}
 								} }
-								onFilterValueChange={ ( inputValue ) =>
-									getFilteredOptions( inputValue )
-								}
 								help={ `${ blockConfig.help } ${ __(
 									'Choose “None” to remove an action. Actions should be paired with meaningful labels and remain keyboard accessible.',
 									'block-actions'

@@ -139,6 +139,52 @@ describe( 'Modal Toggle Store', () => {
 			document.body.removeChild( modal2 );
 		} );
 
+		it( 'decrements once per close when multiple triggers share a dialog', () => {
+			// Wire a SECOND trigger to the same dialog — its init adds
+			// another `close` listener to the shared element.
+			const trigger2 = document.createElement( 'button' );
+			interactivityMock.__setContext( {
+				modalId: 'test-modal',
+				isOpen: false,
+			} );
+			interactivityMock.__setElement( trigger2 );
+			storeDefinition.callbacks.init();
+
+			// A second dialog opened by its own trigger keeps the body
+			// locked while the shared dialog closes.
+			const trigger3 = document.createElement( 'button' );
+			const modal2 = document.createElement( 'dialog' );
+			modal2.id = 'test-modal-2';
+			document.body.appendChild( modal2 );
+			interactivityMock.__setContext( {
+				modalId: 'test-modal-2',
+				isOpen: false,
+			} );
+			interactivityMock.__setElement( trigger3 );
+			storeDefinition.callbacks.init();
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( storeDefinition.state.openCount ).toBe( 1 );
+
+			// Open the shared dialog via the original trigger.
+			interactivityMock.__setContext( mockContext );
+			interactivityMock.__setElement( mockElement );
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( storeDefinition.state.openCount ).toBe( 2 );
+
+			// Close the shared dialog. Both of its close listeners fire,
+			// but the count must only drop by one and the body must stay
+			// locked because the second dialog is still open.
+			modalElement.close();
+			expect( storeDefinition.state.openCount ).toBe( 1 );
+			expect( document.body.style.overflow ).toBe( 'hidden' );
+
+			modal2.close();
+			expect( storeDefinition.state.openCount ).toBe( 0 );
+			expect( document.body.style.overflow ).toBe( '' );
+
+			document.body.removeChild( modal2 );
+		} );
+
 		it( 'restores the prior body overflow value on close', () => {
 			document.body.style.overflow = 'scroll';
 

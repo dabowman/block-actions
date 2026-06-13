@@ -31,11 +31,14 @@ class Carousel extends Action_Renderer {
 	 * @return array Initial context data.
 	 */
 	public function get_initial_context( \WP_HTML_Tag_Processor $processor, array $block ): array {
+		// The editor's "Wrap Around" toggle serializes to data-wrap-around
+		// ("true"/"false"). Absent attribute means the default: wrap.
+		$wrap = $processor->get_attribute( 'data-wrap-around' );
 		return array(
 			'currentIndex' => 0,
 			'isAnimating'  => false,
 			'totalSlides'  => 0,
-			'wrapAround'   => true,
+			'wrapAround'   => ! in_array( $wrap, array( 'false', '0' ), true ),
 		);
 	}
 
@@ -92,8 +95,12 @@ class Carousel extends Action_Renderer {
 			if ( $p->has_class( 'carousel-button-left' ) ) {
 				$p->set_attribute( 'data-wp-on--click', 'actions.prevSlide' );
 				$p->set_attribute( 'aria-label', __( 'Previous slide', 'block-actions' ) );
-				if ( 'BUTTON' !== $p->get_tag() ) {
+				if ( 'BUTTON' === $p->get_tag() ) {
+					$p->set_attribute( 'data-wp-bind--disabled', 'state.isPrevDisabled' );
+				} else {
 					$p->set_attribute( 'role', 'button' );
+					$p->set_attribute( 'data-wp-class--disabled', 'state.isPrevDisabled' );
+					$p->set_attribute( 'data-wp-bind--aria-disabled', 'state.isPrevDisabled' );
 					if ( null === $p->get_attribute( 'tabindex' ) ) {
 						$p->set_attribute( 'tabindex', '0' );
 					}
@@ -104,8 +111,12 @@ class Carousel extends Action_Renderer {
 			if ( $p->has_class( 'carousel-button-right' ) ) {
 				$p->set_attribute( 'data-wp-on--click', 'actions.nextSlide' );
 				$p->set_attribute( 'aria-label', __( 'Next slide', 'block-actions' ) );
-				if ( 'BUTTON' !== $p->get_tag() ) {
+				if ( 'BUTTON' === $p->get_tag() ) {
+					$p->set_attribute( 'data-wp-bind--disabled', 'state.isNextDisabled' );
+				} else {
 					$p->set_attribute( 'role', 'button' );
+					$p->set_attribute( 'data-wp-class--disabled', 'state.isNextDisabled' );
+					$p->set_attribute( 'data-wp-bind--aria-disabled', 'state.isNextDisabled' );
 					if ( null === $p->get_attribute( 'tabindex' ) ) {
 						$p->set_attribute( 'tabindex', '0' );
 					}

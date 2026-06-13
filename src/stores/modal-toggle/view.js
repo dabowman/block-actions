@@ -39,6 +39,19 @@ import {
  */
 const privateState = new WeakMap();
 
+/**
+ * Dialogs this store opened and not yet accounted closed.
+ *
+ * Several triggers can target the same dialog, and each wires its own
+ * `close` listener in init — so one native close event runs N listeners.
+ * The shared open count must only move once per actual open/close, so
+ * the close path consults this set: only the listener that finds the
+ * dialog still in the set decrements.
+ *
+ * @type {WeakSet<HTMLElement>}
+ */
+const openModals = new WeakSet();
+
 const { state } = store( 'block-actions/modal-toggle', {
 	state: {
 		openCount: 0,
@@ -64,6 +77,7 @@ const { state } = store( 'block-actions/modal-toggle', {
 					state.priorBodyOverflow = document.body.style.overflow;
 				}
 				modal.showModal();
+				openModals.add( modal );
 				state.openCount++;
 				document.body.style.overflow = 'hidden';
 				ctx.isOpen = true;
@@ -99,9 +113,13 @@ const { state } = store( 'block-actions/modal-toggle', {
 				}
 			};
 			const handleNativeClose = () => {
-				state.openCount = Math.max( 0, state.openCount - 1 );
-				if ( state.openCount === 0 ) {
-					document.body.style.overflow = state.priorBodyOverflow;
+				if ( openModals.has( modal ) ) {
+					openModals.delete( modal );
+					state.openCount = Math.max( 0, state.openCount - 1 );
+					if ( state.openCount === 0 ) {
+						document.body.style.overflow =
+							state.priorBodyOverflow;
+					}
 				}
 				ctx.isOpen = false;
 			};

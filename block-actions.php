@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Block Actions
  * Description: Extend blocks with custom actions and data attributes.
- * Version: 2.0.0
- * Requires at least: 6.6
+ * Version: 3.0.0
+ * Requires at least: 7.0
  * Requires PHP: 8.0
  * Author: dabowman
  * License: GPL-2.0-or-later
@@ -17,13 +17,42 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-const VERSION = '2.1.0';
+const VERSION = '3.0.0';
+
+/**
+ * Minimum supported WordPress version.
+ *
+ * The Interactivity API surface this plugin builds on (withSyncEvent,
+ * script module dependency resolution) plus the roadmap features
+ * (unique directive IDs, router asset auto-loading, watch(), Abilities)
+ * set the floor at 7.0.
+ */
+const MIN_WP_VERSION = '7.0';
 
 if ( ! defined( 'Block_Actions\\DIR' ) ) {
 	define( 'Block_Actions\\DIR', plugin_dir_path( __FILE__ ) );
 }
 if ( ! defined( 'Block_Actions\\URL' ) ) {
 	define( 'Block_Actions\\URL', plugin_dir_url( __FILE__ ) );
+}
+
+if ( version_compare( get_bloginfo( 'version' ), MIN_WP_VERSION, '<' ) ) {
+	add_action(
+		'admin_notices',
+		function (): void {
+			printf(
+				'<div class="notice notice-error"><p>%s</p></div>',
+				esc_html(
+					sprintf(
+						/* translators: %s: minimum required WordPress version. */
+						__( 'Block Actions requires WordPress %s or newer and is inactive on this site. Please update WordPress to use it.', 'block-actions' ),
+						MIN_WP_VERSION
+					)
+				)
+			);
+		}
+	);
+	return;
 }
 
 // Load Interactivity API infrastructure.
@@ -92,9 +121,10 @@ function enqueue_block_editor_assets(): void {
 	$theme_actions = discover_theme_actions();
 	$editor_actions = array();
 	foreach ( $theme_actions as $action ) {
+		// IDs are already canonical (sanitized at discovery time).
 		$editor_actions[] = array(
-			'id'    => sanitize_key( $action['id'] ),
-			'label' => ucwords( str_replace( '-', ' ', $action['id'] ) ),
+			'id'    => $action['id'],
+			'label' => ucwords( str_replace( array( '-', '_' ), ' ', $action['id'] ) ),
 		);
 	}
 	if ( ! empty( $editor_actions ) ) {
@@ -208,6 +238,18 @@ function discover_theme_actions(): array {
 				continue;
 			}
 
+			// Canonical action ID. Derived once here and used everywhere
+			// (editor dropdown, renderer registry, module handle) so a
+			// mixed-case filename can't produce mismatched IDs.
+			$action_id = sanitize_key( $filename );
+			if ( '' === $action_id ) {
+				continue;
+			}
+			if ( $action_id !== $filename && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				error_log( sprintf( '[Block Actions] Theme action file "%s.js" registered as "%s" — prefer kebab-case filenames so the ID matches the file.', $filename, $action_id ) );
+			}
+
 			// Determine URL based on directory location.
 			$file_url = '';
 			$theme_dir = get_stylesheet_directory();
@@ -219,7 +261,7 @@ function discover_theme_actions(): array {
 
 			if ( $file_url ) {
 				$actions[] = array(
-					'id' => $filename,
+					'id' => $action_id,
 					'path' => $file_path,
 					'url' => $file_url,
 				);
