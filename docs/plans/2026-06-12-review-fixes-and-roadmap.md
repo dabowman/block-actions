@@ -32,7 +32,7 @@ safely operate.
 
 ## Phase 1 — Correctness & Trust Fixes
 
-- [ ] **Task 1.1: Unify version + requirements** — Set 3.0.0 everywhere; bump
+- [x] **Task 1.1: Unify version + requirements** — Set 3.0.0 everywhere; bump
   `Requires at least` to 7.0; set `Tested up to: 7.0` after a wp-env pass against current
   core. Add a runtime guard (admin notice + bail) for pre-7.0 WordPress.
   - Files: `block-actions.php` (header + `VERSION`), `package.json`, `readme.txt`,
@@ -41,7 +41,7 @@ safely operate.
   - Tests: grep for version strings agrees everywhere; plugin activates on WP 7.0
   - Parallelizable: yes
 
-- [ ] **Task 1.2: Fix carousel `wrapAround` plumbing** — `Carousel::get_initial_context()`
+- [x] **Task 1.2: Fix carousel `wrapAround` plumbing** — `Carousel::get_initial_context()`
   reads `data-wrap-around` from the processor (parse `'false'`/`'true'` strings) instead
   of hardcoding `true`.
   - Files: `includes/renderers/class-carousel.php`
@@ -50,7 +50,7 @@ safely operate.
     slide's Next does nothing
   - Parallelizable: yes
 
-- [ ] **Task 1.3: Bind carousel disabled states** — Renderer binds
+- [x] **Task 1.3: Bind carousel disabled states** — Renderer binds
   `data-wp-bind--disabled` (real `<button>`) or `data-wp-class--disabled` +
   `data-wp-bind--aria-disabled` (non-button) on prev/next using the existing
   `state.isPrevDisabled`/`isNextDisabled` getters.
@@ -59,7 +59,7 @@ safely operate.
   - Tests: non-wrap carousel at index 0 → prev disabled; at last → next disabled
   - Parallelizable: no (after 1.2)
 
-- [ ] **Task 1.4: Fix modal scroll-lock bookkeeping for multiple triggers** — Key
+- [x] **Task 1.4: Fix modal scroll-lock bookkeeping for multiple triggers** — Key
   open-count bookkeeping on the dialog element (e.g. module-level `WeakSet` of open
   dialogs, or single close-listener per dialog) so N triggers targeting one dialog don't
   decrement `state.openCount` N times per close.
@@ -68,7 +68,7 @@ safely operate.
   - Tests: two triggers → one dialog; open + close; `openCount` and body overflow correct
   - Parallelizable: yes
 
-- [ ] **Task 1.5: Normalize theme-action IDs once** — Derive the canonical ID in
+- [x] **Task 1.5: Normalize theme-action IDs once** — Derive the canonical ID in
   `discover_theme_actions()` (single sanitization) and use it for editor registration,
   renderer registration, and module handles; warn (debug log) when a filename normalizes
   away from its raw name.
@@ -77,7 +77,7 @@ safely operate.
   - Tests: `MyAction.js` produces one consistent ID end-to-end (PHP test in 4.2)
   - Parallelizable: yes
 
-- [ ] **Task 1.6: Rewrite `create-action` scaffolding** — Templates must match the current
+- [x] **Task 1.6: Rewrite `create-action` scaffolding** — Templates must match the current
   API: renderer extends `Action_Renderer` with `get_initial_context( $processor, $block )`
   + `apply_directives( $processor, $block )`, ABSPATH guard; JS template uses
   `withSyncEvent`, no rate limiter, declarative-pattern comments. Stretch: auto-insert the
@@ -87,7 +87,7 @@ safely operate.
   - Tests: run the wizard, build, register output — no fatals; generated action works in wp-env
   - Parallelizable: yes
 
-- [ ] **Task 1.7: Fix distribution zip** — Include `patterns/`, `uninstall.php`,
+- [x] **Task 1.7: Fix distribution zip** — Include `patterns/`, `uninstall.php`,
   `readme.txt` (and exclude docs/plans). Lay the zip out to wp.org conventions now (per
   Q1) — consider `wp-scripts plugin-zip` + a files allowlist.
   - Files: `package.json`
@@ -95,7 +95,7 @@ safely operate.
   - Tests: unzip → activate in wp-env → pattern appears, uninstall cleans option
   - Parallelizable: yes
 
-- [ ] **Task 1.8: Remove dead code** — Delete `src/stores/utils/sanitize.js` (+ its tests,
+- [x] **Task 1.8: Remove dead code** — Delete `src/stores/utils/sanitize.js` (+ its tests,
   + `dompurify` dep), `@wordpress/api-fetch` dep, `getAllActions()` wrapper, the no-op
   `getFilteredOptions`/`onFilterValueChange` in `block-extensions.js`; remove
   `test-action` + `example-rate-limited` webpack entries and stores (decision Q6);
@@ -109,7 +109,7 @@ safely operate.
 
 ## Phase 2 — Documentation Truth Sweep
 
-- [ ] **Task 2.1: `withSyncEvent` sweep across all docs/examples** — Every
+- [x] **Task 2.1: `withSyncEvent` sweep across all docs/examples** — Every
   `preventDefault()` example wrapped in `withSyncEvent`; `setTimeout`-touching-context
   examples use `withScope`; boilerplate aligned with the plugin's declarative conventions.
   - Files: `docs/examples/*.js` (6 files), `docs/THEME-ACTIONS.md`, `docs/EXAMPLES.md`,
@@ -119,7 +119,7 @@ safely operate.
     example into wp-env theme `/actions` and verify it runs without console warnings
   - Parallelizable: yes
 
-- [ ] **Task 2.2: Fix carousel doc drift** — CSS template `transition: transform` (not
+- [x] **Task 2.2: Fix carousel doc drift** — CSS template `transition: transform` (not
   `left`); delete the claim that the script applies `container: carousel / inline-size`
   (author CSS responsibility — keep the CSS sample that does it); document the disabled
   bindings from 1.3; remove stale `position:relative; left:0` remnants.
@@ -128,7 +128,7 @@ safely operate.
   - Tests: build a carousel from the doc's copy-paste CSS in wp-env — slides animate
   - Parallelizable: no (after 1.3)
 
-- [ ] **Task 2.3: Correct capability claims + document tradeoffs** — Remove
+- [x] **Task 2.3: Correct capability claims + document tradeoffs** — Remove
   nonce-verification / rate-limiting / DOMPurify / CSP claims from README + readme.txt;
   describe the real security posture (Tag Processor injection, scalar context
   sanitization); add a documented note that deactivating the plugin invalidates blocks
