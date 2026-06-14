@@ -45,6 +45,28 @@ class Test_Renderers extends WP_UnitTestCase {
 		$this->assertFalse( $ctx['wrapAround'] );
 	}
 
+	/**
+	 * Hand-authored / pattern markup may spell the toggle as off/no/0 (any
+	 * case). All disable wrap; an unrelated value leaves the default on.
+	 *
+	 * @dataProvider data_wrap_around_spellings
+	 */
+	public function test_carousel_wrap_around_spellings( string $value, bool $expected ): void {
+		list( $ctx ) = $this->run_root( new Carousel(), '<div data-wrap-around="' . $value . '" class="carousel-container"></div>' );
+		$this->assertSame( $expected, $ctx['wrapAround'] );
+	}
+
+	public function data_wrap_around_spellings(): array {
+		return array(
+			'off'      => array( 'off', false ),
+			'no'       => array( 'no', false ),
+			'zero'     => array( '0', false ),
+			'False'    => array( 'False', false ),
+			'unknown'  => array( 'maybe', true ),
+			'explicit' => array( 'true', true ),
+		);
+	}
+
 	public function test_carousel_root_directives(): void {
 		list( , $html ) = $this->run_root( new Carousel(), '<div class="carousel-container"></div>' );
 		$this->assertStringContainsString( 'data-wp-init="callbacks.init"', $html );

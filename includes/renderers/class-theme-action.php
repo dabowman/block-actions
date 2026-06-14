@@ -94,22 +94,49 @@ class Theme_Action extends Action_Renderer {
 	 * @return void
 	 */
 	public function enqueue_view_script( string $action_id ): void {
-		foreach ( \Block_Actions\discover_theme_actions() as $action ) {
-			if ( $action['id'] !== $action_id ) {
-				continue;
-			}
-
-			$version = file_exists( $action['path'] )
-				? (string) filemtime( $action['path'] )
-				: \Block_Actions\VERSION;
-
-			wp_enqueue_script_module(
-				'block-actions-theme-' . $action_id,
-				$action['url'],
-				array( '@wordpress/interactivity' ),
-				$version
-			);
+		$action = $this->find_action( $action_id );
+		if ( null === $action ) {
 			return;
 		}
+
+		$version = file_exists( $action['path'] )
+			? (string) filemtime( $action['path'] )
+			: \Block_Actions\VERSION;
+
+		wp_enqueue_script_module(
+			'block-actions-theme-' . $action_id,
+			$action['url'],
+			array( '@wordpress/interactivity' ),
+			$version
+		);
+	}
+
+	/**
+	 * Resolve a discovered theme action by its canonical ID.
+	 *
+	 * Builds an id → action map once per request from the (already cached)
+	 * discovery list so the on-demand enqueue is O(1) per render rather than
+	 * re-scanning the list for every block that carries a theme action.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $action_id The canonical action identifier.
+	 * @return array|null The discovered action entry, or null if not found.
+	 */
+	private function find_action( string $action_id ): ?array {
+		static $map = null;
+
+		if ( null === $map ) {
+			$map = array();
+			foreach ( \Block_Actions\discover_theme_actions() as $action ) {
+				// Discovery already de-duplicates IDs, so the first writer
+				// wins and this can't clobber a distinct action.
+				if ( ! isset( $map[ $action['id'] ] ) ) {
+					$map[ $action['id'] ] = $action;
+				}
+			}
+		}
+
+		return $map[ $action_id ] ?? null;
 	}
 }

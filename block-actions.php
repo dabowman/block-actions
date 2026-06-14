@@ -205,6 +205,7 @@ function discover_theme_actions(): array {
 
 	$directories = get_action_directories();
 	$actions     = array();
+	$seen        = array();
 
 	foreach ( $directories as $directory ) {
 		if ( ! is_dir( $directory ) ) {
@@ -237,6 +238,18 @@ function discover_theme_actions(): array {
 				error_log( sprintf( '[Block Actions] Theme action file "%s.js" registered as "%s" — prefer kebab-case filenames so the ID matches the file.', $filename, $action_id ) );
 			}
 
+			// Two files normalizing to the same ID (e.g. "Hero.js" + "hero.js"
+			// on a case-sensitive filesystem) would otherwise both register —
+			// only the first would ever load, silently. Keep the first and
+			// warn so the collision is diagnosable.
+			if ( isset( $seen[ $action_id ] ) ) {
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					error_log( sprintf( '[Block Actions] Theme action "%s" from "%s" is ignored — ID already provided by "%s". Use a unique filename.', $action_id, $file_path, $seen[ $action_id ] ) );
+				}
+				continue;
+			}
+
 			// Determine URL based on directory location.
 			$file_url  = '';
 			$theme_dir = get_stylesheet_directory();
@@ -247,7 +260,8 @@ function discover_theme_actions(): array {
 			}
 
 			if ( $file_url ) {
-				$actions[] = array(
+				$seen[ $action_id ] = $file_path;
+				$actions[]          = array(
 					'id'   => $action_id,
 					'path' => $file_path,
 					'url'  => $file_url,
@@ -284,9 +298,17 @@ function init_interactivity_api(): void {
 	$theme_actions  = discover_theme_actions();
 	$theme_renderer = new Renderers\Theme_Action();
 	foreach ( $theme_actions as $action ) {
-		if ( ! in_array( $action['id'], $transformer->get_registered_ids(), true ) ) {
-			$transformer->register_renderer( $action['id'], $theme_renderer );
+		// A built-in renderer with the same ID takes precedence. The theme
+		// file would then never be enqueued (the built-in's enqueue path
+		// runs instead), so warn rather than fail silently on upgrade.
+		if ( in_array( $action['id'], $transformer->get_registered_ids(), true ) ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				error_log( sprintf( '[Block Actions] Theme action "%s" is ignored because a built-in action with that ID already exists. Rename the theme action file to use a unique ID.', $action['id'] ) );
+			}
+			continue;
 		}
+		$transformer->register_renderer( $action['id'], $theme_renderer );
 	}
 
 	// Hook into render_block to inject directives.
