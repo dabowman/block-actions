@@ -32,13 +32,18 @@ class Carousel extends Action_Renderer {
 	 */
 	public function get_initial_context( \WP_HTML_Tag_Processor $processor, array $block ): array {
 		// The editor's "Wrap Around" toggle serializes to data-wrap-around
-		// ("true"/"false"). Absent attribute means the default: wrap.
-		$wrap = $processor->get_attribute( 'data-wrap-around' );
+		// ("true"/"false"). Absent attribute means the default: wrap. Common
+		// falsy spellings are honored too so hand-authored / pattern markup
+		// (data-wrap-around="off") behaves as expected rather than silently
+		// enabling wrap.
+		$wrap     = $processor->get_attribute( 'data-wrap-around' );
+		$wrap_off = is_string( $wrap )
+			&& in_array( strtolower( $wrap ), array( 'false', '0', 'no', 'off' ), true );
 		return array(
 			'currentIndex' => 0,
 			'isAnimating'  => false,
 			'totalSlides'  => 0,
-			'wrapAround'   => ! in_array( $wrap, array( 'false', '0' ), true ),
+			'wrapAround'   => ! $wrap_off,
 		);
 	}
 
@@ -93,34 +98,12 @@ class Carousel extends Action_Renderer {
 			}
 
 			if ( $p->has_class( 'carousel-button-left' ) ) {
-				$p->set_attribute( 'data-wp-on--click', 'actions.prevSlide' );
-				$p->set_attribute( 'aria-label', __( 'Previous slide', 'block-actions' ) );
-				if ( 'BUTTON' === $p->get_tag() ) {
-					$p->set_attribute( 'data-wp-bind--disabled', 'state.isPrevDisabled' );
-				} else {
-					$p->set_attribute( 'role', 'button' );
-					$p->set_attribute( 'data-wp-class--disabled', 'state.isPrevDisabled' );
-					$p->set_attribute( 'data-wp-bind--aria-disabled', 'state.isPrevDisabled' );
-					if ( null === $p->get_attribute( 'tabindex' ) ) {
-						$p->set_attribute( 'tabindex', '0' );
-					}
-				}
+				$this->apply_nav_button( $p, 'actions.prevSlide', __( 'Previous slide', 'block-actions' ), 'state.isPrevDisabled' );
 				continue;
 			}
 
 			if ( $p->has_class( 'carousel-button-right' ) ) {
-				$p->set_attribute( 'data-wp-on--click', 'actions.nextSlide' );
-				$p->set_attribute( 'aria-label', __( 'Next slide', 'block-actions' ) );
-				if ( 'BUTTON' === $p->get_tag() ) {
-					$p->set_attribute( 'data-wp-bind--disabled', 'state.isNextDisabled' );
-				} else {
-					$p->set_attribute( 'role', 'button' );
-					$p->set_attribute( 'data-wp-class--disabled', 'state.isNextDisabled' );
-					$p->set_attribute( 'data-wp-bind--aria-disabled', 'state.isNextDisabled' );
-					if ( null === $p->get_attribute( 'tabindex' ) ) {
-						$p->set_attribute( 'tabindex', '0' );
-					}
-				}
+				$this->apply_nav_button( $p, 'actions.nextSlide', __( 'Next slide', 'block-actions' ), 'state.isNextDisabled' );
 				continue;
 			}
 
@@ -162,5 +145,36 @@ class Carousel extends Action_Renderer {
 		}
 
 		return $p->get_updated_html();
+	}
+
+	/**
+	 * Apply navigation directives and disabled-state bindings to a prev/next
+	 * control. A real <button> uses the native `disabled` attribute; any
+	 * other element gets a button role plus class + aria-disabled bindings
+	 * (it can't carry the boolean disabled attribute).
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param \WP_HTML_Tag_Processor $p            Processor positioned at the control.
+	 * @param string                 $click_action The data-wp-on--click action reference.
+	 * @param string                 $label        Accessible label for the control.
+	 * @param string                 $disabled     The disabled-state getter reference.
+	 * @return void
+	 */
+	private function apply_nav_button( \WP_HTML_Tag_Processor $p, string $click_action, string $label, string $disabled ): void {
+		$p->set_attribute( 'data-wp-on--click', $click_action );
+		$p->set_attribute( 'aria-label', $label );
+
+		if ( 'BUTTON' === $p->get_tag() ) {
+			$p->set_attribute( 'data-wp-bind--disabled', $disabled );
+			return;
+		}
+
+		$p->set_attribute( 'role', 'button' );
+		$p->set_attribute( 'data-wp-class--disabled', $disabled );
+		$p->set_attribute( 'data-wp-bind--aria-disabled', $disabled );
+		if ( null === $p->get_attribute( 'tabindex' ) ) {
+			$p->set_attribute( 'tabindex', '0' );
+		}
 	}
 }
