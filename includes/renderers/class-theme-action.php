@@ -78,4 +78,38 @@ class Theme_Action extends Action_Renderer {
 		$processor->set_attribute( 'data-wp-init', 'callbacks.init' );
 		$processor->set_attribute( 'data-wp-on--click', 'actions.handleClick' );
 	}
+
+	/**
+	 * Enqueue the theme action's ES script module on demand.
+	 *
+	 * Theme action files live in the active theme (not the build/
+	 * directory), so the generic build-path lookup in the parent doesn't
+	 * apply. Resolve the discovered id → URL map and enqueue the matching
+	 * module during render, so a theme's action JS only loads on pages
+	 * where a block actually uses it.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return void
+	 */
+	public function enqueue_view_script( string $action_id ): void {
+		foreach ( \Block_Actions\discover_theme_actions() as $action ) {
+			if ( $action['id'] !== $action_id ) {
+				continue;
+			}
+
+			$version = file_exists( $action['path'] )
+				? (string) filemtime( $action['path'] )
+				: \Block_Actions\VERSION;
+
+			wp_enqueue_script_module(
+				'block-actions-theme-' . $action_id,
+				$action['url'],
+				array( '@wordpress/interactivity' ),
+				$version
+			);
+			return;
+		}
+	}
 }

@@ -51,6 +51,9 @@ The frontend keeps rendering — the saved action attributes are inert without t
 * Carousel: the editor's "Wrap Around" toggle now takes effect on the frontend; prev/next buttons get disabled-state bindings for non-wrapping carousels.
 * Modal toggle: body scroll-lock bookkeeping is now keyed on the dialog, fixing early unlock when several triggers share one modal.
 * Theme actions: action IDs are normalized once at discovery, so mixed-case filenames can't produce mismatched IDs.
+* Theme action script modules now load only on pages where a block uses them (on-demand enqueue), instead of on every page.
+* Performance: the render_block filter skips a substring-absent fast path before parsing, so action-free blocks cost almost nothing.
+* Removed the Content-Security-Policy / security-header feature and its settings page — the plugin is now zero-config. (Security headers belong at the host or a dedicated security plugin. The legacy block_actions_settings option is removed on upgrade.)
 * create-action scaffolding regenerated against the current renderer API (previous output was incompatible).
 * Distribution zip now includes patterns/, uninstall.php, and readme.txt.
 * Removed unused code: DOMPurify sanitizer, rate limiter (preserved as a docs example), unreachable demo stores, unused dependencies.

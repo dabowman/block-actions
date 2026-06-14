@@ -61,6 +61,14 @@ class Directive_Transformer {
 			return $block_content;
 		}
 
+		// Fast path: the overwhelming majority of blocks on a page carry
+		// no action. A substring scan is far cheaper than constructing a
+		// tag processor and walking the markup, so bail before that work
+		// when the marker attribute can't be present.
+		if ( false === strpos( $block_content, 'data-action' ) ) {
+			return $block_content;
+		}
+
 		$processor = new \WP_HTML_Tag_Processor( $block_content );
 		if ( ! $processor->next_tag() ) {
 			return $block_content;

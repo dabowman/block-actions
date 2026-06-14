@@ -164,21 +164,6 @@ function enqueue_modal_dialog_styles(): void {
 add_action( 'enqueue_block_assets', __NAMESPACE__ . '\\enqueue_modal_dialog_styles' );
 
 /**
- * Get plugin settings with defaults.
- *
- * @since 1.0.0
- *
- * @return array Plugin settings with defaults applied.
- */
-function get_plugin_settings(): array {
-	$defaults = array(
-		'enable_csp' => false,
-	);
-	$options = (array) get_option( 'block_actions_settings', array() );
-	return wp_parse_args( $options, $defaults );
-}
-
-/**
  * Get action directories to scan for custom actions.
  *
  * @since 1.0.0
@@ -272,98 +257,6 @@ function discover_theme_actions(): array {
 	$cached = $actions;
 	return $actions;
 }
-
-/**
- * Add security headers (CSP opt-in via setting/filter), and safe defaults.
- *
- * @since 1.0.0
- *
- * @return void
- */
-function add_security_headers(): void {
-	if ( is_admin() ) {
-		return;
-	}
-
-	$settings = get_plugin_settings();
-	$enable_csp = (bool) apply_filters( 'block_actions_enable_csp', (bool) $settings['enable_csp'] );
-
-	if ( $enable_csp ) {
-		// Default policy keeps 'unsafe-inline' for style-src (WordPress core
-		// requirement) but omits 'unsafe-eval' which is unnecessary and
-		// dangerous. Customize via the block_actions_csp_header filter.
-		$csp = (string) apply_filters( 'block_actions_csp_header', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' https:; object-src 'none'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests; block-all-mixed-content;" );
-		header( 'Content-Security-Policy: ' . $csp );
-	}
-
-	// Other security headers.
-	header( 'X-Content-Type-Options: nosniff' );
-	header( 'Referrer-Policy: strict-origin-when-cross-origin' );
-}
-add_action( 'send_headers', __NAMESPACE__ . '\\add_security_headers' );
-
-/**
- * Register settings and admin page.
- *
- * @since 1.0.0
- *
- * @return void
- */
-function register_settings(): void {
-	register_setting( 'block_actions', 'block_actions_settings', array( 'type' => 'array', 'sanitize_callback' => __NAMESPACE__ . '\\sanitize_settings' ) );
-
-	add_options_page(
-		__( 'Block Actions', 'block-actions' ),
-		__( 'Block Actions', 'block-actions' ),
-		'manage_options',
-		'block-actions',
-		__NAMESPACE__ . '\\render_settings_page'
-	);
-}
-add_action( 'admin_menu', __NAMESPACE__ . '\\register_settings' );
-
-/**
- * Sanitize settings.
- *
- * @since 1.0.0
- *
- * @param array $input Raw input from settings form.
- * @return array Sanitized settings array.
- */
-function sanitize_settings( array $input ): array {
-	return array(
-		'enable_csp' => ! empty( $input['enable_csp'] ),
-	);
-}
-
-/**
- * Render settings page.
- *
- * @since 1.0.0
- *
- * @return void
- */
-function render_settings_page(): void { ?>
-	<div class="wrap">
-		<h1><?php echo esc_html( __( 'Block Actions Settings', 'block-actions' ) ); ?></h1>
-		<form method="post" action="options.php">
-			<?php settings_fields( 'block_actions' ); ?>
-			<?php $settings = get_plugin_settings(); ?>
-			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row"><?php echo esc_html( __( 'Enable Content Security Policy', 'block-actions' ) ); ?></th>
-					<td>
-						<label>
-							<input type="checkbox" name="block_actions_settings[enable_csp]" value="1" <?php checked( $settings['enable_csp'] ); ?> />
-							<?php echo esc_html( __( 'Send CSP header (advanced). Configure via filters.', 'block-actions' ) ); ?>
-						</label>
-					</td>
-				</tr>
-			</table>
-			<?php submit_button(); ?>
-		</form>
-	</div>
-<?php }
 
 /**
  * Initialize the Interactivity API directive transformer.
@@ -531,24 +424,7 @@ function force_dialog_for_modal_groups( string $block_content, array $block ): s
 }
 add_filter( 'render_block', __NAMESPACE__ . '\\force_dialog_for_modal_groups', 20, 2 );
 
-/**
- * Enqueue theme action script modules for the Interactivity API.
- *
- * Theme actions are enqueued as ES script modules with
- * '@wordpress/interactivity' as a dependency.
- *
- * @since 2.0.0
- *
- * @return void
- */
-function enqueue_theme_action_modules(): void {
-	$theme_actions = discover_theme_actions();
-	foreach ( $theme_actions as $action ) {
-		wp_enqueue_script_module(
-			'block-actions-theme-' . $action['id'],
-			$action['url'],
-			array( '@wordpress/interactivity' )
-		);
-	}
-}
-add_action( 'wp_enqueue_scripts', __NAMESPACE__ . '\\enqueue_theme_action_modules' );
+// Theme action script modules are enqueued on demand during render by the
+// Theme_Action renderer (includes/renderers/class-theme-action.php), so a
+// theme's action JS only loads on pages where a block actually uses it —
+// matching how built-in action stores are enqueued.

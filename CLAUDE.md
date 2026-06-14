@@ -199,7 +199,6 @@ Browser: Interactivity API processes directives, store hydrates
 
 - **`window.BlockActions.registerAction(id, label, init)`** — Register actions from theme JS (populates the editor action dropdown)
 - **`block_actions_directories` filter (PHP)** — Add custom action directories
-- **`block_actions_enable_csp` / `block_actions_csp_header` filters (PHP)** — CSP header control
 - **`Action_Renderer` abstract class (PHP)** — Extend for custom action renderers
 
 ### Modal Toggle — target markup contract
@@ -271,7 +270,8 @@ All built-in stores follow the same declarative contract:
 - Server-side HTML manipulation only via `WP_HTML_Tag_Processor`; attribute values safely encoded
 - Theme action context forwarding: scalar values only, validated keys, `sanitize_text_field` on strings
 - `data-action` values from content only honored when a registered renderer exists
-- CSP headers available (opt-in via setting or filter) — scheduled for removal in 3.0.0 (see docs/plans/2026-06-12-review-fixes-and-roadmap.md, Task 3.3)
+- Action `data-*` attributes (`data-action`, `data-modal`, `data-custom`, etc.) survive `wp_kses_post()`, so low-capability authors (Contributor/Author, no `unfiltered_html`) can save blocks carrying actions — verified on WP 7.0. No `wp_kses_allowed_html` filter needed.
+- No security-header / CSP feature and no settings page — removed in 3.0.0 (headers belong at the host/security-plugin layer; the plugin is zero-config). `uninstall.php` still deletes the legacy `block_actions_settings` option for upgraders.
 
 ## Important Notes
 
