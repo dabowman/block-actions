@@ -181,7 +181,7 @@ safely operate.
 
 ## Phase 4 — Test & CI Infrastructure
 
-- [ ] **Task 4.1: PHP test environment** — Flip `.wp-env.json` `testsEnvironment` on, add
+- [x] **Task 4.1: PHP test environment** — Flip `.wp-env.json` `testsEnvironment` on, add
   `composer.json` with PHPUnit + WP test utils (or `wp-env`'s phpunit container), wire
   `npm run test:php`.
   - Files: `.wp-env.json`, `composer.json` (new), `package.json`, `tests/php/bootstrap.php` (new)
@@ -189,7 +189,7 @@ safely operate.
   - Tests: a trivial PHP test runs green locally
   - Parallelizable: yes
 
-- [ ] **Task 4.2: PHP test suite for the logic core** — Transformer (fast path, context
+- [x] **Task 4.2: PHP test suite for the logic core** — Transformer (fast path, context
   injection, renderer error isolation), each renderer's context + directives +
   `post_process_html`, theme-action discovery (ID normalization, URL mapping, underscore
   skip), pattern registration, `force_dialog_for_modal_groups`.
@@ -198,7 +198,7 @@ safely operate.
   - Tests: is the tests
   - Parallelizable: no (after 4.1)
 
-- [ ] **Task 4.3: CI hardening** — Add `lint-js`, PHPCS (WPCS ruleset via
+- [x] **Task 4.3: CI hardening** — Add `lint-js`, PHPCS (WPCS ruleset via
   `phpcs.xml.dist`), PHP test job, and Plugin Check as a non-blocking warning step
   (decision Q1) to the workflow.
   - Files: `.github/workflows/ci.yml`, `phpcs.xml.dist` (new)
