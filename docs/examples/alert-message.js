@@ -11,11 +11,18 @@
  * 4. Click the button on the frontend to see the alert
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import {
+	store,
+	getContext,
+	getElement,
+	withSyncEvent,
+} from '@wordpress/interactivity';
 
 store( 'block-actions/alert-message', {
 	actions: {
-		handleClick( event ) {
+		// withSyncEvent is required because the handler calls
+		// event.preventDefault() (WordPress 6.8+).
+		handleClick: withSyncEvent( function ( event ) {
 			event.preventDefault();
 			const ctx = getContext();
 			const { ref } = getElement();
@@ -35,7 +42,7 @@ store( 'block-actions/alert-message', {
 			setTimeout( () => {
 				link.textContent = originalText;
 			}, 1500 );
-		},
+		} ),
 	},
 	callbacks: {
 		init() {

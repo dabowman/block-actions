@@ -10,11 +10,7 @@
  * @since 2.0.0
  */
 
-import {
-	store,
-	getContext,
-	withSyncEvent,
-} from '@wordpress/interactivity';
+import { store, getContext, withSyncEvent } from '@wordpress/interactivity';
 
 const { state } = store( 'block-actions/toggle-visibility', {
 	state: {

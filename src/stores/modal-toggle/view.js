@@ -117,8 +117,7 @@ const { state } = store( 'block-actions/modal-toggle', {
 					openModals.delete( modal );
 					state.openCount = Math.max( 0, state.openCount - 1 );
 					if ( state.openCount === 0 ) {
-						document.body.style.overflow =
-							state.priorBodyOverflow;
+						document.body.style.overflow = state.priorBodyOverflow;
 					}
 				}
 				ctx.isOpen = false;

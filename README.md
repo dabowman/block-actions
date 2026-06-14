@@ -1,7 +1,9 @@
 # Block Actions
 
-Tested up to: 6.8
-Stable tag: 2.0.0
+Requires at least: 7.0
+Tested up to: 7.0
+Requires PHP: 8.0
+Stable tag: 3.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -15,9 +17,8 @@ Assign modular actions and data attributes to blocks for lightweight frontend in
 - **Data Attributes**: Add custom data attributes to any block
 - **Block-Specific Actions**: Configure which blocks can receive actions
 - **Searchable Action Selection**: ComboboxControl interface for easy action discovery and selection
-- **Error Handling & Logging**: Comprehensive error handling and debug logging system
-- **Accessibility**: Built-in accessibility features for all actions
-- **Security**: XSS protection via DOMPurify, nonce verification, rate limiting, and optional CSP headers
+- **Accessibility**: Server-rendered ARIA attributes, keyboard navigation, native `<dialog>` semantics
+- **Security**: Server-side directive injection via `WP_HTML_Tag_Processor`, sanitized scalar-only context forwarding, escaped output
 - **Extensible API**: Global JavaScript API and PHP renderer system for registering and managing actions
 
 ## Installation
@@ -58,16 +59,17 @@ Assign modular actions and data attributes to blocks for lightweight frontend in
  * My Custom Action
  * File: wp-content/themes/your-theme/actions/my-action.js
  */
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import { store, getContext, withSyncEvent } from '@wordpress/interactivity';
 
 store( 'block-actions/my-action', {
     actions: {
-        handleClick( event ) {
+        // withSyncEvent is required when calling preventDefault() (WP 6.8+).
+        handleClick: withSyncEvent( ( event ) => {
             event.preventDefault();
             const ctx = getContext();
             ctx.clicked = true;
             // Your action logic here
-        },
+        } ),
     },
     callbacks: {
         init() {
@@ -98,36 +100,34 @@ To add actions that ship with the plugin:
 2. **Manual Creation**:
    Create a store in `src/stores/your-action/view.js`:
    ```javascript
-   import { store, getContext, getElement } from '@wordpress/interactivity';
-   import { getRateLimiter } from '../utils/rate-limiter';
+   import {
+       store,
+       getContext,
+       withSyncEvent,
+   } from '@wordpress/interactivity';
 
    store( 'block-actions/your-action', {
        actions: {
-           handleClick( event ) {
+           // withSyncEvent is required when the handler calls
+           // event.preventDefault() (WP 6.8+).
+           handleClick: withSyncEvent( ( event ) => {
                event.preventDefault();
-               const { ref } = getElement();
-               const limiter = getRateLimiter( ref );
-               if ( ! limiter.canExecute() ) return;
-
                const ctx = getContext();
-               // Your action logic here
-           },
+               // Flip context flags; bind state getters from the PHP
+               // renderer so the view updates reactively.
+           } ),
        },
        callbacks: {
            init() {
-               const ctx = getContext();
-               const { ref } = getElement();
-               // Initialization logic
-
-               // Return a cleanup function if you set up observers,
-               // timers, or event listeners (Interactivity API best practice).
+               // Imperative setup only (listeners, observers).
+               // Return a cleanup function if you set anything up.
                return () => { /* cleanup */ };
            },
        },
    } );
    ```
 
-   Then create a PHP renderer in `includes/renderers/class-your-action.php` and add the webpack entry.
+   Then create a PHP renderer in `includes/renderers/class-your-action.php` (extend `Action_Renderer`), register it in `block-actions.php` → `init_interactivity_api()`, and add the action to the `ACTIONS` array in `webpack.config.js`.
 
 3. **Rebuild the plugin**: `npm run build`
 
@@ -141,11 +141,7 @@ To add actions that ship with the plugin:
 - `smooth-scroll`: Smooth scrolling to page sections with configurable offset
 - `copy-to-clipboard`: Copy text to clipboard with visual feedback
 
-**Example/Reference Actions** (in `/src/stores/`):
-- `test-action`: Demonstrates the feedback action pattern
-- `example-rate-limited`: Demonstrates per-element rate limiting
-
-**Copy-paste templates** are also available in `/docs/examples/`.
+**Copy-paste templates** for theme actions are available in `/docs/examples/`.
 
 **Additional Resources:**
 - [Create your own theme actions](docs/THEME-ACTIONS.md)
@@ -163,7 +159,7 @@ To add actions that ship with the plugin:
 2. **Interactivity API Stores (`src/stores/`)**:
    - Per-action stores using `@wordpress/interactivity` `store()` API
    - Reactive derived state (getters), declarative actions, and init callbacks
-   - Shared utilities: `rate-limiter.js`, `sanitize.js`, `api.js`
+   - Shared feedback-pattern helpers in `src/stores/utils/create-feedback-store.js`
 
 3. **PHP Directive Transformer**:
    - `render_block` filter using `WP_HTML_Tag_Processor` for safe HTML manipulation
@@ -249,87 +245,31 @@ See the [Theme Actions Guide](docs/THEME-ACTIONS.md) for complete API documentat
 
 ### Interactivity API Store Utilities
 
-When building stores for the Interactivity API, these shared utilities are available:
+When building built-in stores, shared helpers for the "transient feedback" pattern live in `src/stores/utils/create-feedback-store.js`:
 
-| Module | Export | Description |
-|--------|--------|-------------|
-| `utils/rate-limiter` | `getRateLimiter(element)` | WeakMap-based per-element rate limiting (auto GC) |
-| `utils/rate-limiter` | `createRateLimiter(maxPerSecond)` | Create a standalone rate limiter instance |
-| `utils/sanitize` | `sanitizeText(text)` | Strip HTML via DOMPurify |
-| `utils/sanitize` | `validateStyle(property, value)` | Validate CSS values against allowlist |
-| `utils/api` | `apiRequest(endpoint, data)` | Nonce-authenticated WordPress REST API fetch |
-| `utils/api` | `log(type, message, error)` | Centralized logging utility |
+| Export | Description |
+|--------|-------------|
+| `createFeedbackInit(timers)` | Init callback capturing the button's original text + timer cleanup |
+| `createFeedbackAction(timers, config)` | Click handler that runs a side effect and flips `context.isScrolling` for a duration |
+| `feedbackButtonText(ctx)` | Derived-state helper returning the feedback or original label |
+
+Theme actions are standalone ES modules and can't import these — copy the patterns from `/docs/examples/` instead.
 
 ## Security
 
-The plugin implements several security measures:
-- WordPress nonce verification for AJAX requests
-- Data sanitization for all inputs
-- XSS protection through DOMPurify
-- Basic security headers (X-Content-Type-Options, Referrer-Policy)
-- Rate limiting for action execution (5 per second per element)
-- Proper error handling and logging
-- `WP_HTML_Tag_Processor` for safe server-side HTML manipulation (v2.0.0)
+- **Server-side directive injection** uses `WP_HTML_Tag_Processor` — no regex HTML manipulation, attribute values are safely encoded
+- **Theme action context forwarding** accepts scalar values only; keys are validated and string values pass through `sanitize_text_field`
+- **Action IDs from content** are only honored when a registered renderer exists for them
+- **Renderer errors are isolated** — a failing renderer logs and returns the original block markup rather than breaking the page
+- **All PHP output is escaped**; stores use `textContent`-style updates (never `innerHTML`)
 
-### Content Security Policy (optional)
+### A note on deactivation
 
-CSP headers are **disabled by default**. To enable CSP for production:
-
-Enable CSP via Settings > Block Actions. Adjust the policy using the `block_actions_csp_header` filter to fit your environment.
-
-## Logging System
-
-The Block Actions plugin includes a centralized logging system that provides consistent error handling across all components.
-
-### JavaScript Logging
-
-```javascript
-import { log } from '../utils/api';
-
-// Info logging (only appears in debug mode)
-log('info', 'Initializing component');
-
-// Warning logging (appears in console)
-log('warning', 'Feature X is deprecated');
-
-// Error logging (appears in console and sends to server)
-try {
-  // Some code that might fail
-} catch (error) {
-  log('error', 'Operation failed', error);
-}
-```
-
-### Rate Limiting
-
-```javascript
-import { getRateLimiter } from '../utils/rate-limiter';
-
-// In a store action:
-const { ref } = getElement();
-const limiter = getRateLimiter( ref );
-if ( ! limiter.canExecute() ) {
-    return;
-}
-// Proceed with action...
-```
-
-The rate limiter uses a `WeakMap` keyed by DOM element, so limiter state is automatically garbage collected when elements are removed.
-
-### Server-side Logging
-
-Not enabled by default. If needed, implement via custom REST routes with proper permissions and nonces.
+Action attributes are added to block markup at save time. If you deactivate the plugin, existing blocks that carry an action will show an "unexpected or invalid content" notice the next time they're edited, because the saved markup no longer matches what core generates. The frontend keeps rendering fine (the attributes are inert without the plugin). To recover, either reactivate the plugin or use "Attempt recovery" on the affected blocks to strip the attributes.
 
 ### Debug Mode
 
-Enable debug mode by defining `WP_DEBUG` as `true` in your wp-config.php file:
-
-```php
-define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', true);
-```
-
-When debug mode is active, informational logs will appear in the browser console.
+With `WP_DEBUG` enabled, the plugin logs renderer errors and theme-action discovery warnings to the PHP error log, and the stores log warnings (e.g. a modal target that isn't a `<dialog>`) to the browser console.
 
 ## FAQ
 
@@ -344,6 +284,9 @@ Build a custom block. Actions are for frontend-only interactions.
 
 **Does it work with block themes?**
 Yes. Works with classic or block themes.
+
+**What happens if I deactivate the plugin?**
+The frontend keeps rendering (saved attributes are inert without the plugin), but blocks carrying an action will show an invalid-content notice when next edited. Reactivate the plugin or use "Attempt recovery" to strip the attributes. See the Security section above.
 
 ## Contributing
 

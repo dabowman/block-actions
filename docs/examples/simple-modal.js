@@ -1,13 +1,18 @@
 /**
- * Modal Toggle Action
+ * Simple Modal Action
  *
  * Opens and closes a native <dialog> element when the trigger is
  * clicked. The browser provides focus trap, ESC to close, and focus
  * restore; this action layers on body scroll lock, backdrop-click to
  * close, and convenience close-button selectors.
  *
+ * Named `simple-modal` (not `modal-toggle`) on purpose: the filename
+ * becomes the action ID and the store namespace, and the plugin already
+ * ships a built-in `modal-toggle` action. Reusing a built-in name would
+ * merge the two stores and the built-in renderer would win.
+ *
  * Usage:
- * 1. Copy to: wp-content/themes/your-theme/actions/modal-toggle.js
+ * 1. Copy to: wp-content/themes/your-theme/actions/simple-modal.js
  * 2. Add to a Button block in the editor
  * 3. Set data-modal="my-modal-id" on the button
  * 4. Create a <dialog> element with the matching ID:
@@ -25,15 +30,31 @@
  * themselves.
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import {
+	store,
+	getContext,
+	getElement,
+	withSyncEvent,
+} from '@wordpress/interactivity';
 
-const { state } = store( 'block-actions/modal-toggle', {
+/**
+ * Dialogs this store opened and not yet accounted closed. Keying the
+ * close bookkeeping on the dialog (not the trigger) means several
+ * triggers can safely share one dialog.
+ *
+ * @type {WeakSet<HTMLElement>}
+ */
+const openModals = new WeakSet();
+
+const { state } = store( 'block-actions/simple-modal', {
 	state: {
 		openCount: 0,
 		priorBodyOverflow: '',
 	},
 	actions: {
-		handleClick( event ) {
+		// withSyncEvent is required because the handler calls
+		// event.preventDefault() (WordPress 6.8+).
+		handleClick: withSyncEvent( function ( event ) {
 			event.preventDefault();
 			const ctx = getContext();
 			if ( ! ctx.modalId ) {
@@ -52,11 +73,12 @@ const { state } = store( 'block-actions/modal-toggle', {
 					state.priorBodyOverflow = document.body.style.overflow;
 				}
 				modal.showModal();
+				openModals.add( modal );
 				state.openCount++;
 				document.body.style.overflow = 'hidden';
 				ctx.isOpen = true;
 			}
-		},
+		} ),
 	},
 	callbacks: {
 		init() {
@@ -82,9 +104,12 @@ const { state } = store( 'block-actions/modal-toggle', {
 				}
 			};
 			const handleNativeClose = () => {
-				state.openCount = Math.max( 0, state.openCount - 1 );
-				if ( state.openCount === 0 ) {
-					document.body.style.overflow = state.priorBodyOverflow;
+				if ( openModals.has( modal ) ) {
+					openModals.delete( modal );
+					state.openCount = Math.max( 0, state.openCount - 1 );
+					if ( state.openCount === 0 ) {
+						document.body.style.overflow = state.priorBodyOverflow;
+					}
 				}
 				ctx.isOpen = false;
 			};

@@ -29,7 +29,7 @@
  * Group variation as a child block — variant-switching the Dialog
  * itself swaps its identity and leaves residual attributes behind.
  *
- * @since 2.2.0
+ * @since 3.0.0
  */
 
 /* Shared (frontend + editor): neutralize UA paint defaults so Group

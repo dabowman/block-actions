@@ -5,7 +5,7 @@
  * renders as a native <dialog> element with a close-button scaffold.
  * Pair with a Button block using the Modal Toggle action to open it.
  *
- * @since 2.2.0
+ * @since 3.0.0
  */
 
 import { registerBlockVariation } from '@wordpress/blocks';
@@ -23,7 +23,7 @@ import { __ } from '@wordpress/i18n';
  * Scaffold is intentionally minimal — just the close button. Authors
  * compose the rest of the dialog content using any blocks they want.
  *
- * @since 2.2.0
+ * @since 3.0.0
  */
 export function registerModalDialogVariation() {
 	registerBlockVariation( 'core/group', {

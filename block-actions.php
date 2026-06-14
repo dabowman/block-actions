@@ -144,7 +144,7 @@ add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_edit
  *   - Editor-only visibility overrides scoped via the
  *     `.block-editor-block-list__block` class Gutenberg injects.
  *
- * @since 2.2.0
+ * @since 3.0.0
  *
  * @return void
  */
@@ -414,7 +414,7 @@ add_action( 'init', __NAMESPACE__ . '\\init_interactivity_api' );
  * patterns from themes but not from plugins — plugins still need to
  * register explicitly.
  *
- * @since 2.2.0
+ * @since 3.0.0
  *
  * @return void
  */
@@ -494,7 +494,7 @@ add_action( 'init', __NAMESPACE__ . '\\register_block_patterns' );
  * `<dialog>` element regardless of what tagName is set to. It's a
  * no-op in the common case where the tag is already `<dialog>`.
  *
- * @since 2.2.0
+ * @since 3.0.0
  *
  * @param string $block_content Rendered block HTML.
  * @param array  $block         Parsed block data.
