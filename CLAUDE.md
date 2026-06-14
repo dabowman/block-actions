@@ -32,9 +32,19 @@ block-actions/
 │       ├── class-smooth-scroll.php
 │       ├── class-copy-to-clipboard.php
 │       └── class-theme-action.php       # Generic renderer for theme actions
+├── assets/
+│   └── actions/                   # Per-action minimal functional CSS (enqueued on demand)
+│       ├── carousel.css           # Carousel layout mechanics (theme owns appearance)
+│       └── toggle-visibility.css  # `.is-hidden` utility
+├── patterns/                      # Block patterns (registered from PHP)
+│   ├── modal-with-trigger.php
+│   ├── disclosure.php             # Button (toggle-visibility) + hidden Group
+│   └── carousel.php               # Carousel built from core blocks
 ├── src/
 │   ├── block-extensions.js        # Editor-side: block attribute registration, inspector UI
 │   ├── action-registry.js         # Static list of built-in action IDs and labels
+│   ├── anchor-uniqueness.js       # Editor: re-keys duplicate pattern anchors
+│   ├── block-variations.js        # Dialog variation of core/group
 │   └── stores/                    # Interactivity API stores
 │       ├── carousel/view.js       # Carousel store (directives for slides, imperative for touch/lazy)
 │       ├── scroll-to-top/view.js
@@ -60,12 +70,15 @@ block-actions/
 │   │   ├── copy-to-clipboard.test.js
 │   │   └── utils/
 │   │       └── create-feedback-store.test.js
+│   ├── anchor-uniqueness.test.js  # Pure collision-resolver tests
 │   ├── php/                       # PHPUnit integration tests (WP_UnitTestCase)
 │   │   ├── bootstrap.php          # Loads WP test suite + plugin
 │   │   ├── test-smoke.php
 │   │   ├── test-directive-transformer.php
 │   │   ├── test-renderers.php
 │   │   ├── test-theme-action.php
+│   │   ├── test-action-directories.php
+│   │   ├── test-manifests.php
 │   │   └── test-modal-dialog.php
 │   └── __mocks__/
 │       ├── styleMock.js           # CSS mock for Jest
@@ -86,7 +99,7 @@ block-actions/
 npm ci                  # Install dependencies (use this in CI, not npm install)
 npm run build           # Production build → build/ (webpack, 7 entries; cleans build/ first)
 npm run start           # Development watch mode with hot reload
-npm test                # Run Jest (JS) tests once (143 tests across 8 suites)
+npm test                # Run Jest (JS) tests once (150 tests across 9 suites)
 npm run test:watch      # Jest in watch mode
 npm run test:coverage   # Jest with coverage report
 npm run test:php        # PHPUnit (PHP) in the wp-env tests-cli container (needs composer install + wp-env)
@@ -168,7 +181,7 @@ Two suites: JS unit tests (Jest, no WordPress) and PHP integration tests (PHPUni
 - **Setup:** `tests/setup.js` — mocks `wp.i18n`, `window.blockActions`, fake timers, fetch
 - **Test patterns:** `tests/**/*.test.js` and `tests/**/test-*.js`
 - **Interactivity mock:** `tests/__mocks__/interactivity.js` — `store`, `getContext`, `getElement` with `__setContext()`, `__setElement()`, `__reset()` helpers
-- **Stats:** 143 tests across 8 suites. Run: `npm test`.
+- **Stats:** 150 tests across 9 suites. Run: `npm test`.
 
 ### PHP (PHPUnit, integration)
 
@@ -177,7 +190,7 @@ Two suites: JS unit tests (Jest, no WordPress) and PHP integration tests (PHPUni
 - **Config:** `phpunit.xml.dist` (suite = `tests/php/`, `prefix="test-"` so `bootstrap.php` is excluded).
 - **Run:** `npm run test:php` (needs `composer install` once + a running wp-env). Real `WP_HTML_Tag_Processor` output is asserted, so these are integration tests, not mocked units.
 - **Coverage:** transformer (fast path, directive injection, context escaping, renderer error isolation), every renderer's context/directives/`post_process_html`, `Theme_Action` context forwarding (the scalar/key-validation security boundary), `force_dialog_for_modal_groups`, and pattern registration.
-- **Stats:** 33 tests, 76 assertions.
+- **Stats:** 47 tests, 98 assertions.
 - **Note:** `discover_theme_actions()` caches in a `static`, so glob/ID-normalization isn't unit-tested here (proven via wp-env smoke tests instead); the cache-free `Theme_Action` forwarding is covered.
 
 Run both before submitting:
@@ -229,8 +242,10 @@ Browser: Interactivity API processes directives, store hydrates
 ### Key Extension Points
 
 - **`window.BlockActions.registerAction(id, label, init)`** — Register actions from theme JS (populates the editor action dropdown)
-- **`block_actions_directories` filter (PHP)** — Add custom action directories
-- **`Action_Renderer` abstract class (PHP)** — Extend for custom action renderers
+- **`blockActions.supportedBlocks` filter (JS)** — Opt additional block types into the action UI
+- **`block_actions_directories` filter (PHP)** — Add custom action directories (string paths under theme/wp-content auto-map to URLs; `{ path, url }` pairs for anywhere else)
+- **Theme-action manifests** — a `{action}.json` sidecar declares editor `label`, inspector `fields`, and extra `data-wp-*` `directives` (validated server-side); no editor script needed
+- **`Action_Renderer` abstract class (PHP)** — Extend for custom action renderers; optional `assets/actions/{id}.css` ships minimal functional CSS, enqueued on demand
 
 ### Modal Toggle — target markup contract
 
@@ -306,7 +321,7 @@ All built-in stores follow the same declarative contract:
 
 ## Important Notes
 
-- **Supported blocks:** Only `core/button` and `core/group` receive action controls in the editor
+- **Supported blocks:** `core/button` and `core/group` by default; extend via the `blockActions.supportedBlocks` JS filter (`getSupportedBlocks()` in `block-extensions.js` resolves it at call time, routing attribute registration + inspector + save through one source of truth)
 - **Build output is gitignored:** The `build/` and `dist/` directories are not committed; run `npm run build` after cloning
 - **Theme actions don't require rebuild:** They're ES module JS files auto-discovered by PHP
 - **Action IDs come from filenames:** `my-action.js` → action ID `my-action` (normalized via `sanitize_key()`, so use lowercase kebab-case)

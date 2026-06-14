@@ -68,6 +68,12 @@ class Theme_Action extends Action_Renderer {
 	/**
 	 * Apply generic directives to the root element.
 	 *
+	 * Every theme action gets init + click. A manifest (`{id}.json`) may
+	 * declare additional `data-wp-*` directives — e.g. keydown handlers or
+	 * extra bindings — which are validated at discovery time and injected
+	 * here. The action id is read back off the element's data-action so a
+	 * single shared renderer instance can serve every theme action.
+	 *
 	 * @since 2.0.0
 	 *
 	 * @param \WP_HTML_Tag_Processor $processor The HTML tag processor.
@@ -77,6 +83,22 @@ class Theme_Action extends Action_Renderer {
 	public function apply_directives( \WP_HTML_Tag_Processor $processor, array $block ): void {
 		$processor->set_attribute( 'data-wp-init', 'callbacks.init' );
 		$processor->set_attribute( 'data-wp-on--click', 'actions.handleClick' );
+
+		$action_id = $processor->get_attribute( 'data-action' );
+		if ( ! is_string( $action_id ) ) {
+			return;
+		}
+
+		foreach ( \Block_Actions\discover_theme_actions() as $action ) {
+			if ( $action['id'] !== $action_id ) {
+				continue;
+			}
+			$directives = $action['manifest']['directives'] ?? array();
+			foreach ( $directives as $name => $value ) {
+				$processor->set_attribute( $name, $value );
+			}
+			return;
+		}
 	}
 
 	/**

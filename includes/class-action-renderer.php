@@ -95,4 +95,33 @@ abstract class Action_Renderer {
 			$asset['version']
 		);
 	}
+
+	/**
+	 * Enqueue the action's minimal functional stylesheet, if one ships.
+	 *
+	 * Action CSS lives in `assets/actions/{action_id}.css` and is loaded
+	 * on demand during render — so a page only pays for the CSS of actions
+	 * it actually uses, matching the on-demand view-script behavior. Only
+	 * the layout mechanics the action needs to work ship here; appearance
+	 * is the theme's responsibility.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return void
+	 */
+	public function enqueue_view_style( string $action_id ): void {
+		$css_path = "assets/actions/{$action_id}.css";
+
+		if ( ! file_exists( DIR . $css_path ) ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			"block-actions-{$action_id}",
+			URL . $css_path,
+			array(),
+			(string) filemtime( DIR . $css_path )
+		);
+	}
 }

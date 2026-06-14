@@ -61,9 +61,12 @@ class Toggle_Visibility extends Action_Renderer {
 	}
 
 	/**
-	 * Apply data-wp-text to the inner anchor so the button label swaps
-	 * reactively when context.isVisible flips. If the block has no
-	 * anchor (e.g. a core/group toggle), the label stays as authored.
+	 * Apply data-wp-text to the inner control so the button label swaps
+	 * reactively when context.isVisible flips. Targets the first <a> or
+	 * <button> — so the trigger works whether the Button block renders as
+	 * an anchor or (preferably, for keyboard focus) a real <button>. If
+	 * the block has no such control (e.g. a core/group toggle), the label
+	 * stays as authored.
 	 *
 	 * @since 2.1.0
 	 *
@@ -73,7 +76,8 @@ class Toggle_Visibility extends Action_Renderer {
 	public function post_process_html( string $html ): string {
 		$p = new \WP_HTML_Tag_Processor( $html );
 		while ( $p->next_tag() ) {
-			if ( 'A' === $p->get_tag() ) {
+			$tag = $p->get_tag();
+			if ( 'A' === $tag || 'BUTTON' === $tag ) {
 				$p->set_attribute( 'data-wp-text', 'state.buttonLabel' );
 				break;
 			}

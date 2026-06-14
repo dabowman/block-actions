@@ -5,6 +5,14 @@
 // Mock WordPress packages
 jest.mock( '@wordpress/hooks', () => ( {
 	addFilter: jest.fn(),
+	// Pass-through by default (no filters registered). A test can override
+	// the implementation to simulate a registered supportedBlocks filter.
+	applyFilters: jest.fn( ( hookName, value ) => value ),
+} ) );
+jest.mock( '@wordpress/data', () => ( {
+	subscribe: jest.fn(),
+	select: jest.fn( () => ( { getBlocks: () => [] } ) ),
+	dispatch: jest.fn( () => ( { updateBlockAttributes: jest.fn() } ) ),
 } ) );
 
 jest.mock( '@wordpress/blocks', () => ( {
@@ -108,7 +116,17 @@ describe( 'block-extensions', () => {
 		};
 
 		// Re-apply mocks after resetModules
-		jest.mock( '@wordpress/hooks', () => ( { addFilter: jest.fn() } ) );
+		jest.mock( '@wordpress/hooks', () => ( {
+			addFilter: jest.fn(),
+			applyFilters: jest.fn( ( hookName, value ) => value ),
+		} ) );
+		jest.mock( '@wordpress/data', () => ( {
+			subscribe: jest.fn(),
+			select: jest.fn( () => ( { getBlocks: () => [] } ) ),
+			dispatch: jest.fn( () => ( {
+				updateBlockAttributes: jest.fn(),
+			} ) ),
+		} ) );
 		jest.mock( '@wordpress/compose', () => ( {
 			createHigherOrderComponent: jest.fn( ( fn, name ) => {
 				const wrapped = fn;
@@ -446,6 +464,34 @@ describe( 'block-extensions', () => {
 				{ customAction: 'scroll-to-top' }
 			);
 			expect( result[ 'data-action' ] ).toBeUndefined();
+		} );
+
+		test( 'honors the blockActions.supportedBlocks filter', () => {
+			loadModule();
+			const { addFilter, applyFilters } = require( '@wordpress/hooks' );
+
+			// Simulate a theme opting core/image in via the filter.
+			applyFilters.mockImplementation( ( hookName, value ) =>
+				hookName === 'blockActions.supportedBlocks'
+					? {
+							...value,
+							'core/image': { label: 'Image Action', help: '' },
+					  }
+					: value
+			);
+
+			const filterFn = addFilter.mock.calls.find(
+				( c ) => c[ 0 ] === 'blocks.getSaveContent.extraProps'
+			)[ 2 ];
+
+			// core/image is not a built-in supported block, but the filter
+			// opted it in, so the save output should carry the action.
+			const result = filterFn(
+				{},
+				{ name: 'core/image' },
+				{ customAction: 'scroll-to-top' }
+			);
+			expect( result[ 'data-action' ] ).toBe( 'scroll-to-top' );
 		} );
 
 		test( 'does not add data-action when customAction is empty', () => {

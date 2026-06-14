@@ -14,7 +14,7 @@
  * @module block-extensions
  */
 
-import { addFilter } from '@wordpress/hooks';
+import { addFilter, applyFilters } from '@wordpress/hooks';
 import { createHigherOrderComponent } from '@wordpress/compose';
 import { Fragment } from '@wordpress/element';
 import { InspectorAdvancedControls } from '@wordpress/block-editor';
@@ -26,6 +26,7 @@ import {
 import { __ } from '@wordpress/i18n';
 import actions from './action-registry';
 import { registerModalDialogVariation } from './block-variations';
+import { setupAnchorUniqueness } from './anchor-uniqueness';
 import './block-variations.css';
 
 /**
@@ -239,11 +240,17 @@ if ( typeof window !== 'undefined' ) {
 
 	// Auto-register theme actions passed via wp_localize_script from PHP.
 	// This replaces the previous approach of loading theme action ES modules
-	// as classic scripts (which failed due to ES module syntax).
+	// as classic scripts (which failed due to ES module syntax). Inspector
+	// fields come from the action's optional JSON manifest.
 	if ( Array.isArray( window.blockActionsThemeActions ) ) {
 		window.blockActionsThemeActions.forEach( ( action ) => {
 			if ( action.id && action.label ) {
-				registerEditorAction( action.id, action.label, () => {} );
+				registerEditorAction(
+					action.id,
+					action.label,
+					Array.isArray( action.fields ) ? action.fields : [],
+					() => {}
+				);
 			}
 		} );
 	}
@@ -294,6 +301,38 @@ const BLOCKS_WITH_ACTIONS = {
 };
 
 /**
+ * Get the map of blocks that support actions, filtered so themes and
+ * plugins can opt additional block types in.
+ *
+ * Resolved at call time (not memoized) so a filter registered after this
+ * module loads still applies. Routes the whole pipeline — attribute
+ * registration, the inspector control, and save output — through one
+ * source of truth.
+ *
+ * Example, from a theme/plugin editor script:
+ *
+ *     import { addFilter } from '@wordpress/hooks';
+ *     addFilter(
+ *         'blockActions.supportedBlocks',
+ *         'my-theme/image-actions',
+ *         ( blocks ) => ( {
+ *             ...blocks,
+ *             'core/image': {
+ *                 label: 'Image Action',
+ *                 help: 'Add an action to this image.',
+ *             },
+ *         } )
+ *     );
+ *
+ * @since 3.0.0
+ *
+ * @return {Object.<string, {label: string, help: string}>} Supported blocks map.
+ */
+function getSupportedBlocks() {
+	return applyFilters( 'blockActions.supportedBlocks', BLOCKS_WITH_ACTIONS );
+}
+
+/**
  * Adds custom attributes to blocks during registration.
  * - customData: Added to all blocks
  * - customAction: Added only to blocks that support actions
@@ -313,7 +352,7 @@ function addCustomDataAttribute( settings ) {
 			},
 		};
 
-		if ( BLOCKS_WITH_ACTIONS[ settings.name ] ) {
+		if ( getSupportedBlocks()[ settings.name ] ) {
 			settings.attributes = {
 				...settings.attributes,
 				customAction: {
@@ -398,13 +437,14 @@ const withActionInspectorControl = createHigherOrderComponent(
 		return ( props ) => {
 			try {
 				// Only apply to blocks that support actions
-				if ( ! BLOCKS_WITH_ACTIONS[ props.name ] ) {
+				const supportedBlocks = getSupportedBlocks();
+				if ( ! supportedBlocks[ props.name ] ) {
 					return <BlockEdit { ...props } />;
 				}
 
 				const { attributes, setAttributes } = props;
 				const { customAction, actionData = {} } = attributes;
-				const blockConfig = BLOCKS_WITH_ACTIONS[ props.name ];
+				const blockConfig = supportedBlocks[ props.name ];
 				const fields = getFieldsForAction( customAction );
 
 				// Create action options from all registered actions
@@ -488,7 +528,7 @@ function addCustomDataToSave( extraProps, blockType, attributes ) {
 		}
 
 		// Add action attribute only to blocks that support actions
-		if ( BLOCKS_WITH_ACTIONS[ blockType.name ] && customAction ) {
+		if ( getSupportedBlocks()[ blockType.name ] && customAction ) {
 			extraProps[ 'data-action' ] = customAction;
 
 			// Map actionData fields to data-* attributes
@@ -546,6 +586,7 @@ try {
 	);
 
 	registerModalDialogVariation();
+	setupAnchorUniqueness();
 } catch ( error ) {
 	log( 'error', 'Failed to register Block Actions', error );
 }

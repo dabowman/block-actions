@@ -1,0 +1,15 @@
+/**
+ * Toggle Visibility — minimal functional CSS.
+ *
+ * The store toggles the `is-hidden` class on the target element. This
+ * rule is the only thing the action needs to actually hide content;
+ * everything else (animation, appearance) is the theme's responsibility.
+ *
+ * `!important` makes the hide win even when a theme's layout CSS sets a
+ * stronger `display` on the target — hiding is a foundational contract.
+ *
+ * @since 3.0.0
+ */
+.is-hidden {
+	display: none !important;
+}

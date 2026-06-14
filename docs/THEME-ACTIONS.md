@@ -91,6 +91,36 @@ Theme actions are **automatically registered** in the editor dropdown when the p
 
 No manual registration is needed for basic use cases.
 
+### Manifest (custom label, fields, and directives — no editor script)
+
+Drop a JSON file next to your action with the same basename — `smooth-toggle.js` → `smooth-toggle.json` — to give it a custom label, inspector fields, and extra directives without writing any editor JavaScript:
+
+```json
+{
+    "label": "Smooth Toggle",
+    "fields": [
+        {
+            "key": "target",
+            "type": "text",
+            "label": "Target Element ID",
+            "help": "The ID of the element to toggle.",
+            "dataAttribute": "data-target",
+            "required": true,
+            "default": ""
+        }
+    ],
+    "directives": {
+        "data-wp-on--keydown": "actions.handleKeydown"
+    }
+}
+```
+
+- **`label`** — overrides the filename-derived label in the action dropdown.
+- **`fields`** — inspector controls (`text`, `number`, `toggle`). Each value is saved to the matching `dataAttribute` and forwarded to your store as context. `key` must be an identifier (letters, digits, underscore); `dataAttribute` must look like `data-…`.
+- **`directives`** — extra `data-wp-*` directives injected on the action's root element, on top of the automatic `data-wp-init="callbacks.init"` and `data-wp-on--click="actions.handleClick"`. Only `data-wp-*` keys are allowed — a manifest can't inject arbitrary HTML attributes.
+
+Everything is validated server-side; unknown keys and unsafe values are dropped. The manifest replaces the need to call `registerAction()` for custom labels or fields.
+
 ### Global API (Optional)
 
 The plugin exposes a global `window.BlockActions` object for advanced use cases such as custom labels or adding inspector fields.
@@ -261,19 +291,53 @@ store( 'block-actions/interactive-toggle', {
 
 ## Advanced Usage
 
-### Custom Action Directories
+### Supporting More Block Types
 
-Add custom directories beyond the theme's `/actions` folder:
+By default the action selector appears only on **Button** and **Group** blocks. Opt additional block types in with the `blockActions.supportedBlocks` JavaScript filter from a theme or plugin editor script:
 
-```php
-// In your theme's functions.php
-add_filter('block_actions_directories', function($directories) {
-    $directories[] = get_stylesheet_directory() . '/custom-actions';
-    return $directories;
-});
+```javascript
+// Enqueue this on enqueue_block_editor_assets, e.g. my-theme-editor.js
+import { addFilter } from '@wordpress/hooks';
+
+addFilter(
+    'blockActions.supportedBlocks',
+    'my-theme/image-actions',
+    ( blocks ) => ( {
+        ...blocks,
+        'core/image': {
+            label: 'Image Action',
+            help: 'Add an action to this image.',
+        },
+    } )
+);
 ```
 
-> **Current limitation:** only directories inside the active (child) theme can be resolved to URLs today — files in parent-theme or plugin directories are discovered but skipped. Support for `{ path, url }` entries is planned.
+The filtered map drives the whole pipeline — attribute registration, the inspector control, and the saved `data-action` output — so the chosen block becomes fully action-capable with no other changes. The action still needs a renderer: built-in actions and the generic `Theme_Action` renderer work on any block that carries `data-action`, so most actions just work on the newly-supported block.
+
+### Custom Action Directories
+
+Add directories beyond the theme's `/actions` folder with the `block_actions_directories` filter. Paths under the active theme, the parent theme, or `wp-content` (including plugin directories) have their URL derived automatically:
+
+```php
+add_filter( 'block_actions_directories', function ( $directories ) {
+    $directories[] = get_stylesheet_directory() . '/custom-actions'; // child theme
+    $directories[] = get_template_directory() . '/actions';          // parent theme
+    $directories[] = WP_PLUGIN_DIR . '/my-plugin/actions';           // a plugin
+    return $directories;
+} );
+```
+
+For a location **outside** those web roots (e.g. a symlinked or `mu-plugins`-adjacent path), pass an explicit `{ path, url }` pair so the frontend can load the module:
+
+```php
+add_filter( 'block_actions_directories', function ( $directories ) {
+    $directories[] = array(
+        'path' => '/srv/shared/block-actions',
+        'url'  => 'https://cdn.example.com/block-actions',
+    );
+    return $directories;
+} );
+```
 
 ### Action File Naming
 

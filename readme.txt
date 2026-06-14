@@ -47,6 +47,12 @@ The frontend keeps rendering — the saved action attributes are inert without t
 == Changelog ==
 
 = 3.0.0 =
+* New "Disclosure (Show / Hide)" and "Carousel" block patterns — insert a working interaction from the inserter.
+* Extend the action UI to more block types with the `blockActions.supportedBlocks` JavaScript filter (Button and Group by default).
+* Theme actions can ship a `{action}.json` manifest declaring a custom label, inspector fields, and extra `data-wp-*` directives — no editor script required.
+* Custom action directories under the parent theme or any plugin now resolve correctly; supply a `{ path, url }` pair for locations outside the usual web roots.
+* Minimal functional CSS for the carousel and show/hide actions now ships, enqueued only on pages that use the action.
+* Inserting an interaction pattern more than once on a page automatically gives each copy a unique anchor id, so the copies don't control each other.
 * Minimum WordPress raised to 7.0 (runtime guard with admin notice on older versions).
 * Carousel: the editor's "Wrap Around" toggle now takes effect on the frontend; prev/next buttons get disabled-state bindings for non-wrapping carousels.
 * Modal toggle: body scroll-lock bookkeeping is now keyed on the dialog, fixing early unlock when several triggers share one modal.
