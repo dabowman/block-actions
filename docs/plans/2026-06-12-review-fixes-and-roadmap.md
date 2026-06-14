@@ -28,6 +28,18 @@ safely operate.
   manifests/platform.
 - **Q8 — Forms: out of scope.** Revisit only if a clear gap remains after Phase 6.
 
+### Phase 5 decisions (resolved 2026-06-14)
+
+- **PR strategy: new stacked PR.** Phase 5 lands on branch `3.0.0-phase-5` off
+  `3.0.0-phase-1-2`; its PR targets `3.0.0-phase-1-2` as base so review sees only the
+  Phase 5 diff. Merges after PR #7.
+- **Shipped CSS: minimal functional only.** Ship `.is-hidden` and carousel layout
+  mechanics (overflow, transform, container-query sizing) — the CSS without which the
+  pattern is broken. No aesthetic styling (button look, spacing, transitions beyond the
+  slide transform); the theme owns appearance. Honors the behavior-layer principle. CSS
+  enqueues on demand per action (matching the Phase 3 JS module pattern).
+- **Scope: all six tasks**, including theme-action manifests v1 (5.6).
+
 ---
 
 ## Phase 1 — Correctness & Trust Fixes
