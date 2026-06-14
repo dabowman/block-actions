@@ -140,7 +140,7 @@ safely operate.
 
 ## Phase 3 — Security & Performance Hygiene
 
-- [ ] **Task 3.1: Transformer fast path** — Early-return in
+- [x] **Task 3.1: Transformer fast path** — Early-return in
   `Directive_Transformer::transform()` when
   `! str_contains( $block_content, 'data-action' )` before constructing the processor.
   - Files: `includes/class-directive-transformer.php`
@@ -149,7 +149,7 @@ safely operate.
     data-action still transforms
   - Parallelizable: yes
 
-- [ ] **Task 3.2: On-demand theme-action enqueue** — Register theme modules
+- [x] **Task 3.2: On-demand theme-action enqueue** — Register theme modules
   (`wp_register_script_module`) up front; `Theme_Action` overrides `enqueue_view_script()`
   to enqueue from a discovered id→URL map during render, matching built-in behavior. Theme
   action JS stops loading on pages that don't use it.
@@ -158,7 +158,7 @@ safely operate.
   - Tests: page without the action → module absent; page with it → module loads, action works
   - Parallelizable: no (after 1.5)
 
-- [ ] **Task 3.3: Remove security headers, CSP, and settings page** — Delete
+- [x] **Task 3.3: Remove security headers, CSP, and settings page** — Delete
   `add_security_headers()`, the `block_actions_enable_csp` / `block_actions_csp_header`
   filters, `register_settings()` / `sanitize_settings()` / `render_settings_page()` /
   `get_plugin_settings()`, and the options page (decision Q4). Keep `uninstall.php`
@@ -170,7 +170,7 @@ safely operate.
     upgrading from 2.x leaves no orphaned behavior
   - Parallelizable: yes
 
-- [ ] **Task 3.4: KSES verification for low-capability roles** — Verify (wp-env, as a
+- [x] **Task 3.4: KSES verification for low-capability roles** — Verify (wp-env, as a
   Contributor) that `data-action` / `data-modal` / `data-custom` attributes survive kses
   on save. Document the result; if stripped, add a `wp_kses_allowed_html` filter scoped to
   the plugin's attributes.
