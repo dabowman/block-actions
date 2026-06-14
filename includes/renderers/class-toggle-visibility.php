@@ -43,8 +43,9 @@ class Toggle_Visibility extends Action_Renderer {
 	/**
 	 * Apply directives to the root element.
 	 *
-	 * aria-expanded and aria-controls are bound declaratively so they
-	 * stay in sync with context.isVisible without imperative DOM writes.
+	 * The aria-expanded and aria-controls attributes are bound
+	 * declaratively so they stay in sync with context.isVisible without
+	 * imperative DOM writes.
 	 *
 	 * @since 2.0.0
 	 *

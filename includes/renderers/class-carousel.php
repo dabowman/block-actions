@@ -72,7 +72,7 @@ class Carousel extends Action_Renderer {
 		$total_slides = 0;
 		while ( $pre->next_tag() ) {
 			if ( $pre->has_class( 'carousel-slide' ) ) {
-				$total_slides++;
+				++$total_slides;
 			}
 		}
 
@@ -135,7 +135,7 @@ class Carousel extends Action_Renderer {
 				$p->set_attribute( 'aria-roledescription', __( 'slide', 'block-actions' ) );
 				/* translators: 1: current slide index (1-based), 2: total slides */
 				$p->set_attribute( 'aria-label', sprintf( __( 'Slide %1$d of %2$d', 'block-actions' ), $slide_index + 1, $total_slides ) );
-				$slide_index++;
+				++$slide_index;
 				continue;
 			}
 
@@ -152,7 +152,7 @@ class Carousel extends Action_Renderer {
 				if ( null === $p->get_attribute( 'tabindex' ) ) {
 					$p->set_attribute( 'tabindex', '0' );
 				}
-				$thumb_index++;
+				++$thumb_index;
 				continue;
 			}
 

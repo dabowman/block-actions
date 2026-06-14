@@ -53,5 +53,10 @@ coverage/
 build/
 dist/
 
+# Composer (dev-only deps: PHPUnit, WPCS — not shipped). composer.lock IS
+# committed to pin the dev toolchain for reproducible CI.
+vendor/
+.phpunit.result.cache
+
 # wp-env local override
 .wp-env.override.json

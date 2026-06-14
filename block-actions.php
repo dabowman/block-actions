@@ -9,6 +9,8 @@
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: block-actions
+ *
+ * @package Block_Actions
  */
 
 namespace Block_Actions;
@@ -78,18 +80,18 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-theme-actio
  * @return array{dependencies: array, version: string} Asset metadata with dependencies and version.
  */
 function get_asset_meta( string $asset_filename, string $script_filename ): array {
-	$asset_path = plugin_dir_path( __FILE__ ) . $asset_filename;
+	$asset_path  = plugin_dir_path( __FILE__ ) . $asset_filename;
 	$script_path = plugin_dir_path( __FILE__ ) . $script_filename;
-	$deps = array();
-	$ver = file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0';
+	$deps        = array();
+	$ver         = file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0';
 	if ( file_exists( $asset_path ) ) {
 		$asset = include $asset_path;
-		$deps = isset( $asset['dependencies'] ) ? (array) $asset['dependencies'] : array();
-		$ver = isset( $asset['version'] ) ? (string) $asset['version'] : $ver;
+		$deps  = isset( $asset['dependencies'] ) ? (array) $asset['dependencies'] : array();
+		$ver   = isset( $asset['version'] ) ? (string) $asset['version'] : $ver;
 	}
 	return array(
 		'dependencies' => $deps,
-		'version' => $ver,
+		'version'      => $ver,
 	);
 }
 
@@ -118,7 +120,7 @@ function enqueue_block_editor_assets(): void {
 	// in the action selector. Theme action JS files are ES modules and
 	// cannot be loaded as classic scripts in the editor; instead we pass
 	// their metadata and let block-extensions.js register them.
-	$theme_actions = discover_theme_actions();
+	$theme_actions  = discover_theme_actions();
 	$editor_actions = array();
 	foreach ( $theme_actions as $action ) {
 		// IDs are already canonical (sanitized at discovery time).
@@ -202,7 +204,7 @@ function discover_theme_actions(): array {
 	}
 
 	$directories = get_action_directories();
-	$actions = array();
+	$actions     = array();
 
 	foreach ( $directories as $directory ) {
 		if ( ! is_dir( $directory ) ) {
@@ -236,7 +238,7 @@ function discover_theme_actions(): array {
 			}
 
 			// Determine URL based on directory location.
-			$file_url = '';
+			$file_url  = '';
 			$theme_dir = get_stylesheet_directory();
 			$theme_uri = get_stylesheet_directory_uri();
 
@@ -246,9 +248,9 @@ function discover_theme_actions(): array {
 
 			if ( $file_url ) {
 				$actions[] = array(
-					'id' => $action_id,
+					'id'   => $action_id,
 					'path' => $file_path,
-					'url' => $file_url,
+					'url'  => $file_url,
 				);
 			}
 		}
@@ -279,7 +281,7 @@ function init_interactivity_api(): void {
 	$transformer->register_renderer( 'copy-to-clipboard', new Renderers\Copy_To_Clipboard() );
 
 	// Register generic renderer for theme actions.
-	$theme_actions = discover_theme_actions();
+	$theme_actions  = discover_theme_actions();
 	$theme_renderer = new Renderers\Theme_Action();
 	foreach ( $theme_actions as $action ) {
 		if ( ! in_array( $action['id'], $transformer->get_registered_ids(), true ) ) {
@@ -416,7 +418,7 @@ function force_dialog_for_modal_groups( string $block_content, array $block ): s
 
 	// WP_HTML_Tag_Processor can't rewrite tag names; fall back to
 	// targeted regex on the outermost opening + closing tag.
-	$quoted = preg_quote( $tag, '/' );
+	$quoted        = preg_quote( $tag, '/' );
 	$block_content = preg_replace( '/^(\s*)<' . $quoted . '\b/i', '$1<dialog', $block_content, 1 );
 	$block_content = preg_replace( '/<\/' . $quoted . '>(\s*)$/i', '</dialog>$1', $block_content, 1 );
 

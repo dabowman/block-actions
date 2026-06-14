@@ -29,7 +29,7 @@ class Directive_Transformer {
 	 *
 	 * @var array<string, Action_Renderer>
 	 */
-	private array $renderers = [];
+	private array $renderers = array();
 
 	/**
 	 * Register a renderer for a specific action ID.
