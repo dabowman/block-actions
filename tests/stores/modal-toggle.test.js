@@ -252,6 +252,31 @@ describe( 'Modal Toggle Store', () => {
 			expect( document.body.style.overflow ).toBe( '' );
 		} );
 
+		it( 'wires the close listener via toggle when the dialog was absent at init', () => {
+			// A trigger can hydrate before its target <dialog> is in the DOM
+			// (lazy-rendered modal). init() then bails and wires nothing —
+			// opening later must still wire a close listener, or body scroll
+			// would lock forever.
+			const trigger = document.createElement( 'button' );
+			document.body.removeChild( modalElement );
+			const ctx = { modalId: 'test-modal', isOpen: false };
+			interactivityMock.__setContext( ctx );
+			interactivityMock.__setElement( trigger );
+
+			expect( storeDefinition.callbacks.init() ).toBeUndefined();
+
+			// The dialog appears, then the user clicks the trigger.
+			document.body.appendChild( modalElement );
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( modalElement.open ).toBe( true );
+			expect( document.body.style.overflow ).toBe( 'hidden' );
+
+			// A native close releases the lock — proving toggle wired it.
+			modalElement.close();
+			expect( document.body.style.overflow ).toBe( '' );
+			expect( ctx.isOpen ).toBe( false );
+		} );
+
 		it( 'closes the dialog when a .modal-close button is clicked', () => {
 			const closeBtn = document.createElement( 'button' );
 			closeBtn.classList.add( 'modal-close' );

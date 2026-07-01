@@ -73,6 +73,13 @@ const { state } = store( 'block-actions/modal-toggle', {
 			if ( modal.open ) {
 				modal.close();
 			} else {
+				// If this trigger hydrated before its dialog was in the DOM,
+				// init() bailed and wired no `close` listener — opening now
+				// without one would lock body scroll forever. Wire listeners
+				// here (idempotent per trigger) before showing the dialog.
+				const { ref } = getElement();
+				wireDialogListeners( ref, modal, ctx );
+
 				if ( state.openCount === 0 ) {
 					state.priorBodyOverflow = document.body.style.overflow;
 				}
@@ -102,43 +109,8 @@ const { state } = store( 'block-actions/modal-toggle', {
 				return;
 			}
 
-			applyModalLabel( modal );
-
 			const { ref } = getElement();
-
-			const handleCloseClick = () => modal.close();
-			const handleBackdropClick = ( e ) => {
-				if ( e.target === modal ) {
-					modal.close();
-				}
-			};
-			const handleNativeClose = () => {
-				if ( openModals.has( modal ) ) {
-					openModals.delete( modal );
-					state.openCount = Math.max( 0, state.openCount - 1 );
-					if ( state.openCount === 0 ) {
-						document.body.style.overflow = state.priorBodyOverflow;
-					}
-				}
-				ctx.isOpen = false;
-			};
-
-			const closeButtons = modal.querySelectorAll(
-				'.modal-close, [data-modal-close]'
-			);
-			closeButtons.forEach( ( button ) => {
-				button.addEventListener( 'click', handleCloseClick );
-			} );
-			modal.addEventListener( 'click', handleBackdropClick );
-			modal.addEventListener( 'close', handleNativeClose );
-
-			privateState.set( ref, {
-				closeButtons,
-				handleCloseClick,
-				handleBackdropClick,
-				handleNativeClose,
-				modal,
-			} );
+			wireDialogListeners( ref, modal, ctx );
 
 			return () => {
 				const priv = privateState.get( ref );
@@ -175,6 +147,64 @@ const { state } = store( 'block-actions/modal-toggle', {
  */
 function isDialog( el ) {
 	return !! el && typeof el.showModal === 'function';
+}
+
+/**
+ * Wire the close/backdrop/native-close listeners for a trigger's dialog.
+ *
+ * Idempotent per trigger (`ref`): a second call for an already-wired trigger
+ * is a no-op, so it's safe to call from both `init()` (the normal path) and
+ * `toggle()` (the recovery path when the dialog wasn't in the DOM at
+ * hydration time). The shared open-count is decremented at most once per
+ * actual close via the `openModals` WeakSet, even when several triggers
+ * target — and each wire a `close` listener on — the same dialog.
+ *
+ * @since 3.0.0
+ *
+ * @param {HTMLElement} ref   The trigger element (cleanup key).
+ * @param {HTMLElement} modal The target <dialog> element.
+ * @param {Object}      ctx   The trigger's Interactivity context.
+ */
+function wireDialogListeners( ref, modal, ctx ) {
+	if ( privateState.has( ref ) ) {
+		return;
+	}
+
+	applyModalLabel( modal );
+
+	const handleCloseClick = () => modal.close();
+	const handleBackdropClick = ( e ) => {
+		if ( e.target === modal ) {
+			modal.close();
+		}
+	};
+	const handleNativeClose = () => {
+		if ( openModals.has( modal ) ) {
+			openModals.delete( modal );
+			state.openCount = Math.max( 0, state.openCount - 1 );
+			if ( state.openCount === 0 ) {
+				document.body.style.overflow = state.priorBodyOverflow;
+			}
+		}
+		ctx.isOpen = false;
+	};
+
+	const closeButtons = modal.querySelectorAll(
+		'.modal-close, [data-modal-close]'
+	);
+	closeButtons.forEach( ( button ) => {
+		button.addEventListener( 'click', handleCloseClick );
+	} );
+	modal.addEventListener( 'click', handleBackdropClick );
+	modal.addEventListener( 'close', handleNativeClose );
+
+	privateState.set( ref, {
+		closeButtons,
+		handleCloseClick,
+		handleBackdropClick,
+		handleNativeClose,
+		modal,
+	} );
 }
 
 /**
