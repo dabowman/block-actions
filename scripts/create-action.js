@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+/**
+ * Scaffold a new built-in action: an Interactivity API store plus a PHP
+ * renderer matching the current Action_Renderer API.
+ *
+ * Usage: npm run create-action
+ */
+
 const fs = require( 'fs' );
 const path = require( 'path' );
 const readline = require( 'readline' );
@@ -9,50 +16,101 @@ const rl = readline.createInterface( {
 	output: process.stdout,
 } );
 
-// Template for new Interactivity API store
+// Line-queue input handling so the wizard works both interactively and
+// with piped stdin (rl.question alone drops lines buffered before the
+// question is asked, and hangs forever on EOF).
+const pendingLines = [];
+const waiters = [];
+let stdinClosed = false;
+rl.on( 'line', ( line ) => {
+	const waiter = waiters.shift();
+	if ( waiter ) {
+		waiter( line );
+	} else {
+		pendingLines.push( line );
+	}
+} );
+rl.on( 'close', () => {
+	stdinClosed = true;
+	while ( waiters.length ) {
+		waiters.shift()( '' );
+	}
+} );
+
+function ask( prompt ) {
+	process.stdout.write( prompt );
+	const buffered = pendingLines.shift();
+	if ( buffered !== undefined ) {
+		process.stdout.write( `${ buffered }\n` );
+		return Promise.resolve( buffered );
+	}
+	// 'close' fires once: a prompt issued AFTER EOF would push a waiter
+	// nothing ever drains, and the process would exit 0 with no output.
+	// Resolve empty immediately so validation reports the missing input.
+	if ( stdinClosed ) {
+		process.stdout.write( '\n' );
+		return Promise.resolve( '' );
+	}
+	return new Promise( ( resolve ) => {
+		waiters.push( resolve );
+	} );
+}
+
+// Template for a new Interactivity API store.
 const getStoreTemplate = ( name, description ) => `/**
  * ${ description }
  *
- * @since 2.0.0
+ * @since 3.0.0
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
-import { getRateLimiter } from '../utils/rate-limiter';
+import {
+	store,
+	getContext,
+	getElement,
+	withSyncEvent,
+} from '@wordpress/interactivity';
 
 store( 'block-actions/${ name }', {
+	state: {
+		// Derived state getters go here. Bind them from the PHP renderer
+		// via data-wp-text / data-wp-class--* / data-wp-style--* so the
+		// view updates reactively — avoid imperative DOM writes.
+	},
 	actions: {
-		handleClick( event ) {
+		// withSyncEvent is required whenever the handler uses
+		// event.preventDefault(), stopPropagation(), or currentTarget
+		// (WP 6.8+). For async work use a generator (function*) wrapped
+		// in withSyncEvent — never async/await.
+		handleClick: withSyncEvent( function ( event ) {
 			event.preventDefault();
-			const { ref } = getElement();
-			const limiter = getRateLimiter( ref );
-			if ( ! limiter.canExecute() ) {
-				return;
-			}
-
 			const ctx = getContext();
-			// Add your action logic here.
-		},
+			// Flip context flags; let state getters derive the view.
+			ctx.isActive = ! ctx.isActive;
+		} ),
 	},
 	callbacks: {
 		init() {
-			const ctx = getContext();
 			const { ref } = getElement();
-			// Initialization logic.
+			// Imperative setup only: listeners, observers, measurements.
+			// Accessibility attributes belong in the PHP renderer so they
+			// are correct on first paint.
+			console.debug( '[block-actions/${ name }] init', ref );
 
-			// Return a cleanup function if you set up observers,
-			// timers, or event listeners.
+			// Return a cleanup function if you set up observers, timers,
+			// or event listeners.
 			return () => {};
 		},
 	},
 } );
 `;
 
-// Template for PHP renderer
+// Template for the PHP renderer (must match the Action_Renderer API in
+// includes/class-action-renderer.php).
 const getRendererTemplate = ( name, className, description ) => `<?php
 /**
  * ${ description } renderer.
  *
- * @since 2.0.0
+ * @since 3.0.0
  * @package Block_Actions
  */
 
@@ -60,63 +118,57 @@ namespace Block_Actions\\Renderers;
 
 use Block_Actions\\Action_Renderer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Renderer for the ${ name } action.
  *
- * @since 2.0.0
+ * @since 3.0.0
  */
 class ${ className } extends Action_Renderer {
 
 	/**
-	 * Get the Interactivity API namespace.
-	 *
-	 * @since 2.0.0
-	 *
-	 * @return string Namespace string.
-	 */
-	public function get_namespace(): string {
-		return 'block-actions/${ name }';
-	}
-
-	/**
 	 * Get initial context for the action.
 	 *
-	 * @since 2.0.0
+	 * Read configuration off the root element with
+	 * $processor->get_attribute( 'data-…' ) and return it here — the
+	 * transformer serializes this array into data-wp-context.
 	 *
+	 * @since 3.0.0
+	 *
+	 * @param \\WP_HTML_Tag_Processor $processor The HTML tag processor positioned at the root element.
+	 * @param array                  $block     The parsed block data.
 	 * @return array Initial context data.
 	 */
-	public function get_initial_context(): array {
-		return array();
-	}
-
-	/**
-	 * Get directives to add to the root element.
-	 *
-	 * @since 2.0.0
-	 *
-	 * @return array Directive key-value pairs.
-	 */
-	public function get_directives(): array {
+	public function get_initial_context( \\WP_HTML_Tag_Processor $processor, array $block ): array {
 		return array(
-			'data-wp-on--click' => 'actions.handleClick',
-			'data-wp-init'      => 'callbacks.init',
+			'isActive' => false,
 		);
 	}
 
 	/**
-	 * Get the view script module path.
+	 * Apply directives to the root element.
 	 *
-	 * @since 2.0.0
+	 * Add reactive bindings (data-wp-bind--*, data-wp-class--*,
+	 * data-wp-text) and static accessibility attributes here. Override
+	 * post_process_html() for directives on child elements.
 	 *
-	 * @return string Script module path relative to plugin root.
+	 * @since 3.0.0
+	 *
+	 * @param \\WP_HTML_Tag_Processor $processor The HTML tag processor positioned at the root element.
+	 * @param array                  $block     The parsed block data.
+	 * @return void
 	 */
-	public function get_view_script_module(): string {
-		return 'build/actions/${ name }/view.js';
+	public function apply_directives( \\WP_HTML_Tag_Processor $processor, array $block ): void {
+		$processor->set_attribute( 'data-wp-on--click', 'actions.handleClick' );
+		$processor->set_attribute( 'data-wp-init', 'callbacks.init' );
 	}
 }
 `;
 
-// Function to create kebab case
+// Function to create kebab case.
 const toKebabCase = ( str ) => {
 	return str
 		.toLowerCase()
@@ -124,8 +176,8 @@ const toKebabCase = ( str ) => {
 		.replace( /[^a-z0-9-]/g, '' );
 };
 
-// Function to create PascalCase class name
-const toPascalCase = ( str ) => {
+// Function to create a Pascal_Snake class name (WordPress style).
+const toClassName = ( str ) => {
 	return str
 		.split( /[-\s]+/ )
 		.map(
@@ -135,26 +187,32 @@ const toPascalCase = ( str ) => {
 		.join( '_' );
 };
 
-// Main function to create the action
+// Main function to create the action.
 async function createAction() {
 	try {
-		// Get action name from user
-		const name = await new Promise( ( resolve ) => {
-			rl.question(
-				'Enter action name (e.g., "Scroll to Top"): ',
-				resolve
-			);
-		} );
-
-		// Get action description from user
-		const description = await new Promise( ( resolve ) => {
-			rl.question( 'Enter action description: ', resolve );
-		} );
+		// Get action name and description from user.
+		const name = await ask( 'Enter action name (e.g., "Scroll to Top"): ' );
+		const description = await ask( 'Enter action description: ' );
 
 		const kebabName = toKebabCase( name );
-		const className = toPascalCase( name );
+		const className = toClassName( name );
 
-		// Create store directory and file
+		if ( ! kebabName ) {
+			console.error( '\nError: action name produced an empty ID.' );
+			process.exit( 1 );
+		}
+
+		// The class name is written into `class <name> extends …` — a
+		// digit-leading or symbol-carrying name ('2 Way Toggle' →
+		// 2_Way_Toggle) would scaffold a PHP parse error.
+		if ( ! /^[A-Za-z][A-Za-z0-9_]*$/.test( className ) ) {
+			console.error(
+				`\nError: "${ name }" derives the PHP class name "${ className }", which is not a valid PHP identifier. Start the action name with a letter and use only letters, numbers, spaces, or hyphens.`
+			);
+			process.exit( 1 );
+		}
+
+		// Create store directory and file.
 		const storeDir = path.join(
 			__dirname,
 			'..',
@@ -177,7 +235,7 @@ async function createAction() {
 			getStoreTemplate( kebabName, description )
 		);
 
-		// Create PHP renderer
+		// Create PHP renderer.
 		const rendererPath = path.join(
 			__dirname,
 			'..',
@@ -200,17 +258,25 @@ async function createAction() {
 			`  - includes/renderers/class-${ kebabName }.php (PHP renderer)`
 		);
 		console.log( '\nNext steps:' );
-		console.log( `1. Add the webpack entry to webpack.config.js:` );
 		console.log(
-			`   'actions/${ kebabName }/view': path.resolve(__dirname, 'src/stores/${ kebabName }/view.js'),`
+			`1. Add '${ kebabName }' to the ACTIONS array in webpack.config.js`
 		);
 		console.log(
-			`2. Register the renderer in block-actions.php → init_interactivity_api()`
+			`2. Register the renderer in block-actions.php → init_interactivity_api():`
 		);
 		console.log(
-			`3. Add { id: '${ kebabName }', label: '${ name }' } to src/action-registry.js`
+			`   $transformer->register_renderer( '${ kebabName }', new Renderers\\${ className }() );`
 		);
-		console.log( '4. Run npm run build\n' );
+		console.log(
+			`   (and add the require_once for includes/renderers/class-${ kebabName }.php)`
+		);
+		console.log(
+			`3. Add { id: '${ kebabName }', label: '${ name }', fields: [] } to src/action-registry.js`
+		);
+		console.log(
+			`4. Add tests in tests/stores/${ kebabName }.test.js (see existing store tests)`
+		);
+		console.log( '5. Run npm run build && npm test\n' );
 	} catch ( error ) {
 		console.error( 'Error creating action:', error );
 		process.exit( 1 );
@@ -219,5 +285,5 @@ async function createAction() {
 	}
 }
 
-// Run the script
+// Run the script.
 createAction();

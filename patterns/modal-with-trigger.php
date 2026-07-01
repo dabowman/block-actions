@@ -9,6 +9,10 @@
  *
  * @package Block_Actions
  */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 ?>
 <!-- wp:buttons -->
 <div class="wp-block-buttons"><!-- wp:button {"tagName":"button","customAction":"modal-toggle","actionData":{"modal":"block-actions-modal-1"}} -->

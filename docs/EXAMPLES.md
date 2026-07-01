@@ -40,11 +40,11 @@ The simplest possible working action - just shows an alert.
 
 ---
 
-### 3. **Toggle Visibility** (`toggle-visibility.js`)
+### 3. **Show / Hide** (`show-hide.js`)
 **Perfect for:** Show/hide interactions
 **Complexity:** Intermediate
 
-Toggles the visibility of a target element.
+Toggles the visibility of a target element. (Named `show-hide` so it doesn't clash with the built-in `toggle-visibility` action — the filename becomes the action ID.)
 
 **What it does:**
 - Shows/hides element by ID
@@ -60,11 +60,11 @@ Toggles the visibility of a target element.
 
 ---
 
-### 4. **Copy to Clipboard** (`copy-to-clipboard.js`)
+### 4. **Copy Text** (`copy-text.js`)
 **Perfect for:** Browser API interaction
 **Complexity:** Intermediate
 
-Copies text to user's clipboard with visual feedback.
+Copies text to user's clipboard with visual feedback. (Named `copy-text` so it doesn't clash with the built-in `copy-to-clipboard` action.)
 
 **What it does:**
 - Uses Clipboard API
@@ -80,11 +80,11 @@ Copies text to user's clipboard with visual feedback.
 
 ---
 
-### 5. **Smooth Scroll** (`smooth-scroll.js`)
+### 5. **Scroll To** (`scroll-to.js`)
 **Perfect for:** Navigation actions
 **Complexity:** Intermediate
 
-Smoothly scrolls to a target element on the page.
+Smoothly scrolls to a target element on the page. (Named `scroll-to` so it doesn't clash with the built-in `smooth-scroll` action.)
 
 **What it does:**
 - Smooth scrolling to element by ID
@@ -100,13 +100,15 @@ Smoothly scrolls to a target element on the page.
 
 ---
 
-### 6. **Modal Toggle** (`modal-toggle.js`)
+### 6. **Simple Modal** (`simple-modal.js`)
 **Perfect for:** Complex interactions
 **Complexity:** Advanced
 
 Opens and closes a native `<dialog>` element. The browser handles focus
 trap, ESC to close, and focus restore; the action layers on body scroll
-lock, backdrop-click to close, and close-button helpers.
+lock, backdrop-click to close, and close-button helpers. (Named
+`simple-modal` so it doesn't clash with the built-in `modal-toggle`
+action.)
 
 **Target markup** — the modal must be a `<dialog>`:
 
@@ -134,6 +136,15 @@ lock, backdrop-click to close, and close-button helpers.
 
 ---
 
+### 7. **Rate-Limited Action** (`rate-limited-action.js`)
+**Perfect for:** Actions that trigger network requests
+**Complexity:** Intermediate
+
+Per-element rolling-window rate limiting for expensive work. Rate
+limiting is for I/O — plain UI clicks don't need it.
+
+---
+
 ## Quick Start Guide
 
 ### Step 1: Choose an Example
@@ -141,9 +152,9 @@ lock, backdrop-click to close, and close-button helpers.
 Pick an example based on what you want to build:
 
 - **First action?** → Start with `boilerplate-action.js`
-- **Simple interaction?** → Use `alert-message.js` or `toggle-visibility.js`
-- **API interaction?** → Check out `copy-to-clipboard.js`
-- **Advanced UI?** → Try `modal-toggle.js` or `smooth-scroll.js`
+- **Simple interaction?** → Use `alert-message.js` or `show-hide.js`
+- **API interaction?** → Check out `copy-text.js` or `rate-limited-action.js`
+- **Advanced UI?** → Try `simple-modal.js` or `scroll-to.js`
 
 ### Step 2: Copy to Your Theme
 
@@ -203,13 +214,14 @@ if ( ! target ) {
 ### State Management
 
 ```javascript
-// Use context for per-instance state
+// Use context for per-instance state. withSyncEvent is required
+// whenever the handler calls event.preventDefault() (WP 6.8+).
 actions: {
-    handleClick( event ) {
+    handleClick: withSyncEvent( ( event ) => {
         event.preventDefault();
         const ctx = getContext();
         ctx.isActive = ! ctx.isActive;
-    },
+    } ),
 },
 state: {
     get activeClass() {
@@ -260,14 +272,14 @@ state: {
 ```
 
 ### Copy with Modal Confirmation
-Combine clipboard and modal patterns:
+Combine clipboard and modal patterns (generators compose with `withSyncEvent`):
 ```javascript
 actions: {
-    *handleCopyAndConfirm( event ) {
+    handleCopyAndConfirm: withSyncEvent( function* ( event ) {
         event.preventDefault();
         yield navigator.clipboard.writeText( getContext().text );
         getContext().showModal = true;
-    },
+    } ),
 },
 ```
 
@@ -279,8 +291,9 @@ actions: {
 2. **Use context for state** - Per-instance state belongs in context, not module variables
 3. **Handle missing elements** - Check for null from `getElementById()` before using
 4. **Use generator functions** - For async operations, use `function*` with `yield` (never `async/await`)
-5. **Use `textContent`** - Never use `innerHTML` for user-provided data
-6. **Use data attributes** - Make actions configurable without code changes
+5. **Wrap in `withSyncEvent`** - Required when a handler calls `preventDefault()`, `stopPropagation()`, or reads `currentTarget` (WP 6.8+)
+6. **Use `textContent`** - Never use `innerHTML` for user-provided data
+7. **Use data attributes** - Make actions configurable without code changes
 
 ---
 

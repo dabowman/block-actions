@@ -113,7 +113,10 @@ describe( 'createFeedbackAction', () => {
 
 	it( 'calls perform with ctx', () => {
 		const perform = jest.fn();
-		const action = createFeedbackAction( timers, { perform, duration: 500 } );
+		const action = createFeedbackAction( timers, {
+			perform,
+			duration: 500,
+		} );
 		action( { preventDefault: jest.fn() } );
 		expect( perform ).toHaveBeenCalledWith( mockContext );
 	} );

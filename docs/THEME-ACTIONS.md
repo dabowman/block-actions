@@ -28,11 +28,19 @@ Create a JavaScript file in `/actions`. The filename becomes the action ID. Them
  *
  * Toggles an element's visibility with a smooth animation.
  */
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import {
+    store,
+    getContext,
+    getElement,
+    withSyncEvent,
+} from '@wordpress/interactivity';
 
 store( 'block-actions/smooth-toggle', {
     actions: {
-        handleClick( event ) {
+        // withSyncEvent is REQUIRED whenever a handler calls
+        // event.preventDefault(), stopPropagation(), or reads
+        // event.currentTarget (WordPress 6.8+).
+        handleClick: withSyncEvent( ( event ) => {
             event.preventDefault();
             const ctx = getContext();
             const targetElement = document.getElementById( ctx.targetId );
@@ -43,7 +51,7 @@ store( 'block-actions/smooth-toggle', {
 
             ctx.isVisible = ! ctx.isVisible;
             targetElement.style.display = ctx.isVisible ? 'block' : 'none';
-        },
+        } ),
     },
     callbacks: {
         init() {
@@ -134,10 +142,11 @@ If your theme action needs similar functionality, implement it directly in your 
 
 | Utility | Description |
 |---------|-------------|
-| Rate limiting | Use a simple timestamp check (see built-in `src/stores/utils/rate-limiter.js`) |
+| Rate limiting | Use a simple timestamp check (see `docs/examples/rate-limited-action.js`) |
 | Text sanitization | Use `textContent` (not `innerHTML`) to prevent XSS |
 | Style validation | Validate against known-safe patterns before setting styles |
 | Async actions | Use generator functions (`function*` with `yield`) |
+| Sync event access | Wrap handlers in `withSyncEvent` when they call `preventDefault()` |
 
 ---
 
@@ -145,17 +154,19 @@ If your theme action needs similar functionality, implement it directly in your 
 
 ### Basic Click Handler
 
+Handlers that call `event.preventDefault()`, `event.stopPropagation()`, or read `event.currentTarget` **must** be wrapped in `withSyncEvent` (WordPress 6.8+) — without it, the event is handled asynchronously and those calls silently do nothing.
+
 ```javascript
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import { store, getContext, withSyncEvent } from '@wordpress/interactivity';
 
 store( 'block-actions/my-click-action', {
     actions: {
-        handleClick( event ) {
+        handleClick: withSyncEvent( ( event ) => {
             event.preventDefault();
             const ctx = getContext();
             ctx.clicked = true;
             // Your action code here
-        },
+        } ),
     },
     callbacks: {
         init() {
@@ -167,14 +178,14 @@ store( 'block-actions/my-click-action', {
 
 ### Async API Request (Generator Function)
 
-Use `function*` with `yield` for async operations. **Do not use `async/await`** — it breaks the Interactivity API's scope tracking.
+Use `function*` with `yield` for async operations. **Do not use `async/await`** — it breaks the Interactivity API's scope tracking. Generators compose with `withSyncEvent`:
 
 ```javascript
-import { store, getContext } from '@wordpress/interactivity';
+import { store, getContext, withSyncEvent } from '@wordpress/interactivity';
 
 store( 'block-actions/my-api-action', {
     actions: {
-        *handleClick( event ) {
+        handleClick: withSyncEvent( function* ( event ) {
             event.preventDefault();
             const ctx = getContext();
 
@@ -188,7 +199,7 @@ store( 'block-actions/my-api-action', {
             } catch ( error ) {
                 console.error( '[Block Actions] API request failed', error );
             }
-        },
+        } ),
     },
 } );
 ```
@@ -196,7 +207,12 @@ store( 'block-actions/my-api-action', {
 ### State Toggle with Cleanup
 
 ```javascript
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import {
+    store,
+    getContext,
+    getElement,
+    withSyncEvent,
+} from '@wordpress/interactivity';
 
 store( 'block-actions/interactive-toggle', {
     state: {
@@ -206,11 +222,11 @@ store( 'block-actions/interactive-toggle', {
         },
     },
     actions: {
-        handleClick( event ) {
+        handleClick: withSyncEvent( ( event ) => {
             event.preventDefault();
             const ctx = getContext();
             ctx.isActive = ! ctx.isActive;
-        },
+        } ),
     },
     callbacks: {
         init() {
@@ -250,20 +266,21 @@ store( 'block-actions/interactive-toggle', {
 Add custom directories beyond the theme's `/actions` folder:
 
 ```php
-// In your theme's functions.php or plugin
+// In your theme's functions.php
 add_filter('block_actions_directories', function($directories) {
-    $directories[] = get_template_directory() . '/custom-actions';
-    $directories[] = WP_PLUGIN_DIR . '/my-plugin/actions';
+    $directories[] = get_stylesheet_directory() . '/custom-actions';
     return $directories;
 });
 ```
 
+> **Current limitation:** only directories inside the active (child) theme can be resolved to URLs today — files in parent-theme or plugin directories are discovered but skipped. Support for `{ path, url }` entries is planned.
+
 ### Action File Naming
 
-- **Good**: `my-action.js`, `smooth-scroll.js`, `toggle-menu.js`
-- **Bad**: `_private.js` (starts with underscore), `.hidden.js` (starts with dot)
+- **Good**: `my-action.js`, `toggle-menu.js` (lowercase kebab-case)
+- **Bad**: `_private.js` (starts with underscore), `.hidden.js` (starts with dot), `MyAction.js` (mixed case — the ID is normalized to `myaction`, so the filename no longer matches)
 
-Files starting with `_` or `.` are ignored.
+Files starting with `_` or `.` are ignored. Action IDs are derived from the filename via `sanitize_key()`, so stick to lowercase letters, numbers, and hyphens. Avoid reusing a built-in action name (`scroll-to-top`, `carousel`, `toggle-visibility`, `modal-toggle`, `smooth-scroll`, `copy-to-clipboard`) — the built-in renderer and store would take precedence over yours.
 
 ### Debugging
 
@@ -299,22 +316,24 @@ callbacks: {
 },
 ```
 
-### 2. Prevent Rapid Clicks
+### 2. Throttle Expensive Work
 
-Implement simple rate limiting in your action to prevent spam:
+Rate limiting is for I/O (network requests, heavy computation) — plain UI clicks don't need it. When you do need it, keep the throttle state in context so it's per-instance:
 
 ```javascript
-let lastClick = 0;
 actions: {
-    handleClick( event ) {
+    handleClick: withSyncEvent( ( event ) => {
         event.preventDefault();
+        const ctx = getContext();
         const now = Date.now();
-        if ( now - lastClick < 200 ) return; // 200ms throttle
-        lastClick = now;
-        // Your action code...
-    },
+        if ( now - ( ctx.lastClick || 0 ) < 200 ) return; // 200ms throttle
+        ctx.lastClick = now;
+        // Your expensive action code...
+    } ),
 },
 ```
+
+For a complete per-element rolling-window limiter, see `docs/examples/rate-limited-action.js`.
 
 ### 3. Use Context for State
 
@@ -372,13 +391,8 @@ actions: {
 1. Verify the store namespace matches `block-actions/<action-id>`
 2. Check that the ID matches the filename
 3. Check browser console for Interactivity API errors
-4. Ensure WordPress 6.6+ is installed
-
-### Rate Limiting Too Aggressive
-
-The default is 5 executions per second. If you need more frequent execution, consider:
-1. Using throttle/debounce for scroll/resize events instead of rate limiting
-2. Creating a custom execution manager for your specific use case
+4. Ensure WordPress 7.0+ is installed
+5. If `preventDefault()` seems ignored, wrap the handler in `withSyncEvent`
 
 ---
 

@@ -2,13 +2,15 @@
 /**
  * Plugin Name: Block Actions
  * Description: Extend blocks with custom actions and data attributes.
- * Version: 2.0.0
- * Requires at least: 6.6
+ * Version: 3.0.0
+ * Requires at least: 7.0
  * Requires PHP: 8.0
  * Author: dabowman
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: block-actions
+ *
+ * @package Block_Actions
  */
 
 namespace Block_Actions;
@@ -17,13 +19,46 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-const VERSION = '2.1.0';
+const VERSION = '3.0.0';
+
+/**
+ * Minimum supported WordPress version.
+ *
+ * The Interactivity API surface this plugin builds on (withSyncEvent,
+ * script module dependency resolution) plus the roadmap features
+ * (unique directive IDs, router asset auto-loading, watch(), Abilities)
+ * set the floor at 7.0.
+ */
+const MIN_WP_VERSION = '7.0';
 
 if ( ! defined( 'Block_Actions\\DIR' ) ) {
 	define( 'Block_Actions\\DIR', plugin_dir_path( __FILE__ ) );
 }
 if ( ! defined( 'Block_Actions\\URL' ) ) {
 	define( 'Block_Actions\\URL', plugin_dir_url( __FILE__ ) );
+}
+
+// Strip pre-release suffixes before comparing: version_compare() sorts
+// "7.0-beta2" / "7.0-RC1" BEFORE "7.0", so without this the guard would
+// deactivate the plugin on the exact pre-release builds of the minimum
+// version it targets (and again on every future minimum bump).
+if ( version_compare( preg_replace( '/[-+].*$/', '', (string) get_bloginfo( 'version' ) ), MIN_WP_VERSION, '<' ) ) {
+	add_action(
+		'admin_notices',
+		function (): void {
+			printf(
+				'<div class="notice notice-error"><p>%s</p></div>',
+				esc_html(
+					sprintf(
+						/* translators: %s: minimum required WordPress version. */
+						__( 'Block Actions requires WordPress %s or newer and is inactive on this site. Please update WordPress to use it.', 'block-actions' ),
+						MIN_WP_VERSION
+					)
+				)
+			);
+		}
+	);
+	return;
 }
 
 // Load Interactivity API infrastructure.
@@ -49,18 +84,18 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-theme-actio
  * @return array{dependencies: array, version: string} Asset metadata with dependencies and version.
  */
 function get_asset_meta( string $asset_filename, string $script_filename ): array {
-	$asset_path = plugin_dir_path( __FILE__ ) . $asset_filename;
+	$asset_path  = plugin_dir_path( __FILE__ ) . $asset_filename;
 	$script_path = plugin_dir_path( __FILE__ ) . $script_filename;
-	$deps = array();
-	$ver = file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0';
+	$deps        = array();
+	$ver         = file_exists( $script_path ) ? (string) filemtime( $script_path ) : '1.0.0';
 	if ( file_exists( $asset_path ) ) {
 		$asset = include $asset_path;
-		$deps = isset( $asset['dependencies'] ) ? (array) $asset['dependencies'] : array();
-		$ver = isset( $asset['version'] ) ? (string) $asset['version'] : $ver;
+		$deps  = isset( $asset['dependencies'] ) ? (array) $asset['dependencies'] : array();
+		$ver   = isset( $asset['version'] ) ? (string) $asset['version'] : $ver;
 	}
 	return array(
 		'dependencies' => $deps,
-		'version' => $ver,
+		'version'      => $ver,
 	);
 }
 
@@ -89,12 +124,13 @@ function enqueue_block_editor_assets(): void {
 	// in the action selector. Theme action JS files are ES modules and
 	// cannot be loaded as classic scripts in the editor; instead we pass
 	// their metadata and let block-extensions.js register them.
-	$theme_actions = discover_theme_actions();
+	$theme_actions  = discover_theme_actions();
 	$editor_actions = array();
 	foreach ( $theme_actions as $action ) {
+		// IDs are already canonical (sanitized at discovery time).
 		$editor_actions[] = array(
-			'id'    => sanitize_key( $action['id'] ),
-			'label' => ucwords( str_replace( '-', ' ', $action['id'] ) ),
+			'id'    => $action['id'],
+			'label' => ucwords( str_replace( array( '-', '_' ), ' ', $action['id'] ) ),
 		);
 	}
 	if ( ! empty( $editor_actions ) ) {
@@ -114,7 +150,7 @@ add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_edit
  *   - Editor-only visibility overrides scoped via the
  *     `.block-editor-block-list__block` class Gutenberg injects.
  *
- * @since 2.2.0
+ * @since 3.0.0
  *
  * @return void
  */
@@ -132,21 +168,6 @@ function enqueue_modal_dialog_styles(): void {
 	);
 }
 add_action( 'enqueue_block_assets', __NAMESPACE__ . '\\enqueue_modal_dialog_styles' );
-
-/**
- * Get plugin settings with defaults.
- *
- * @since 1.0.0
- *
- * @return array Plugin settings with defaults applied.
- */
-function get_plugin_settings(): array {
-	$defaults = array(
-		'enable_csp' => false,
-	);
-	$options = (array) get_option( 'block_actions_settings', array() );
-	return wp_parse_args( $options, $defaults );
-}
 
 /**
  * Get action directories to scan for custom actions.
@@ -171,6 +192,24 @@ function get_action_directories(): array {
 }
 
 /**
+ * Log a developer diagnostic when WP_DEBUG is on.
+ *
+ * One home for the debug guard, the `[Block Actions]` prefix, and the
+ * phpcs suppression, so the call sites can't drift apart.
+ *
+ * @since 3.0.0
+ *
+ * @param string $message The message to log (unprefixed).
+ * @return void
+ */
+function debug_log( string $message ): void {
+	if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		error_log( '[Block Actions] ' . $message );
+	}
+}
+
+/**
  * Discover action files in registered directories.
  *
  * Results are cached in a static variable to avoid repeated
@@ -187,7 +226,8 @@ function discover_theme_actions(): array {
 	}
 
 	$directories = get_action_directories();
-	$actions = array();
+	$actions     = array();
+	$seen        = array();
 
 	foreach ( $directories as $directory ) {
 		if ( ! is_dir( $directory ) ) {
@@ -208,8 +248,28 @@ function discover_theme_actions(): array {
 				continue;
 			}
 
+			// Canonical action ID. Derived once here and used everywhere
+			// (editor dropdown, renderer registry, module handle) so a
+			// mixed-case filename can't produce mismatched IDs.
+			$action_id = sanitize_key( $filename );
+			if ( '' === $action_id ) {
+				continue;
+			}
+			if ( $action_id !== $filename ) {
+				debug_log( sprintf( 'Theme action file "%s.js" registered as "%s" — prefer kebab-case filenames so the ID matches the file.', $filename, $action_id ) );
+			}
+
+			// Two files normalizing to the same ID (e.g. "Hero.js" + "hero.js"
+			// on a case-sensitive filesystem) would otherwise both register —
+			// only the first would ever load, silently. Keep the first and
+			// warn so the collision is diagnosable.
+			if ( isset( $seen[ $action_id ] ) ) {
+				debug_log( sprintf( 'Theme action "%s" from "%s" is ignored — ID already provided by "%s". Use a unique filename.', $action_id, $file_path, $seen[ $action_id ] ) );
+				continue;
+			}
+
 			// Determine URL based on directory location.
-			$file_url = '';
+			$file_url  = '';
 			$theme_dir = get_stylesheet_directory();
 			$theme_uri = get_stylesheet_directory_uri();
 
@@ -218,10 +278,11 @@ function discover_theme_actions(): array {
 			}
 
 			if ( $file_url ) {
-				$actions[] = array(
-					'id' => $filename,
+				$seen[ $action_id ] = $file_path;
+				$actions[]          = array(
+					'id'   => $action_id,
 					'path' => $file_path,
-					'url' => $file_url,
+					'url'  => $file_url,
 				);
 			}
 		}
@@ -230,98 +291,6 @@ function discover_theme_actions(): array {
 	$cached = $actions;
 	return $actions;
 }
-
-/**
- * Add security headers (CSP opt-in via setting/filter), and safe defaults.
- *
- * @since 1.0.0
- *
- * @return void
- */
-function add_security_headers(): void {
-	if ( is_admin() ) {
-		return;
-	}
-
-	$settings = get_plugin_settings();
-	$enable_csp = (bool) apply_filters( 'block_actions_enable_csp', (bool) $settings['enable_csp'] );
-
-	if ( $enable_csp ) {
-		// Default policy keeps 'unsafe-inline' for style-src (WordPress core
-		// requirement) but omits 'unsafe-eval' which is unnecessary and
-		// dangerous. Customize via the block_actions_csp_header filter.
-		$csp = (string) apply_filters( 'block_actions_csp_header', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' https:; object-src 'none'; frame-ancestors 'self'; form-action 'self'; upgrade-insecure-requests; block-all-mixed-content;" );
-		header( 'Content-Security-Policy: ' . $csp );
-	}
-
-	// Other security headers.
-	header( 'X-Content-Type-Options: nosniff' );
-	header( 'Referrer-Policy: strict-origin-when-cross-origin' );
-}
-add_action( 'send_headers', __NAMESPACE__ . '\\add_security_headers' );
-
-/**
- * Register settings and admin page.
- *
- * @since 1.0.0
- *
- * @return void
- */
-function register_settings(): void {
-	register_setting( 'block_actions', 'block_actions_settings', array( 'type' => 'array', 'sanitize_callback' => __NAMESPACE__ . '\\sanitize_settings' ) );
-
-	add_options_page(
-		__( 'Block Actions', 'block-actions' ),
-		__( 'Block Actions', 'block-actions' ),
-		'manage_options',
-		'block-actions',
-		__NAMESPACE__ . '\\render_settings_page'
-	);
-}
-add_action( 'admin_menu', __NAMESPACE__ . '\\register_settings' );
-
-/**
- * Sanitize settings.
- *
- * @since 1.0.0
- *
- * @param array $input Raw input from settings form.
- * @return array Sanitized settings array.
- */
-function sanitize_settings( array $input ): array {
-	return array(
-		'enable_csp' => ! empty( $input['enable_csp'] ),
-	);
-}
-
-/**
- * Render settings page.
- *
- * @since 1.0.0
- *
- * @return void
- */
-function render_settings_page(): void { ?>
-	<div class="wrap">
-		<h1><?php echo esc_html( __( 'Block Actions Settings', 'block-actions' ) ); ?></h1>
-		<form method="post" action="options.php">
-			<?php settings_fields( 'block_actions' ); ?>
-			<?php $settings = get_plugin_settings(); ?>
-			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row"><?php echo esc_html( __( 'Enable Content Security Policy', 'block-actions' ) ); ?></th>
-					<td>
-						<label>
-							<input type="checkbox" name="block_actions_settings[enable_csp]" value="1" <?php checked( $settings['enable_csp'] ); ?> />
-							<?php echo esc_html( __( 'Send CSP header (advanced). Configure via filters.', 'block-actions' ) ); ?>
-						</label>
-					</td>
-				</tr>
-			</table>
-			<?php submit_button(); ?>
-		</form>
-	</div>
-<?php }
 
 /**
  * Initialize the Interactivity API directive transformer.
@@ -344,12 +313,17 @@ function init_interactivity_api(): void {
 	$transformer->register_renderer( 'copy-to-clipboard', new Renderers\Copy_To_Clipboard() );
 
 	// Register generic renderer for theme actions.
-	$theme_actions = discover_theme_actions();
+	$theme_actions  = discover_theme_actions();
 	$theme_renderer = new Renderers\Theme_Action();
 	foreach ( $theme_actions as $action ) {
-		if ( ! in_array( $action['id'], $transformer->get_registered_ids(), true ) ) {
-			$transformer->register_renderer( $action['id'], $theme_renderer );
+		// A built-in renderer with the same ID takes precedence. The theme
+		// file would then never be enqueued (the built-in's enqueue path
+		// runs instead), so warn rather than fail silently on upgrade.
+		if ( in_array( $action['id'], $transformer->get_registered_ids(), true ) ) {
+			debug_log( sprintf( 'Theme action "%s" is ignored because a built-in action with that ID already exists. Rename the theme action file to use a unique ID.', $action['id'] ) );
+			continue;
 		}
+		$transformer->register_renderer( $action['id'], $theme_renderer );
 	}
 
 	// Hook into render_block to inject directives.
@@ -372,7 +346,7 @@ add_action( 'init', __NAMESPACE__ . '\\init_interactivity_api' );
  * patterns from themes but not from plugins — plugins still need to
  * register explicitly.
  *
- * @since 2.2.0
+ * @since 3.0.0
  *
  * @return void
  */
@@ -452,7 +426,7 @@ add_action( 'init', __NAMESPACE__ . '\\register_block_patterns' );
  * `<dialog>` element regardless of what tagName is set to. It's a
  * no-op in the common case where the tag is already `<dialog>`.
  *
- * @since 2.2.0
+ * @since 3.0.0
  *
  * @param string $block_content Rendered block HTML.
  * @param array  $block         Parsed block data.
@@ -481,7 +455,7 @@ function force_dialog_for_modal_groups( string $block_content, array $block ): s
 
 	// WP_HTML_Tag_Processor can't rewrite tag names; fall back to
 	// targeted regex on the outermost opening + closing tag.
-	$quoted = preg_quote( $tag, '/' );
+	$quoted        = preg_quote( $tag, '/' );
 	$block_content = preg_replace( '/^(\s*)<' . $quoted . '\b/i', '$1<dialog', $block_content, 1 );
 	$block_content = preg_replace( '/<\/' . $quoted . '>(\s*)$/i', '</dialog>$1', $block_content, 1 );
 
@@ -489,24 +463,7 @@ function force_dialog_for_modal_groups( string $block_content, array $block ): s
 }
 add_filter( 'render_block', __NAMESPACE__ . '\\force_dialog_for_modal_groups', 20, 2 );
 
-/**
- * Enqueue theme action script modules for the Interactivity API.
- *
- * Theme actions are enqueued as ES script modules with
- * '@wordpress/interactivity' as a dependency.
- *
- * @since 2.0.0
- *
- * @return void
- */
-function enqueue_theme_action_modules(): void {
-	$theme_actions = discover_theme_actions();
-	foreach ( $theme_actions as $action ) {
-		wp_enqueue_script_module(
-			'block-actions-theme-' . $action['id'],
-			$action['url'],
-			array( '@wordpress/interactivity' )
-		);
-	}
-}
-add_action( 'wp_enqueue_scripts', __NAMESPACE__ . '\\enqueue_theme_action_modules' );
+// Theme action script modules are enqueued on demand during render by the
+// Theme_Action renderer (includes/renderers/class-theme-action.php), so a
+// theme's action JS only loads on pages where a block actually uses it —
+// matching how built-in action stores are enqueued.

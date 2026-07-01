@@ -7,8 +7,71 @@ on:
     branches: [ main ]
 
 jobs:
-  build-test:
+  js:
+    name: JS lint, build & test
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint JS
+        run: npx wp-scripts lint-js src tests scripts docs
+      - name: Build
+        run: npm run build
+      - name: Test
+        run: npm test -- --ci
+
+  phpcs:
+    name: PHP coding standards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress
+      - name: Run PHPCS
+        run: composer lint
+
+  php-tests:
+    name: PHP unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install wp-env
+        run: npm install -g @wordpress/env
+      - name: Start WordPress test environment
+        run: wp-env start
+      - name: Run PHPUnit
+        run: wp-env run tests-cli --env-cwd=wp-content/plugins/block-actions vendor/bin/phpunit
+
+  plugin-check:
+    name: Plugin Check (non-blocking)
+    runs-on: ubuntu-latest
+    # Informational only — wp.org submission is a later goal (see roadmap Q1).
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js
@@ -20,6 +83,14 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
-      - name: Test
-        run: npm test -- --ci
-
+      - name: Install wp-env
+        run: npm install -g @wordpress/env
+      - name: Start WordPress
+        run: wp-env start
+      - name: Install Plugin Check
+        run: wp-env run cli wp plugin install plugin-check --activate
+      - name: Run Plugin Check
+        run: >
+          wp-env run cli wp plugin check block-actions
+          --exclude-directories=node_modules,vendor,build,dist,docs,tests,.claude,.cursor,.github
+          --severity=5

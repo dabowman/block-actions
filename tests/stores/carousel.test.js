@@ -150,7 +150,6 @@ describe( 'Carousel Store', () => {
 			);
 			removeSpy.mockRestore();
 		} );
-
 	} );
 
 	describe( 'navigation actions', () => {

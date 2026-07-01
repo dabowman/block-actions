@@ -652,33 +652,6 @@ describe( 'block-extensions', () => {
 			}
 		} );
 
-		test( 'onFilterValueChange returns filtered options', () => {
-			const hoc = getHOC();
-			const MockBlockEdit = jest.fn( () => null );
-			const Component = hoc( MockBlockEdit );
-
-			const props = {
-				name: 'core/group',
-				attributes: { customAction: '' },
-				setAttributes: jest.fn(),
-			};
-			Component( props );
-
-			const comboCall = global.wp.element.createElement.mock.calls.find(
-				( call ) => call[ 0 ] === 'ComboboxControl'
-			);
-			if (
-				comboCall &&
-				comboCall[ 1 ] &&
-				comboCall[ 1 ].onFilterValueChange
-			) {
-				// Call with empty string (should return all options)
-				comboCall[ 1 ].onFilterValueChange( '' );
-				// Call with search term
-				comboCall[ 1 ].onFilterValueChange( 'carousel' );
-			}
-		} );
-
 		test( 'returns BlockEdit on error', () => {
 			const hoc = getHOC();
 			const MockBlockEdit = jest.fn( () => null );

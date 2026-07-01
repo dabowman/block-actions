@@ -32,8 +32,6 @@ const ACTIONS = [
 	'modal-toggle',
 	'smooth-scroll',
 	'copy-to-clipboard',
-	'test-action',
-	'example-rate-limited',
 ];
 
 const moduleEntries = Object.fromEntries(

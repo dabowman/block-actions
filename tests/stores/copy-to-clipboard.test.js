@@ -88,7 +88,9 @@ describe( 'Copy to Clipboard Store', () => {
 	it( 'sets status to error on clipboard failure', () => {
 		// Return a pending promise and drive the generator manually so
 		// the rejected path can be exercised synchronously.
-		navigator.clipboard.writeText = jest.fn( () => new Promise( () => {} ) );
+		navigator.clipboard.writeText = jest.fn(
+			() => new Promise( () => {} )
+		);
 		const event = { preventDefault: jest.fn() };
 		const gen = storeDefinition.actions.copy( event );
 		gen.next();

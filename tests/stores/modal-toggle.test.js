@@ -139,6 +139,52 @@ describe( 'Modal Toggle Store', () => {
 			document.body.removeChild( modal2 );
 		} );
 
+		it( 'decrements once per close when multiple triggers share a dialog', () => {
+			// Wire a SECOND trigger to the same dialog — its init adds
+			// another `close` listener to the shared element.
+			const trigger2 = document.createElement( 'button' );
+			interactivityMock.__setContext( {
+				modalId: 'test-modal',
+				isOpen: false,
+			} );
+			interactivityMock.__setElement( trigger2 );
+			storeDefinition.callbacks.init();
+
+			// A second dialog opened by its own trigger keeps the body
+			// locked while the shared dialog closes.
+			const trigger3 = document.createElement( 'button' );
+			const modal2 = document.createElement( 'dialog' );
+			modal2.id = 'test-modal-2';
+			document.body.appendChild( modal2 );
+			interactivityMock.__setContext( {
+				modalId: 'test-modal-2',
+				isOpen: false,
+			} );
+			interactivityMock.__setElement( trigger3 );
+			storeDefinition.callbacks.init();
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( storeDefinition.state.openCount ).toBe( 1 );
+
+			// Open the shared dialog via the original trigger.
+			interactivityMock.__setContext( mockContext );
+			interactivityMock.__setElement( mockElement );
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( storeDefinition.state.openCount ).toBe( 2 );
+
+			// Close the shared dialog. Both of its close listeners fire,
+			// but the count must only drop by one and the body must stay
+			// locked because the second dialog is still open.
+			modalElement.close();
+			expect( storeDefinition.state.openCount ).toBe( 1 );
+			expect( document.body.style.overflow ).toBe( 'hidden' );
+
+			modal2.close();
+			expect( storeDefinition.state.openCount ).toBe( 0 );
+			expect( document.body.style.overflow ).toBe( '' );
+
+			document.body.removeChild( modal2 );
+		} );
+
 		it( 'restores the prior body overflow value on close', () => {
 			document.body.style.overflow = 'scroll';
 
@@ -163,15 +209,19 @@ describe( 'Modal Toggle Store', () => {
 			expect( storeDefinition.callbacks.init() ).toBeUndefined();
 		} );
 
-		it( 'returns nothing when target element is not found', () => {
+		it( 'returns a cleanup even when the target element is not found', () => {
+			// toggle() wires listeners lazily when the dialog appears
+			// later — init must still hand the runtime a teardown for them.
 			interactivityMock.__setContext( {
 				modalId: 'nonexistent',
 				isOpen: false,
 			} );
-			expect( storeDefinition.callbacks.init() ).toBeUndefined();
+			expect( typeof storeDefinition.callbacks.init() ).toBe(
+				'function'
+			);
 		} );
 
-		it( 'warns and returns nothing when target is not a <dialog>', () => {
+		it( 'warns but still returns a cleanup when target is not a <dialog>', () => {
 			const div = document.createElement( 'div' );
 			div.id = 'also-not-a-dialog';
 			document.body.appendChild( div );
@@ -185,7 +235,7 @@ describe( 'Modal Toggle Store', () => {
 
 			const result = storeDefinition.callbacks.init();
 
-			expect( result ).toBeUndefined();
+			expect( typeof result ).toBe( 'function' );
 			expect( warnSpy ).toHaveBeenCalledWith(
 				expect.stringContaining( 'not a <dialog> element' )
 			);
@@ -204,6 +254,80 @@ describe( 'Modal Toggle Store', () => {
 
 			expect( mockContext.isOpen ).toBe( false );
 			expect( document.body.style.overflow ).toBe( '' );
+		} );
+
+		it( 'wires the close listener via toggle when the dialog was absent at init', () => {
+			// A trigger can hydrate before its target <dialog> is in the DOM
+			// (lazy-rendered modal). init() then bails and wires nothing —
+			// opening later must still wire a close listener, or body scroll
+			// would lock forever.
+			const trigger = document.createElement( 'button' );
+			document.body.removeChild( modalElement );
+			const ctx = { modalId: 'test-modal', isOpen: false };
+			interactivityMock.__setContext( ctx );
+			interactivityMock.__setElement( trigger );
+
+			const cleanup = storeDefinition.callbacks.init();
+			expect( typeof cleanup ).toBe( 'function' );
+
+			// The dialog appears, then the user clicks the trigger.
+			document.body.appendChild( modalElement );
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( modalElement.open ).toBe( true );
+			expect( document.body.style.overflow ).toBe( 'hidden' );
+
+			// A native close releases the lock — proving toggle wired it.
+			modalElement.close();
+			expect( document.body.style.overflow ).toBe( '' );
+			expect( ctx.isOpen ).toBe( false );
+
+			// The lazily-wired listeners are torn down by init's cleanup.
+			cleanup();
+			modalElement.showModal();
+			modalElement.close();
+			expect( ctx.isOpen ).toBe( false );
+		} );
+
+		it( 'cleanup reconciles the scroll lock when a trigger unmounts mid-open', () => {
+			// Router region swap / conditional re-render: the trigger is
+			// torn down while its dialog is open, so the native `close`
+			// event never fires. Cleanup must reconcile the shared state
+			// or every later view loads with body scroll locked.
+			const cleanup = storeDefinition.callbacks.init();
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+			expect( storeDefinition.state.openCount ).toBe( 1 );
+			expect( document.body.style.overflow ).toBe( 'hidden' );
+
+			cleanup();
+
+			expect( storeDefinition.state.openCount ).toBe( 0 );
+			expect( document.body.style.overflow ).toBe( '' );
+		} );
+
+		it( 'syncs every trigger context when one of several opens the dialog', () => {
+			// Two triggers target the same dialog; opening via the first
+			// must flip the second's ctx.isOpen too, or its
+			// aria-expanded binding announces "false" over an open dialog.
+			const ctx1 = mockContext;
+			storeDefinition.callbacks.init();
+
+			const trigger2 = document.createElement( 'button' );
+			const ctx2 = { modalId: 'test-modal', isOpen: false };
+			interactivityMock.__setContext( ctx2 );
+			interactivityMock.__setElement( trigger2 );
+			storeDefinition.callbacks.init();
+
+			// Click trigger 1.
+			interactivityMock.__setContext( ctx1 );
+			interactivityMock.__setElement( mockElement );
+			storeDefinition.actions.toggle( { preventDefault: jest.fn() } );
+
+			expect( ctx1.isOpen ).toBe( true );
+			expect( ctx2.isOpen ).toBe( true );
+
+			modalElement.close();
+			expect( ctx1.isOpen ).toBe( false );
+			expect( ctx2.isOpen ).toBe( false );
 		} );
 
 		it( 'closes the dialog when a .modal-close button is clicked', () => {

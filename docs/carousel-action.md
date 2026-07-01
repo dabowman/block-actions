@@ -34,9 +34,12 @@ In this approach, the block with the action contains a separate carousel contain
         </div>
     </div>
     
-    <!-- Navigation buttons (optional) -->
-    <div class="carousel-button-left"><!-- Left button --></div>
-    <div class="carousel-button-right"><!-- Right button --></div>
+    <!-- Navigation buttons (optional) — use real <button> elements so
+         the renderer can apply the native disabled attribute at the
+         bounds (a core Button block works too: the plugin descends from
+         the .wp-block-button wrapper to the inner control) -->
+    <button type="button" class="carousel-button-left">Previous</button>
+    <button type="button" class="carousel-button-right">Next</button>
     
     <!-- Thumbnails (optional) -->
     <div class="carousel-thumbnails">
@@ -60,9 +63,12 @@ Alternatively, the block itself can be the carousel container by adding the `car
         <div class="carousel-slide"><!-- Image 3 --></div>
     </div>
     
-    <!-- Navigation buttons (optional) -->
-    <div class="carousel-button-left"><!-- Left button --></div>
-    <div class="carousel-button-right"><!-- Right button --></div>
+    <!-- Navigation buttons (optional) — use real <button> elements so
+         the renderer can apply the native disabled attribute at the
+         bounds (a core Button block works too: the plugin descends from
+         the .wp-block-button wrapper to the inner control) -->
+    <button type="button" class="carousel-button-left">Previous</button>
+    <button type="button" class="carousel-button-right">Next</button>
     
     <!-- Thumbnails (optional) -->
     <div class="carousel-thumbnails">
@@ -87,13 +93,13 @@ Alternatively, the block itself can be the carousel container by adding the `car
 
 ## Container Queries
 
-This carousel uses container queries to create more reliable layouts. Container queries allow the carousel to respond to its container size rather than the viewport size. The carousel script:
+This carousel uses container queries to create more reliable layouts. Container queries allow the carousel to respond to its container size rather than the viewport size:
 
-1. Applies `container: carousel / inline-size` to the main container
-2. Uses `100cqw` units (container query width) to size elements
-3. Sets up responsive behavior based on the container size
+1. **Your CSS** declares `container: carousel / inline-size` on `.carousel-container` (see the Styling Guide template below — the script does not inject this)
+2. The store's slide transform uses `100cqw` units (container query width), so slides shift by exactly one container-width per step
+3. Responsive adjustments can use `@container` rules instead of viewport media queries
 
-This approach ensures that your carousel works correctly even when nested inside other layouts, sidebars, or complex grid systems.
+This approach ensures that your carousel works correctly even when nested inside other layouts, sidebars, or complex grid systems. Without the `container` declaration on `.carousel-container`, `cqw` units fall back to viewport-relative sizing and the slide math will be wrong for any carousel narrower than the viewport.
 
 ## Example Implementations
 
@@ -201,13 +207,12 @@ The carousel action handles the interactive functionality but relies on CSS for 
     min-height: 400px;
 }
 
-/* Slider */
+/* Slider — the store drives a translateX() transform, so the
+   transition must cover `transform` for slides to animate. */
 .carousel-slider {
     display: flex;
     flex-wrap: nowrap;
-    position: relative;
-    left: 0;
-    transition: left 0.4s ease-in-out;
+    transition: transform 0.4s ease-in-out;
 }
 
 /* Slides */
@@ -241,9 +246,15 @@ The carousel action handles the interactive functionality but relies on CSS for 
     right: 10px;
 }
 
+/* Disabled state (non-wrapping carousels at either end).
+   Real <button> elements get the native disabled attribute —
+   style those via :disabled. Non-button elements get a
+   .disabled class plus aria-disabled instead. */
+.carousel-button:disabled,
 .carousel-button.disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    pointer-events: none;
 }
 
 /* Thumbnails */
@@ -307,8 +318,8 @@ The carousel action uses a reactive Interactivity API store with server-side dir
 
 The PHP `Carousel` renderer (`includes/renderers/class-carousel.php`) injects Interactivity API directives into the block HTML at render time:
 
-- **Root element**: `data-wp-interactive="block-actions/carousel"`, `data-wp-context`, `data-wp-init`, `data-wp-on--keydown`
-- **Navigation buttons**: `data-wp-on--click="actions.prevSlide"` / `actions.nextSlide`
+- **Root element**: `data-wp-interactive="block-actions/carousel"`, `data-wp-context` (including `wrapAround` read from `data-wrap-around`), `data-wp-init`, `data-wp-on--keydown`
+- **Navigation buttons**: `data-wp-on--click="actions.prevSlide"` / `actions.nextSlide`, plus disabled-state bindings — `data-wp-bind--disabled` on real `<button>` elements, or `data-wp-class--disabled` + `data-wp-bind--aria-disabled` on anything else
 - **Slides**: `data-wp-context` (per-slide index), `data-wp-class--active`, `data-wp-bind--aria-hidden`
 - **Thumbnails**: `data-wp-on--click="actions.goToSlide"`, `data-wp-class--active`
 - **Slider**: `data-wp-style--transform="state.sliderTransform"` (reactive CSS transform)
@@ -320,9 +331,11 @@ The carousel store (`src/stores/carousel/view.js`) uses derived state getters:
 | Getter | Description |
 |--------|-------------|
 | `state.sliderTransform` | CSS `translateX()` value based on `currentIndex` |
-| `state.isPrevDisabled` | Whether previous button should be disabled |
-| `state.isNextDisabled` | Whether next button should be disabled |
+| `state.isPrevDisabled` | Previous button disabled (start reached, wrap-around off) |
+| `state.isNextDisabled` | Next button disabled (end reached, wrap-around off) |
 | `state.isSlideActive` | Whether the current slide matches context `slideIndex` |
+
+`isPrevDisabled` / `isNextDisabled` only engage when wrap-around is turned off (the "Wrap Around" toggle in the editor, serialized as `data-wrap-around="false"`).
 
 ### Hybrid Approach
 

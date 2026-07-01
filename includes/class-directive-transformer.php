@@ -29,7 +29,7 @@ class Directive_Transformer {
 	 *
 	 * @var array<string, Action_Renderer>
 	 */
-	private array $renderers = [];
+	private array $renderers = array();
 
 	/**
 	 * Register a renderer for a specific action ID.
@@ -58,6 +58,14 @@ class Directive_Transformer {
 	 */
 	public function transform( string $block_content, array $block ): string {
 		if ( empty( $block_content ) ) {
+			return $block_content;
+		}
+
+		// Fast path: the overwhelming majority of blocks on a page carry
+		// no action. A substring scan is far cheaper than constructing a
+		// tag processor and walking the markup, so bail before that work
+		// when the marker attribute can't be present.
+		if ( false === strpos( $block_content, 'data-action' ) ) {
 			return $block_content;
 		}
 

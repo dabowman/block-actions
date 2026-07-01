@@ -12,7 +12,12 @@
  * 5. The action will automatically appear in the block editor dropdown
  */
 
-import { store, getContext, getElement } from '@wordpress/interactivity';
+import {
+	store,
+	getContext,
+	getElement,
+	withSyncEvent,
+} from '@wordpress/interactivity';
 
 store( 'block-actions/boilerplate-action', {
 	actions: {
@@ -22,9 +27,13 @@ store( 'block-actions/boilerplate-action', {
 		 * The Theme_Action PHP renderer injects data-wp-on--click="actions.handleClick"
 		 * on the root element, so this is called automatically on click.
 		 *
+		 * withSyncEvent is REQUIRED whenever the handler uses
+		 * event.preventDefault(), event.stopPropagation(), or
+		 * event.currentTarget (WordPress 6.8+).
+		 *
 		 * @param {Event} event The click event.
 		 */
-		handleClick( event ) {
+		handleClick: withSyncEvent( function ( event ) {
 			event.preventDefault();
 			const ctx = getContext();
 			const { ref } = getElement();
@@ -40,12 +49,13 @@ store( 'block-actions/boilerplate-action', {
 			// Example: Add a CSS class
 			ref.classList.add( 'is-active' );
 
-			// Example: Reset after 2 seconds
-			setTimeout( () => {
+			// Example: Reset after 2 seconds. Track the timer in context so
+			// the init cleanup below can cancel it if the element unmounts.
+			ctx.resetTimer = setTimeout( () => {
 				link.textContent = originalText;
 				ref.classList.remove( 'is-active' );
 			}, 2000 );
-		},
+		} ),
 	},
 	callbacks: {
 		/**
@@ -65,6 +75,9 @@ store( 'block-actions/boilerplate-action', {
 			// Return cleanup function (called when element is removed)
 			return () => {
 				// Clean up observers, timers, event listeners, etc.
+				if ( ctx.resetTimer ) {
+					clearTimeout( ctx.resetTimer );
+				}
 			};
 		},
 	},
