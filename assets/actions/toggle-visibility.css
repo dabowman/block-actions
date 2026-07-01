@@ -13,3 +13,15 @@
 .is-hidden {
 	display: none !important;
 }
+
+/*
+ * Editor canvas: this stylesheet loads in the editor iframe too (via
+ * enqueue_block_assets), where hiding the target would make a
+ * pre-collapsed disclosure panel invisible and uneditable. Gutenberg
+ * adds .block-editor-block-list__block to every block wrapper, so
+ * these selectors only ever match inside the canvas.
+ */
+.block-editor-block-list__block.is-hidden,
+.block-editor-block-list__block .is-hidden {
+	display: revert !important;
+}

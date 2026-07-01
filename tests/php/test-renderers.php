@@ -111,6 +111,37 @@ class Test_Renderers extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'role="button"', $out );
 	}
 
+	public function test_carousel_core_button_wrapper_wires_inner_control(): void {
+		// Real core/button markup: the author-facing class lands on the
+		// wrapper div; the interactive control is the inner <button>.
+		$html = '<div class="carousel-container">'
+			. '<div class="wp-block-button carousel-button-left">'
+			. '<button type="button" class="wp-block-button__link">Previous</button>'
+			. '</div>'
+			. '</div>';
+		$out  = ( new Carousel() )->post_process_html( $html );
+
+		// The inner <button> carries the directives + native disabled binding.
+		$p         = new \WP_HTML_Tag_Processor( $out );
+		$found_btn = false;
+		while ( $p->next_tag() ) {
+			if ( $p->has_class( 'wp-block-button' ) && ! $p->has_class( 'wp-block-button__link' ) ) {
+				// The wrapper must stay inert: no second tab stop, no
+				// nested-interactive role, no click handler.
+				$this->assertNull( $p->get_attribute( 'role' ) );
+				$this->assertNull( $p->get_attribute( 'tabindex' ) );
+				$this->assertNull( $p->get_attribute( 'data-wp-on--click' ) );
+			}
+			if ( 'BUTTON' === $p->get_tag() ) {
+				$found_btn = true;
+				$this->assertSame( 'actions.prevSlide', $p->get_attribute( 'data-wp-on--click' ) );
+				$this->assertSame( 'state.isPrevDisabled', $p->get_attribute( 'data-wp-bind--disabled' ) );
+				$this->assertSame( 'Previous slide', $p->get_attribute( 'aria-label' ) );
+			}
+		}
+		$this->assertTrue( $found_btn );
+	}
+
 	/* ---- Modal Toggle ---- */
 
 	public function test_modal_toggle_context_and_directives(): void {
@@ -131,8 +162,60 @@ class Test_Renderers extends WP_UnitTestCase {
 		$this->assertSame( 'panel', $ctx['targetId'] );
 		$this->assertTrue( $ctx['isVisible'] );
 		$this->assertStringContainsString( 'data-wp-bind--aria-controls="context.targetId"', $html );
+		// First-paint truth: literal ARIA matches the visible state.
+		$this->assertStringContainsString( 'aria-expanded="true"', $html );
+		$this->assertStringContainsString( 'aria-controls="panel"', $html );
 
 		$processed = $renderer->post_process_html( $html );
+		$this->assertStringContainsString( 'data-wp-text="state.buttonLabel"', $processed );
+	}
+
+	public function test_toggle_visibility_start_hidden_seeds_collapsed_state(): void {
+		// A pre-collapsed panel (Disclosure pattern) must not be announced
+		// as expanded at first paint.
+		list( $ctx, $html ) = $this->run_root(
+			new Toggle_Visibility(),
+			'<div data-target="panel" data-start-hidden="true"><a class="wp-block-button__link">Show</a></div>'
+		);
+		$this->assertFalse( $ctx['isVisible'] );
+		$this->assertStringContainsString( 'aria-expanded="false"', $html );
+	}
+
+	public function test_toggle_visibility_group_keeps_nested_button_label(): void {
+		// A core/group trigger containing an unrelated CTA button: the
+		// label binding must NOT hijack the nested button's text.
+		$renderer = new Toggle_Visibility();
+		$p        = new \WP_HTML_Tag_Processor(
+			'<div class="wp-block-group" data-target="panel"><button class="wp-block-button__link">Buy now</button></div>'
+		);
+		$p->next_tag();
+		$block = array(
+			'blockName' => 'core/group',
+			'attrs'     => array(),
+		);
+		$renderer->get_initial_context( $p, $block );
+		$renderer->apply_directives( $p, $block );
+
+		$processed = $renderer->post_process_html( $p->get_updated_html() );
+		$this->assertStringNotContainsString( 'data-wp-text', $processed );
+	}
+
+	public function test_toggle_visibility_bare_button_root_gets_label_binding(): void {
+		// Hand-authored markup where the root itself is the control still
+		// gets the reactive label, regardless of block type.
+		$renderer = new Toggle_Visibility();
+		$p        = new \WP_HTML_Tag_Processor(
+			'<button data-target="panel">Show</button>'
+		);
+		$p->next_tag();
+		$block = array(
+			'blockName' => null,
+			'attrs'     => array(),
+		);
+		$renderer->get_initial_context( $p, $block );
+		$renderer->apply_directives( $p, $block );
+
+		$processed = $renderer->post_process_html( $p->get_updated_html() );
 		$this->assertStringContainsString( 'data-wp-text="state.buttonLabel"', $processed );
 	}
 

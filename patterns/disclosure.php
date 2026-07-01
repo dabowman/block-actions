@@ -15,8 +15,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 ?>
 <!-- wp:buttons -->
-<div class="wp-block-buttons"><!-- wp:button {"tagName":"button","customAction":"toggle-visibility","actionData":{"target":"ba-disclosure-1"}} -->
-<div class="wp-block-button" data-action="toggle-visibility" data-target="ba-disclosure-1"><button type="button" class="wp-block-button__link wp-element-button"><?php esc_html_e( 'Show', 'block-actions' ); ?></button></div>
+<div class="wp-block-buttons"><!-- wp:button {"tagName":"button","customAction":"toggle-visibility","actionData":{"target":"ba-disclosure-1","startHidden":true}} -->
+<div class="wp-block-button" data-action="toggle-visibility" data-target="ba-disclosure-1" data-start-hidden="true"><button type="button" class="wp-block-button__link wp-element-button"><?php esc_html_e( 'Show', 'block-actions' ); ?></button></div>
 <!-- /wp:button --></div>
 <!-- /wp:buttons -->
 

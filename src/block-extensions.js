@@ -90,10 +90,16 @@ function registerEditorAction( id, label, fieldsOrInit, maybeInit ) {
 		if (
 			! field.dataAttribute ||
 			typeof field.dataAttribute !== 'string' ||
-			! field.dataAttribute.startsWith( 'data-' )
+			! field.dataAttribute.startsWith( 'data-' ) ||
+			// Reserved: `data-action` routes to the renderer and the
+			// `data-wp-` namespace is live Interactivity directives — a
+			// field value must never be able to occupy either. (Mirrors
+			// the server-side sanitize_manifest_fields rule.)
+			field.dataAttribute === 'data-action' ||
+			field.dataAttribute.startsWith( 'data-wp-' )
 		) {
 			console.error(
-				`${ prefix } Field dataAttribute must start with "data-"`
+				`${ prefix } Field dataAttribute must be a plain data-* attribute (data-action and data-wp-* are reserved)`
 			);
 			return false;
 		}
@@ -183,6 +189,20 @@ function renderActionFields( fields, actionData, setAttributes ) {
 			} );
 		};
 
+		// Advisory (never save-blocking): a required field left empty
+		// means the action silently does nothing on the frontend — say so
+		// where the author is looking.
+		const requiredWarning =
+			field.required && ( value === undefined || value === '' )
+				? __(
+						'Required — the action does nothing until this is set.',
+						'block-actions'
+				  )
+				: '';
+		const helpWithWarning = requiredWarning
+			? `${ requiredWarning } ${ field.help || '' }`.trim()
+			: field.help || '';
+
 		switch ( field.type ) {
 			case 'number':
 				return (
@@ -204,7 +224,7 @@ function renderActionFields( fields, actionData, setAttributes ) {
 							}
 							onChange( parsed );
 						} }
-						help={ field.help || '' }
+						help={ helpWithWarning }
 					/>
 				);
 			case 'toggle':
@@ -214,7 +234,7 @@ function renderActionFields( fields, actionData, setAttributes ) {
 						label={ field.label }
 						checked={ !! value }
 						onChange={ onChange }
-						help={ field.help || '' }
+						help={ helpWithWarning }
 					/>
 				);
 			case 'text':
@@ -225,7 +245,7 @@ function renderActionFields( fields, actionData, setAttributes ) {
 						label={ field.label }
 						value={ value || '' }
 						onChange={ onChange }
-						help={ field.help || '' }
+						help={ helpWithWarning }
 					/>
 				);
 		}
@@ -334,8 +354,16 @@ function getSupportedBlocks() {
 
 /**
  * Adds custom attributes to blocks during registration.
- * - customData: Added to all blocks
- * - customAction: Added only to blocks that support actions
+ *
+ * customAction/actionData are registered on EVERY block type, not just
+ * currently-supported ones: this filter runs once per block at
+ * registration time, while the inspector and save filters resolve
+ * `blockActions.supportedBlocks` at call time. Gating registration on
+ * the support map would break blocks opted in by a filter that loads
+ * after the block registered — the inspector would appear and set
+ * attributes that were never registered, so they'd fail to round-trip
+ * (or invalidate the block) on reload. Unused registered attributes
+ * cost nothing: with empty defaults they don't serialize.
  *
  * @since 1.0.0
  *
@@ -350,21 +378,15 @@ function addCustomDataAttribute( settings ) {
 				type: 'string',
 				default: '',
 			},
+			customAction: {
+				type: 'string',
+				default: '',
+			},
+			actionData: {
+				type: 'object',
+				default: {},
+			},
 		};
-
-		if ( getSupportedBlocks()[ settings.name ] ) {
-			settings.attributes = {
-				...settings.attributes,
-				customAction: {
-					type: 'string',
-					default: '',
-				},
-				actionData: {
-					type: 'object',
-					default: {},
-				},
-			};
-		}
 
 		return settings;
 	} catch ( error ) {
@@ -469,9 +491,25 @@ const withActionInspectorControl = createHigherOrderComponent(
 								options={ actionOptions }
 								onChange={ ( value ) => {
 									try {
+										// Seed actionData with the fields'
+										// meaningful defaults — display-only
+										// defaults never reached the saved
+										// markup, so e.g. a manifest field
+										// default silently vanished on the
+										// frontend. Falsy defaults ('' /
+										// false / 0) are equivalent to
+										// absent and stay unseeded.
+										const seeded = {};
+										getFieldsForAction( value ).forEach(
+											( f ) => {
+												if ( f.default ) {
+													seeded[ f.key ] = f.default;
+												}
+											}
+										);
 										setAttributes( {
 											customAction: value,
-											actionData: {},
+											actionData: seeded,
 										} );
 									} catch ( error ) {
 										log(
@@ -586,7 +624,15 @@ try {
 	);
 
 	registerModalDialogVariation();
-	setupAnchorUniqueness();
+	// The watcher lives for the whole editor session by design (it must
+	// see every insertion). The unsubscribe handle is exposed on the
+	// public namespace so tests and debugging can tear it down instead
+	// of the handle being silently discarded.
+	const unsubscribeAnchorWatcher = setupAnchorUniqueness();
+	if ( typeof window !== 'undefined' ) {
+		window.BlockActions = window.BlockActions || {};
+		window.BlockActions.unsubscribeAnchorWatcher = unsubscribeAnchorWatcher;
+	}
 } catch ( error ) {
 	log( 'error', 'Failed to register Block Actions', error );
 }

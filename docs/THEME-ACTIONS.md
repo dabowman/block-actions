@@ -116,10 +116,14 @@ Drop a JSON file next to your action with the same basename — `smooth-toggle.j
 ```
 
 - **`label`** — overrides the filename-derived label in the action dropdown.
-- **`fields`** — inspector controls (`text`, `number`, `toggle`). Each value is saved to the matching `dataAttribute` and forwarded to your store as context. `key` must be an identifier (letters, digits, underscore); `dataAttribute` must look like `data-…`.
-- **`directives`** — extra `data-wp-*` directives injected on the action's root element, on top of the automatic `data-wp-init="callbacks.init"` and `data-wp-on--click="actions.handleClick"`. Only `data-wp-*` keys are allowed — a manifest can't inject arbitrary HTML attributes.
+- **`fields`** — inspector controls (`text`, `number`, `toggle`). Each value is saved to the matching `dataAttribute` and forwarded to your store as context. `key` must be an identifier (letters, digits, underscore); `dataAttribute` must be a plain `data-…` attribute — `data-action` and the `data-wp-` namespace are reserved and rejected. A field marked `required: true` shows an inline warning in the inspector while empty (saving is never blocked). A non-empty `default` is seeded into the block when the author selects the action, so it reaches your store's context without the author touching the field.
+- **`directives`** — extra `data-wp-*` directives injected on the action's root element, on top of the automatic `data-wp-init="callbacks.init"` and `data-wp-on--click="actions.handleClick"`. Window/document-scoped handlers work too (`data-wp-on-window--resize`, `data-wp-on-document--keydown`). Reserved keys are dropped: `data-wp-interactive`, `data-wp-context`, `data-wp-init`, and `data-wp-on--click` belong to the plugin's wiring — a manifest can only *add* behavior (use suffixed variants like `data-wp-init---setup` for additional init handlers).
 
 Everything is validated server-side; unknown keys and unsafe values are dropped. The manifest replaces the need to call `registerAction()` for custom labels or fields.
+
+### Sidecar stylesheet
+
+Ship functional CSS next to your action with the same basename — `smooth-toggle.js` → `smooth-toggle.css` — and the plugin enqueues it on demand, the same way the action's script module loads: early (in `<head>`) when the action is detected in the page's content, with a render-time fallback for template parts and other late contexts.
 
 ### Global API (Optional)
 

@@ -38,6 +38,26 @@ class Test_Action_Directories extends WP_UnitTestCase {
 		$this->assertSame( '', \Block_Actions\directory_to_url( '/srv/elsewhere/actions' ) );
 	}
 
+	public function test_sibling_prefix_path_does_not_match_root(): void {
+		// A directory whose name merely PREFIXES a root (wp-content-backup,
+		// themes/foo-extra vs themes/foo) must not match that root — the
+		// concatenated URL would be fabricated and 404. Boundary = exact
+		// root or a path-separator descendant.
+		$sibling = untrailingslashit( WP_CONTENT_DIR ) . '-backup/actions';
+		$this->assertSame( '', \Block_Actions\directory_to_url( $sibling ) );
+
+		// A theme-sibling dir must never map via the THEME root's URI.
+		// (Whether it maps at all depends on where themes live relative
+		// to wp-content — in the WP test suite they're outside it — so
+		// assert the boundary property, not a concrete URL.)
+		$theme_sibling = get_stylesheet_directory() . '-extra/actions';
+		$url           = \Block_Actions\directory_to_url( $theme_sibling );
+		$this->assertTrue(
+			'' === $url || 0 !== strpos( $url, get_stylesheet_directory_uri() ),
+			"Sibling path mapped through the theme root: {$url}"
+		);
+	}
+
 	public function test_resolve_string_entry(): void {
 		$resolved = \Block_Actions\resolve_action_directory( get_stylesheet_directory() . '/actions/' );
 		$this->assertSame( get_stylesheet_directory() . '/actions', $resolved['path'] );

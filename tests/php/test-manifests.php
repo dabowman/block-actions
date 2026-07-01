@@ -48,6 +48,21 @@ class Test_Manifests extends WP_UnitTestCase {
 		$this->assertSame( 'text', $fields[0]['type'] );
 	}
 
+	public function test_reserved_data_attributes_dropped(): void {
+		// data-action would overwrite the routing id; data-wp-* would
+		// smuggle a live directive through the fields path.
+		$fields = \Block_Actions\sanitize_manifest_fields(
+			array(
+				array( 'key' => 'a', 'dataAttribute' => 'data-action' ),
+				array( 'key' => 'b', 'dataAttribute' => 'data-wp-bind--href' ),
+				array( 'key' => 'c', 'dataAttribute' => 'data-wp-on--mouseover' ),
+				array( 'key' => 'ok', 'dataAttribute' => 'data-speed' ),
+			)
+		);
+		$this->assertCount( 1, $fields );
+		$this->assertSame( 'ok', $fields[0]['key'] );
+	}
+
 	/* ---- sanitize_manifest_directives ---- */
 
 	public function test_only_data_wp_directives_survive(): void {
@@ -64,6 +79,42 @@ class Test_Manifests extends WP_UnitTestCase {
 			array(
 				'data-wp-on--keydown'  => 'actions.handleKeydown',
 				'data-wp-bind--hidden' => 'context.isHidden',
+			),
+			$directives
+		);
+	}
+
+	public function test_window_and_document_scoped_directives_survive(): void {
+		// The single-hyphen infix in on-window / on-document must pass —
+		// global listeners are the headline manifest use case.
+		$directives = \Block_Actions\sanitize_manifest_directives(
+			array(
+				'data-wp-on-window--resize'    => 'callbacks.onResize',
+				'data-wp-on-document--keydown' => 'callbacks.onKeydown',
+			)
+		);
+		$this->assertCount( 2, $directives );
+	}
+
+	public function test_reserved_directives_dropped(): void {
+		// The transformer owns these: a manifest may add behavior but
+		// never repoint the store, wipe the sanitized context, or replace
+		// the guaranteed init/click wiring. Suffixed variants stay
+		// available for additive handlers.
+		$directives = \Block_Actions\sanitize_manifest_directives(
+			array(
+				'data-wp-interactive'   => 'other/ns',
+				'data-wp-context'       => '{}',
+				'data-wp-init'          => 'callbacks.hijack',
+				'data-wp-on--click'     => 'actions.hijack',
+				'data-wp-init---extra'  => 'callbacks.alsoInit',
+				'data-wp-on--dblclick'  => 'actions.fine',
+			)
+		);
+		$this->assertSame(
+			array(
+				'data-wp-init---extra' => 'callbacks.alsoInit',
+				'data-wp-on--dblclick' => 'actions.fine',
 			),
 			$directives
 		);

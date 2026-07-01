@@ -133,6 +133,41 @@ class Theme_Action extends Action_Renderer {
 	}
 
 	/**
+	 * Enqueue the theme action's sidecar stylesheet, if one ships.
+	 *
+	 * The parent implementation looks in the plugin's own
+	 * `assets/actions/` — a location a theme action can never occupy.
+	 * Theme actions instead ship CSS as a sidecar next to the action
+	 * file (`my-action.js` + `my-action.css`), resolved from the same
+	 * discovered path/url the script enqueue uses.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return void
+	 */
+	public function enqueue_view_style( string $action_id ): void {
+		$action = $this->find_action( $action_id );
+		if ( null === $action ) {
+			return;
+		}
+
+		$css_path = substr( $action['path'], 0, -3 ) . '.css';
+		if ( ! file_exists( $css_path ) ) {
+			return;
+		}
+
+		$handle = "block-actions-{$action_id}";
+		wp_enqueue_style(
+			$handle,
+			substr( $action['url'], 0, -3 ) . '.css',
+			array(),
+			(string) filemtime( $css_path )
+		);
+		wp_style_add_data( $handle, 'path', $css_path );
+	}
+
+	/**
 	 * Resolve a discovered theme action by its canonical ID.
 	 *
 	 * Builds an id → action map once per request from the (already cached)

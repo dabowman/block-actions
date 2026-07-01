@@ -14,7 +14,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 ?>
-<!-- wp:group {"customAction":"carousel","className":"carousel-container","layout":{"type":"constrained"}} -->
+<?php
+// Note: the container uses layout:default on purpose. Constrained layout
+// injects `> * { max-width: …; margin-inline: auto }`, which clamps the
+// .carousel-slider below its 100cqw slides on Wide/Full alignment and
+// clips slide edges asymmetrically.
+?>
+<!-- wp:group {"customAction":"carousel","className":"carousel-container","layout":{"type":"default"}} -->
 <div class="wp-block-group carousel-container" data-action="carousel">
 <!-- wp:group {"className":"carousel-slider","layout":{"type":"default"}} -->
 <div class="wp-block-group carousel-slider">

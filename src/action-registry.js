@@ -52,6 +52,14 @@ const BUILT_IN_ACTIONS = [
 				required: true,
 				default: '',
 			},
+			{
+				key: 'startHidden',
+				type: 'toggle',
+				label: 'Panel starts hidden',
+				help: 'Enable when the target ships with the is-hidden class, so the button announces the collapsed state correctly on first paint.',
+				dataAttribute: 'data-start-hidden',
+				default: false,
+			},
 		],
 	},
 	{

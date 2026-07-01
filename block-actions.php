@@ -170,6 +170,80 @@ function enqueue_modal_dialog_styles(): void {
 add_action( 'enqueue_block_assets', __NAMESPACE__ . '\\enqueue_modal_dialog_styles' );
 
 /**
+ * Enqueue per-action functional stylesheets early, in the right places.
+ *
+ * Enqueuing action CSS from the `render_block` filter is too late for
+ * the frontend <head> (the styles print in the footer → FOUC: the
+ * disclosure panel flashes visible, carousel slides paint stacked) and
+ * never runs in the editor canvas at all. This hook covers both:
+ *
+ * - Editor (`is_admin()`): every action is one insert away, so all
+ *   action stylesheets are enqueued — each is a few hundred bytes of
+ *   functional CSS.
+ * - Frontend: the main query's post content is scanned for
+ *   `data-action="{id}"` so only used actions' CSS is enqueued, in
+ *   <head>. Actions living in template parts, `do_blocks()` output, or
+ *   feeds are still covered by the render-time fallback in
+ *   `Action_Renderer::enqueue_view_style()` (same handles — the second
+ *   call is a no-op).
+ *
+ * Covers the plugin's `assets/actions/{id}.css` and theme-action
+ * sidecar stylesheets (`my-action.js` + `my-action.css`).
+ *
+ * @since 3.0.0
+ *
+ * @return void
+ */
+function enqueue_action_styles(): void {
+	$styles = array();
+	$files  = glob( DIR . 'assets/actions/*.css' );
+	foreach ( is_array( $files ) ? $files : array() as $file ) {
+		$id            = basename( $file, '.css' );
+		$styles[ $id ] = array(
+			'path' => $file,
+			'url'  => URL . 'assets/actions/' . basename( $file ),
+		);
+	}
+	foreach ( discover_theme_actions() as $action ) {
+		$css_path = substr( $action['path'], 0, -3 ) . '.css';
+		if ( ! isset( $styles[ $action['id'] ] ) && file_exists( $css_path ) ) {
+			$styles[ $action['id'] ] = array(
+				'path' => $css_path,
+				'url'  => substr( $action['url'], 0, -3 ) . '.css',
+			);
+		}
+	}
+	if ( empty( $styles ) ) {
+		return;
+	}
+
+	$enqueue_all = is_admin();
+
+	$haystack = '';
+	if ( ! $enqueue_all && ! empty( $GLOBALS['wp_query']->posts ) ) {
+		foreach ( $GLOBALS['wp_query']->posts as $queried_post ) {
+			$haystack .= $queried_post->post_content ?? '';
+		}
+	}
+
+	foreach ( $styles as $id => $style ) {
+		if ( ! $enqueue_all && false === strpos( $haystack, 'data-action="' . $id . '"' ) ) {
+			continue;
+		}
+		$handle = "block-actions-{$id}";
+		wp_enqueue_style(
+			$handle,
+			$style['url'],
+			array(),
+			(string) filemtime( $style['path'] )
+		);
+		// Lets core inline these tiny stylesheets (wp_maybe_inline_styles).
+		wp_style_add_data( $handle, 'path', $style['path'] );
+	}
+}
+add_action( 'enqueue_block_assets', __NAMESPACE__ . '\\enqueue_action_styles' );
+
+/**
  * Get action directories to scan for custom actions.
  *
  * Each entry is either a filesystem path (string) — whose URL is derived
@@ -221,7 +295,13 @@ function directory_to_url( string $path ): string {
 	);
 
 	foreach ( $roots as $root_dir => $root_url ) {
-		if ( '' !== $root_dir && 0 === strpos( $path, $root_dir ) ) {
+		if ( '' === $root_dir ) {
+			continue;
+		}
+		// Boundary-safe prefix match: `/themes/foo-extra` must not match
+		// the root `/themes/foo` (the mangled URL would 404); only the
+		// root itself or true descendants qualify.
+		if ( $path === $root_dir || 0 === strpos( $path, $root_dir . '/' ) ) {
 			return untrailingslashit( $root_url ) . substr( $path, strlen( $root_dir ) );
 		}
 	}
@@ -326,7 +406,15 @@ function sanitize_manifest_fields( array $fields ): array {
 		if ( ! is_string( $key ) || 1 !== preg_match( '/^[A-Za-z_][A-Za-z0-9_]*$/', $key ) ) {
 			continue;
 		}
-		if ( ! is_string( $data_attribute ) || 1 !== preg_match( '/^data-[a-z0-9-]+$/', $data_attribute ) ) {
+		// A field maps to a PLAIN data-* attribute. `data-action` would let
+		// an author-typed value overwrite the action routing id, and the
+		// `data-wp-` namespace would smuggle a live Interactivity directive
+		// past sanitize_manifest_directives — both reserved.
+		if ( ! is_string( $data_attribute )
+			|| 1 !== preg_match( '/^data-[a-z0-9-]+$/', $data_attribute )
+			|| 'data-action' === $data_attribute
+			|| 0 === strpos( $data_attribute, 'data-wp-' )
+		) {
 			continue;
 		}
 
@@ -357,8 +445,14 @@ function sanitize_manifest_fields( array $fields ): array {
  * Validate manifest directive declarations.
  *
  * Only `data-wp-*` keys with string values survive — a manifest can add
- * Interactivity API directives (e.g. `data-wp-on--keydown`) but cannot
- * inject arbitrary HTML attributes.
+ * Interactivity API directives (e.g. `data-wp-on--keydown` or the
+ * window/document-scoped `data-wp-on-window--resize`) but cannot inject
+ * arbitrary HTML attributes. The directives the transformer itself owns
+ * are reserved: a manifest may only ADD behavior, never repoint the
+ * store namespace, wipe the sanitized context, or replace the
+ * init/click wiring the Theme_Action contract guarantees. (Suffixed
+ * variants like `data-wp-init---extra` remain available for additive
+ * handlers.)
  *
  * @since 3.0.0
  *
@@ -366,12 +460,21 @@ function sanitize_manifest_fields( array $fields ): array {
  * @return array Sanitized directive map.
  */
 function sanitize_manifest_directives( array $directives ): array {
-	$clean = array();
+	$reserved = array(
+		'data-wp-interactive',
+		'data-wp-context',
+		'data-wp-init',
+		'data-wp-on--click',
+	);
+	$clean    = array();
 	foreach ( $directives as $key => $value ) {
 		if ( ! is_string( $key ) || ! is_string( $value ) ) {
 			continue;
 		}
-		if ( 1 !== preg_match( '/^data-wp-[a-z0-9]+(--[a-z0-9-]+)*$/', $key ) ) {
+		if ( 1 !== preg_match( '/^data-wp-[a-z0-9-]+(--[a-z0-9-]+)*$/', $key ) ) {
+			continue;
+		}
+		if ( in_array( $key, $reserved, true ) ) {
 			continue;
 		}
 		$clean[ $key ] = $value;
