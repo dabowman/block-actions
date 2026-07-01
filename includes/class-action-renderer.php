@@ -95,4 +95,40 @@ abstract class Action_Renderer {
 			$asset['version']
 		);
 	}
+
+	/**
+	 * Enqueue the action's minimal functional stylesheet, if one ships.
+	 *
+	 * Action CSS lives in `assets/actions/{action_id}.css`. The primary
+	 * enqueue happens early on `enqueue_block_assets` (see
+	 * `Block_Actions\enqueue_action_styles()`) so the CSS lands in the
+	 * document <head> and reaches the editor iframe. This render-time
+	 * call is the FALLBACK for contexts the head-time content scan can't
+	 * see — actions living in template parts, `do_blocks()` output, or
+	 * feeds — where a late stylesheet still beats none. The shared handle
+	 * makes the second call a no-op when the head pass already ran.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return void
+	 */
+	public function enqueue_view_style( string $action_id ): void {
+		$css_path = "assets/actions/{$action_id}.css";
+
+		if ( ! file_exists( DIR . $css_path ) ) {
+			return;
+		}
+
+		$handle = "block-actions-{$action_id}";
+		wp_enqueue_style(
+			$handle,
+			URL . $css_path,
+			array(),
+			(string) filemtime( DIR . $css_path )
+		);
+		// Registering the file path lets core inline these tiny
+		// stylesheets into <head> (wp_maybe_inline_styles) when possible.
+		wp_style_add_data( $handle, 'path', DIR . $css_path );
+	}
 }

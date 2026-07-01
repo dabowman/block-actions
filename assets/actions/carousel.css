@@ -1,0 +1,38 @@
+/**
+ * Carousel — minimal functional CSS (layout mechanics only).
+ *
+ * This is the irreducible CSS that makes the carousel WORK: clip the
+ * track, size slides to the container, and animate the store-driven
+ * transform. Appearance — button placement/styling, thumbnail strip,
+ * spacing, colors, focus rings — is intentionally left to the theme so
+ * the plugin stays a behavior layer, not a page builder.
+ *
+ * Container queries (`cqw`) size slides to the carousel's own width, so
+ * it works correctly nested in sidebars, columns, or grids.
+ *
+ * @since 3.0.0
+ */
+.carousel-container {
+	position: relative;
+	overflow: hidden;
+	container: carousel / inline-size;
+}
+
+.carousel-slider {
+	display: flex;
+	flex-wrap: nowrap;
+	/* The store drives a translateX() transform; the transition must
+	   cover `transform` for slides to glide rather than jump. */
+	transition: transform 0.4s ease-in-out;
+}
+
+.carousel-slide {
+	flex: 0 0 100cqw;
+	min-width: 100cqw;
+}
+
+.carousel-slide img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+}

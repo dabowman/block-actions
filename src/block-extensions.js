@@ -14,7 +14,7 @@
  * @module block-extensions
  */
 
-import { addFilter } from '@wordpress/hooks';
+import { addFilter, applyFilters } from '@wordpress/hooks';
 import { createHigherOrderComponent } from '@wordpress/compose';
 import { Fragment } from '@wordpress/element';
 import { InspectorAdvancedControls } from '@wordpress/block-editor';
@@ -26,6 +26,7 @@ import {
 import { __ } from '@wordpress/i18n';
 import actions from './action-registry';
 import { registerModalDialogVariation } from './block-variations';
+import { setupAnchorUniqueness } from './anchor-uniqueness';
 import './block-variations.css';
 
 /**
@@ -89,10 +90,16 @@ function registerEditorAction( id, label, fieldsOrInit, maybeInit ) {
 		if (
 			! field.dataAttribute ||
 			typeof field.dataAttribute !== 'string' ||
-			! field.dataAttribute.startsWith( 'data-' )
+			! field.dataAttribute.startsWith( 'data-' ) ||
+			// Reserved: `data-action` routes to the renderer and the
+			// `data-wp-` namespace is live Interactivity directives — a
+			// field value must never be able to occupy either. (Mirrors
+			// the server-side sanitize_manifest_fields rule.)
+			field.dataAttribute === 'data-action' ||
+			field.dataAttribute.startsWith( 'data-wp-' )
 		) {
 			console.error(
-				`${ prefix } Field dataAttribute must start with "data-"`
+				`${ prefix } Field dataAttribute must be a plain data-* attribute (data-action and data-wp-* are reserved)`
 			);
 			return false;
 		}
@@ -182,6 +189,20 @@ function renderActionFields( fields, actionData, setAttributes ) {
 			} );
 		};
 
+		// Advisory (never save-blocking): a required field left empty
+		// means the action silently does nothing on the frontend — say so
+		// where the author is looking.
+		const requiredWarning =
+			field.required && ( value === undefined || value === '' )
+				? __(
+						'Required — the action does nothing until this is set.',
+						'block-actions'
+				  )
+				: '';
+		const helpWithWarning = requiredWarning
+			? `${ requiredWarning } ${ field.help || '' }`.trim()
+			: field.help || '';
+
 		switch ( field.type ) {
 			case 'number':
 				return (
@@ -203,7 +224,7 @@ function renderActionFields( fields, actionData, setAttributes ) {
 							}
 							onChange( parsed );
 						} }
-						help={ field.help || '' }
+						help={ helpWithWarning }
 					/>
 				);
 			case 'toggle':
@@ -213,7 +234,7 @@ function renderActionFields( fields, actionData, setAttributes ) {
 						label={ field.label }
 						checked={ !! value }
 						onChange={ onChange }
-						help={ field.help || '' }
+						help={ helpWithWarning }
 					/>
 				);
 			case 'text':
@@ -224,7 +245,7 @@ function renderActionFields( fields, actionData, setAttributes ) {
 						label={ field.label }
 						value={ value || '' }
 						onChange={ onChange }
-						help={ field.help || '' }
+						help={ helpWithWarning }
 					/>
 				);
 		}
@@ -239,11 +260,17 @@ if ( typeof window !== 'undefined' ) {
 
 	// Auto-register theme actions passed via wp_localize_script from PHP.
 	// This replaces the previous approach of loading theme action ES modules
-	// as classic scripts (which failed due to ES module syntax).
+	// as classic scripts (which failed due to ES module syntax). Inspector
+	// fields come from the action's optional JSON manifest.
 	if ( Array.isArray( window.blockActionsThemeActions ) ) {
 		window.blockActionsThemeActions.forEach( ( action ) => {
 			if ( action.id && action.label ) {
-				registerEditorAction( action.id, action.label, () => {} );
+				registerEditorAction(
+					action.id,
+					action.label,
+					Array.isArray( action.fields ) ? action.fields : [],
+					() => {}
+				);
 			}
 		} );
 	}
@@ -294,9 +321,49 @@ const BLOCKS_WITH_ACTIONS = {
 };
 
 /**
+ * Get the map of blocks that support actions, filtered so themes and
+ * plugins can opt additional block types in.
+ *
+ * Resolved at call time (not memoized) so a filter registered after this
+ * module loads still applies. Routes the whole pipeline — attribute
+ * registration, the inspector control, and save output — through one
+ * source of truth.
+ *
+ * Example, from a theme/plugin editor script:
+ *
+ *     import { addFilter } from '@wordpress/hooks';
+ *     addFilter(
+ *         'blockActions.supportedBlocks',
+ *         'my-theme/image-actions',
+ *         ( blocks ) => ( {
+ *             ...blocks,
+ *             'core/image': {
+ *                 label: 'Image Action',
+ *                 help: 'Add an action to this image.',
+ *             },
+ *         } )
+ *     );
+ *
+ * @since 3.0.0
+ *
+ * @return {Object.<string, {label: string, help: string}>} Supported blocks map.
+ */
+function getSupportedBlocks() {
+	return applyFilters( 'blockActions.supportedBlocks', BLOCKS_WITH_ACTIONS );
+}
+
+/**
  * Adds custom attributes to blocks during registration.
- * - customData: Added to all blocks
- * - customAction: Added only to blocks that support actions
+ *
+ * customAction/actionData are registered on EVERY block type, not just
+ * currently-supported ones: this filter runs once per block at
+ * registration time, while the inspector and save filters resolve
+ * `blockActions.supportedBlocks` at call time. Gating registration on
+ * the support map would break blocks opted in by a filter that loads
+ * after the block registered — the inspector would appear and set
+ * attributes that were never registered, so they'd fail to round-trip
+ * (or invalidate the block) on reload. Unused registered attributes
+ * cost nothing: with empty defaults they don't serialize.
  *
  * @since 1.0.0
  *
@@ -311,21 +378,15 @@ function addCustomDataAttribute( settings ) {
 				type: 'string',
 				default: '',
 			},
+			customAction: {
+				type: 'string',
+				default: '',
+			},
+			actionData: {
+				type: 'object',
+				default: {},
+			},
 		};
-
-		if ( BLOCKS_WITH_ACTIONS[ settings.name ] ) {
-			settings.attributes = {
-				...settings.attributes,
-				customAction: {
-					type: 'string',
-					default: '',
-				},
-				actionData: {
-					type: 'object',
-					default: {},
-				},
-			};
-		}
 
 		return settings;
 	} catch ( error ) {
@@ -398,13 +459,14 @@ const withActionInspectorControl = createHigherOrderComponent(
 		return ( props ) => {
 			try {
 				// Only apply to blocks that support actions
-				if ( ! BLOCKS_WITH_ACTIONS[ props.name ] ) {
+				const supportedBlocks = getSupportedBlocks();
+				if ( ! supportedBlocks[ props.name ] ) {
 					return <BlockEdit { ...props } />;
 				}
 
 				const { attributes, setAttributes } = props;
 				const { customAction, actionData = {} } = attributes;
-				const blockConfig = BLOCKS_WITH_ACTIONS[ props.name ];
+				const blockConfig = supportedBlocks[ props.name ];
 				const fields = getFieldsForAction( customAction );
 
 				// Create action options from all registered actions
@@ -429,9 +491,25 @@ const withActionInspectorControl = createHigherOrderComponent(
 								options={ actionOptions }
 								onChange={ ( value ) => {
 									try {
+										// Seed actionData with the fields'
+										// meaningful defaults — display-only
+										// defaults never reached the saved
+										// markup, so e.g. a manifest field
+										// default silently vanished on the
+										// frontend. Falsy defaults ('' /
+										// false / 0) are equivalent to
+										// absent and stay unseeded.
+										const seeded = {};
+										getFieldsForAction( value ).forEach(
+											( f ) => {
+												if ( f.default ) {
+													seeded[ f.key ] = f.default;
+												}
+											}
+										);
 										setAttributes( {
 											customAction: value,
-											actionData: {},
+											actionData: seeded,
 										} );
 									} catch ( error ) {
 										log(
@@ -488,7 +566,7 @@ function addCustomDataToSave( extraProps, blockType, attributes ) {
 		}
 
 		// Add action attribute only to blocks that support actions
-		if ( BLOCKS_WITH_ACTIONS[ blockType.name ] && customAction ) {
+		if ( getSupportedBlocks()[ blockType.name ] && customAction ) {
 			extraProps[ 'data-action' ] = customAction;
 
 			// Map actionData fields to data-* attributes
@@ -546,6 +624,15 @@ try {
 	);
 
 	registerModalDialogVariation();
+	// The watcher lives for the whole editor session by design (it must
+	// see every insertion). The unsubscribe handle is exposed on the
+	// public namespace so tests and debugging can tear it down instead
+	// of the handle being silently discarded.
+	const unsubscribeAnchorWatcher = setupAnchorUniqueness();
+	if ( typeof window !== 'undefined' ) {
+		window.BlockActions = window.BlockActions || {};
+		window.BlockActions.unsubscribeAnchorWatcher = unsubscribeAnchorWatcher;
+	}
 } catch ( error ) {
 	log( 'error', 'Failed to register Block Actions', error );
 }

@@ -162,8 +162,60 @@ class Test_Renderers extends WP_UnitTestCase {
 		$this->assertSame( 'panel', $ctx['targetId'] );
 		$this->assertTrue( $ctx['isVisible'] );
 		$this->assertStringContainsString( 'data-wp-bind--aria-controls="context.targetId"', $html );
+		// First-paint truth: literal ARIA matches the visible state.
+		$this->assertStringContainsString( 'aria-expanded="true"', $html );
+		$this->assertStringContainsString( 'aria-controls="panel"', $html );
 
 		$processed = $renderer->post_process_html( $html );
+		$this->assertStringContainsString( 'data-wp-text="state.buttonLabel"', $processed );
+	}
+
+	public function test_toggle_visibility_start_hidden_seeds_collapsed_state(): void {
+		// A pre-collapsed panel (Disclosure pattern) must not be announced
+		// as expanded at first paint.
+		list( $ctx, $html ) = $this->run_root(
+			new Toggle_Visibility(),
+			'<div data-target="panel" data-start-hidden="true"><a class="wp-block-button__link">Show</a></div>'
+		);
+		$this->assertFalse( $ctx['isVisible'] );
+		$this->assertStringContainsString( 'aria-expanded="false"', $html );
+	}
+
+	public function test_toggle_visibility_group_keeps_nested_button_label(): void {
+		// A core/group trigger containing an unrelated CTA button: the
+		// label binding must NOT hijack the nested button's text.
+		$renderer = new Toggle_Visibility();
+		$p        = new \WP_HTML_Tag_Processor(
+			'<div class="wp-block-group" data-target="panel"><button class="wp-block-button__link">Buy now</button></div>'
+		);
+		$p->next_tag();
+		$block = array(
+			'blockName' => 'core/group',
+			'attrs'     => array(),
+		);
+		$renderer->get_initial_context( $p, $block );
+		$renderer->apply_directives( $p, $block );
+
+		$processed = $renderer->post_process_html( $p->get_updated_html() );
+		$this->assertStringNotContainsString( 'data-wp-text', $processed );
+	}
+
+	public function test_toggle_visibility_bare_button_root_gets_label_binding(): void {
+		// Hand-authored markup where the root itself is the control still
+		// gets the reactive label, regardless of block type.
+		$renderer = new Toggle_Visibility();
+		$p        = new \WP_HTML_Tag_Processor(
+			'<button data-target="panel">Show</button>'
+		);
+		$p->next_tag();
+		$block = array(
+			'blockName' => null,
+			'attrs'     => array(),
+		);
+		$renderer->get_initial_context( $p, $block );
+		$renderer->apply_directives( $p, $block );
+
+		$processed = $renderer->post_process_html( $p->get_updated_html() );
 		$this->assertStringContainsString( 'data-wp-text="state.buttonLabel"', $processed );
 	}
 

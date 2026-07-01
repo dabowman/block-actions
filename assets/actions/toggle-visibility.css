@@ -1,0 +1,27 @@
+/**
+ * Toggle Visibility — minimal functional CSS.
+ *
+ * The store toggles the `is-hidden` class on the target element. This
+ * rule is the only thing the action needs to actually hide content;
+ * everything else (animation, appearance) is the theme's responsibility.
+ *
+ * `!important` makes the hide win even when a theme's layout CSS sets a
+ * stronger `display` on the target — hiding is a foundational contract.
+ *
+ * @since 3.0.0
+ */
+.is-hidden {
+	display: none !important;
+}
+
+/*
+ * Editor canvas: this stylesheet loads in the editor iframe too (via
+ * enqueue_block_assets), where hiding the target would make a
+ * pre-collapsed disclosure panel invisible and uneditable. Gutenberg
+ * adds .block-editor-block-list__block to every block wrapper, so
+ * these selectors only ever match inside the canvas.
+ */
+.block-editor-block-list__block.is-hidden,
+.block-editor-block-list__block .is-hidden {
+	display: revert !important;
+}

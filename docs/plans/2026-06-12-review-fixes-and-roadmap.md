@@ -220,7 +220,7 @@ safely operate.
 
 ## Phase 5 — Extensibility & Out-of-Box Completeness
 
-- [ ] **Task 5.1: Filterable supported blocks** — Run `BLOCKS_WITH_ACTIONS` through
+- [x] **Task 5.1: Filterable supported blocks** — Run `BLOCKS_WITH_ACTIONS` through
   `applyFilters( 'blockActions.supportedBlocks', config )`; document the recipe (theme
   adds `core/image` with two lines of editor JS). Audit save-filter + HOCs to confirm they
   read the filtered config.
@@ -229,7 +229,7 @@ safely operate.
   - Tests: filter adds a block → control appears, attributes save, transform applies
   - Parallelizable: yes
 
-- [ ] **Task 5.2: Fix action-directory URL mapping** — Support `{ path, url }` entries in
+- [x] **Task 5.2: Fix action-directory URL mapping** — Support `{ path, url }` entries in
   `block_actions_directories` plus automatic `content_url()` mapping for any path under
   `WP_CONTENT_DIR` (covers parent themes and plugins). Update the docs example that
   currently doesn't work.
@@ -238,7 +238,7 @@ safely operate.
   - Tests: PHP test — parent-theme dir and plugin dir both yield working URLs
   - Parallelizable: no (after 1.5)
 
-- [ ] **Task 5.3: Ship `.is-hidden` + a toggle-visibility pattern** — Define `.is-hidden`
+- [x] **Task 5.3: Ship `.is-hidden` + a toggle-visibility pattern** — Define `.is-hidden`
   in shipped frontend CSS (respecting editor canvas), add a "Disclosure / Show-Hide"
   pattern wiring a Button (toggle-visibility) to an anchored Group.
   - Files: new CSS (extend `src/block-variations.css` or a new frontend stylesheet entry),
@@ -247,7 +247,7 @@ safely operate.
   - Tests: insert pattern on a fresh theme → toggle works visually with zero theme CSS
   - Parallelizable: yes
 
-- [ ] **Task 5.4: Carousel pattern + working CSS** — Pattern with the full class-name
+- [x] **Task 5.4: Carousel pattern + working CSS** — Pattern with the full class-name
   contract (slides, buttons, thumbnails) and shipped CSS (container query +
   `transition: transform`), so a marketer gets a working carousel from the inserter.
   - Files: `patterns/carousel.php` (new), shipped CSS, `docs/carousel-action.md`
@@ -255,7 +255,7 @@ safely operate.
   - Tests: insert pattern, add images, works end-to-end including keyboard + disabled states
   - Parallelizable: no (after carousel fixes)
 
-- [ ] **Task 5.5: Safe pattern reuse — unique anchors** — When a pattern instance would
+- [x] **Task 5.5: Safe pattern reuse — unique anchors** — When a pattern instance would
   duplicate an existing anchor/`data-modal` pair on the page, auto-suffix both sides
   (editor-side subscription or insertion hook). Small spec note in the PR; v1 can be
   modal-pattern-specific.
@@ -264,7 +264,7 @@ safely operate.
   - Tests: insert modal pattern twice → two independent working modals
   - Parallelizable: yes
 
-- [ ] **Task 5.6: Theme-action manifests v1** — Optional sidecar (`my-action.json` next to
+- [x] **Task 5.6: Theme-action manifests v1** — Optional sidecar (`my-action.json` next to
   `my-action.js`) declaring `label`, `fields`, `directives`. PHP discovery reads it; editor
   receives label + fields (no separate editor script needed); `Theme_Action` injects
   declared directives beyond init/click. This is the bridge to Phase 6.3.

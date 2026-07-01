@@ -98,8 +98,9 @@ class Directive_Transformer {
 			// Apply action-specific directives to the root element.
 			$renderer->apply_directives( $processor, $block );
 
-			// Enqueue the view script module.
+			// Enqueue the view script module and any on-demand stylesheet.
 			$renderer->enqueue_view_script( $action_id );
+			$renderer->enqueue_view_style( $action_id );
 
 			$html = $processor->get_updated_html();
 
