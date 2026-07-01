@@ -34,9 +34,12 @@ In this approach, the block with the action contains a separate carousel contain
         </div>
     </div>
     
-    <!-- Navigation buttons (optional) -->
-    <div class="carousel-button-left"><!-- Left button --></div>
-    <div class="carousel-button-right"><!-- Right button --></div>
+    <!-- Navigation buttons (optional) — use real <button> elements so
+         the renderer can apply the native disabled attribute at the
+         bounds (a core Button block works too: the plugin descends from
+         the .wp-block-button wrapper to the inner control) -->
+    <button type="button" class="carousel-button-left">Previous</button>
+    <button type="button" class="carousel-button-right">Next</button>
     
     <!-- Thumbnails (optional) -->
     <div class="carousel-thumbnails">
@@ -60,9 +63,12 @@ Alternatively, the block itself can be the carousel container by adding the `car
         <div class="carousel-slide"><!-- Image 3 --></div>
     </div>
     
-    <!-- Navigation buttons (optional) -->
-    <div class="carousel-button-left"><!-- Left button --></div>
-    <div class="carousel-button-right"><!-- Right button --></div>
+    <!-- Navigation buttons (optional) — use real <button> elements so
+         the renderer can apply the native disabled attribute at the
+         bounds (a core Button block works too: the plugin descends from
+         the .wp-block-button wrapper to the inner control) -->
+    <button type="button" class="carousel-button-left">Previous</button>
+    <button type="button" class="carousel-button-right">Next</button>
     
     <!-- Thumbnails (optional) -->
     <div class="carousel-thumbnails">

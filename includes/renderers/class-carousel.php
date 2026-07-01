@@ -90,9 +90,7 @@ class Carousel extends Action_Renderer {
 			if ( ! $container_set && $p->has_class( 'carousel-container' ) ) {
 				$p->set_attribute( 'role', 'region' );
 				$p->set_attribute( 'aria-label', __( 'Image carousel', 'block-actions' ) );
-				if ( null === $p->get_attribute( 'tabindex' ) ) {
-					$p->set_attribute( 'tabindex', '0' );
-				}
+				$this->set_default_tabindex( $p );
 				$container_set = true;
 				continue;
 			}
@@ -132,9 +130,7 @@ class Carousel extends Action_Renderer {
 				$p->set_attribute( 'role', 'tab' );
 				/* translators: %d: slide index (1-based) */
 				$p->set_attribute( 'aria-label', sprintf( __( 'Show slide %d', 'block-actions' ), $thumb_index + 1 ) );
-				if ( null === $p->get_attribute( 'tabindex' ) ) {
-					$p->set_attribute( 'tabindex', '0' );
-				}
+				$this->set_default_tabindex( $p );
 				++$thumb_index;
 				continue;
 			}
@@ -184,6 +180,20 @@ class Carousel extends Action_Renderer {
 		$p->set_attribute( 'role', 'button' );
 		$p->set_attribute( 'data-wp-class--disabled', $disabled );
 		$p->set_attribute( 'data-wp-bind--aria-disabled', $disabled );
+		$this->set_default_tabindex( $p );
+	}
+
+	/**
+	 * Make the current element keyboard-focusable unless the author already
+	 * set an explicit tabindex. One definition of the default so the
+	 * container, thumbnail, and non-button nav branches can't drift.
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param \WP_HTML_Tag_Processor $p Processor positioned at the element.
+	 * @return void
+	 */
+	private function set_default_tabindex( \WP_HTML_Tag_Processor $p ): void {
 		if ( null === $p->get_attribute( 'tabindex' ) ) {
 			$p->set_attribute( 'tabindex', '0' );
 		}
