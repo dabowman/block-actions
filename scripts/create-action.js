@@ -21,6 +21,7 @@ const rl = readline.createInterface( {
 // question is asked, and hangs forever on EOF).
 const pendingLines = [];
 const waiters = [];
+let stdinClosed = false;
 rl.on( 'line', ( line ) => {
 	const waiter = waiters.shift();
 	if ( waiter ) {
@@ -30,6 +31,7 @@ rl.on( 'line', ( line ) => {
 	}
 } );
 rl.on( 'close', () => {
+	stdinClosed = true;
 	while ( waiters.length ) {
 		waiters.shift()( '' );
 	}
@@ -41,6 +43,13 @@ function ask( prompt ) {
 	if ( buffered !== undefined ) {
 		process.stdout.write( `${ buffered }\n` );
 		return Promise.resolve( buffered );
+	}
+	// 'close' fires once: a prompt issued AFTER EOF would push a waiter
+	// nothing ever drains, and the process would exit 0 with no output.
+	// Resolve empty immediately so validation reports the missing input.
+	if ( stdinClosed ) {
+		process.stdout.write( '\n' );
+		return Promise.resolve( '' );
 	}
 	return new Promise( ( resolve ) => {
 		waiters.push( resolve );
@@ -190,6 +199,16 @@ async function createAction() {
 
 		if ( ! kebabName ) {
 			console.error( '\nError: action name produced an empty ID.' );
+			process.exit( 1 );
+		}
+
+		// The class name is written into `class <name> extends …` — a
+		// digit-leading or symbol-carrying name ('2 Way Toggle' →
+		// 2_Way_Toggle) would scaffold a PHP parse error.
+		if ( ! /^[A-Za-z][A-Za-z0-9_]*$/.test( className ) ) {
+			console.error(
+				`\nError: "${ name }" derives the PHP class name "${ className }", which is not a valid PHP identifier. Start the action name with a letter and use only letters, numbers, spaces, or hyphens.`
+			);
 			process.exit( 1 );
 		}
 

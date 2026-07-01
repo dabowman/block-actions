@@ -111,6 +111,37 @@ class Test_Renderers extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'role="button"', $out );
 	}
 
+	public function test_carousel_core_button_wrapper_wires_inner_control(): void {
+		// Real core/button markup: the author-facing class lands on the
+		// wrapper div; the interactive control is the inner <button>.
+		$html = '<div class="carousel-container">'
+			. '<div class="wp-block-button carousel-button-left">'
+			. '<button type="button" class="wp-block-button__link">Previous</button>'
+			. '</div>'
+			. '</div>';
+		$out  = ( new Carousel() )->post_process_html( $html );
+
+		// The inner <button> carries the directives + native disabled binding.
+		$p         = new \WP_HTML_Tag_Processor( $out );
+		$found_btn = false;
+		while ( $p->next_tag() ) {
+			if ( $p->has_class( 'wp-block-button' ) && ! $p->has_class( 'wp-block-button__link' ) ) {
+				// The wrapper must stay inert: no second tab stop, no
+				// nested-interactive role, no click handler.
+				$this->assertNull( $p->get_attribute( 'role' ) );
+				$this->assertNull( $p->get_attribute( 'tabindex' ) );
+				$this->assertNull( $p->get_attribute( 'data-wp-on--click' ) );
+			}
+			if ( 'BUTTON' === $p->get_tag() ) {
+				$found_btn = true;
+				$this->assertSame( 'actions.prevSlide', $p->get_attribute( 'data-wp-on--click' ) );
+				$this->assertSame( 'state.isPrevDisabled', $p->get_attribute( 'data-wp-bind--disabled' ) );
+				$this->assertSame( 'Previous slide', $p->get_attribute( 'aria-label' ) );
+			}
+		}
+		$this->assertTrue( $found_btn );
+	}
+
 	/* ---- Modal Toggle ---- */
 
 	public function test_modal_toggle_context_and_directives(): void {

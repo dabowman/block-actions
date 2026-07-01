@@ -52,6 +52,53 @@ const privateState = new WeakMap();
  */
 const openModals = new WeakSet();
 
+/**
+ * All trigger contexts wired to a dialog, so open/close can sync every
+ * trigger's `isOpen` (and therefore its aria-expanded binding) — not
+ * just the one that was clicked.
+ *
+ * @type {WeakMap<HTMLElement, Set<Object>>}
+ */
+const modalContexts = new WeakMap();
+
+/**
+ * The context set for a dialog, created on first access.
+ *
+ * @since 3.0.0
+ *
+ * @param {HTMLElement} modal The dialog element.
+ * @return {Set<Object>} Contexts of triggers wired to it.
+ */
+function contextsFor( modal ) {
+	let set = modalContexts.get( modal );
+	if ( ! set ) {
+		set = new Set();
+		modalContexts.set( modal, set );
+	}
+	return set;
+}
+
+/**
+ * Account a dialog closed exactly once: remove it from the open set,
+ * decrement the shared count, and restore body scroll when the last
+ * open dialog is gone. Safe to call from the native close listener and
+ * from trigger cleanup — the openModals guard makes it idempotent.
+ *
+ * @since 3.0.0
+ *
+ * @param {HTMLElement} modal The dialog element.
+ */
+function reconcileClosed( modal ) {
+	if ( ! openModals.has( modal ) ) {
+		return;
+	}
+	openModals.delete( modal );
+	state.openCount = Math.max( 0, state.openCount - 1 );
+	if ( state.openCount === 0 ) {
+		document.body.style.overflow = state.priorBodyOverflow;
+	}
+}
+
 const { state } = store( 'block-actions/modal-toggle', {
 	state: {
 		openCount: 0,
@@ -87,6 +134,12 @@ const { state } = store( 'block-actions/modal-toggle', {
 				openModals.add( modal );
 				state.openCount++;
 				document.body.style.overflow = 'hidden';
+				// Sync EVERY trigger wired to this dialog, not just the
+				// clicked one — a second trigger's aria-expanded binding
+				// must not announce "false" over a visibly open dialog.
+				contextsFor( modal ).forEach( ( triggerCtx ) => {
+					triggerCtx.isOpen = true;
+				} );
 				ctx.isOpen = true;
 			}
 		} ),
@@ -98,20 +151,21 @@ const { state } = store( 'block-actions/modal-toggle', {
 				return;
 			}
 
+			const { ref } = getElement();
 			const modal = document.getElementById( ctx.modalId );
-			if ( ! isDialog( modal ) ) {
-				if ( modal ) {
-					// eslint-disable-next-line no-console
-					console.warn(
-						`[block-actions/modal-toggle] Target "#${ ctx.modalId }" is not a <dialog> element. Migrate your markup to <dialog id="${ ctx.modalId }">…</dialog>.`
-					);
-				}
-				return;
+			if ( isDialog( modal ) ) {
+				wireDialogListeners( ref, modal, ctx );
+			} else if ( modal ) {
+				// eslint-disable-next-line no-console
+				console.warn(
+					`[block-actions/modal-toggle] Target "#${ ctx.modalId }" is not a <dialog> element. Migrate your markup to <dialog id="${ ctx.modalId }">…</dialog>.`
+				);
 			}
 
-			const { ref } = getElement();
-			wireDialogListeners( ref, modal, ctx );
-
+			// ALWAYS return the cleanup, even when nothing was wired
+			// above: toggle() wires listeners lazily when the dialog
+			// wasn't in the DOM at hydration time, and those must still
+			// be torn down with the trigger.
 			return () => {
 				const priv = privateState.get( ref );
 				if ( ! priv ) {
@@ -131,6 +185,13 @@ const { state } = store( 'block-actions/modal-toggle', {
 					'close',
 					priv.handleNativeClose
 				);
+				contextsFor( priv.modal ).delete( priv.ctx );
+				// A trigger unmounting while its dialog is open (router
+				// region swap, conditional re-render) means the native
+				// `close` event may never fire — without this, openCount
+				// stays ≥ 1 and body scroll is locked for every later
+				// view in the session.
+				reconcileClosed( priv.modal );
 				privateState.delete( ref );
 			};
 		},
@@ -179,13 +240,13 @@ function wireDialogListeners( ref, modal, ctx ) {
 		}
 	};
 	const handleNativeClose = () => {
-		if ( openModals.has( modal ) ) {
-			openModals.delete( modal );
-			state.openCount = Math.max( 0, state.openCount - 1 );
-			if ( state.openCount === 0 ) {
-				document.body.style.overflow = state.priorBodyOverflow;
-			}
-		}
+		reconcileClosed( modal );
+		// Sync every wired trigger's context (idempotent — each wired
+		// trigger's own close listener repeats this), plus this one in
+		// case it was removed from the set by a partial teardown.
+		contextsFor( modal ).forEach( ( triggerCtx ) => {
+			triggerCtx.isOpen = false;
+		} );
 		ctx.isOpen = false;
 	};
 
@@ -198,12 +259,14 @@ function wireDialogListeners( ref, modal, ctx ) {
 	modal.addEventListener( 'click', handleBackdropClick );
 	modal.addEventListener( 'close', handleNativeClose );
 
+	contextsFor( modal ).add( ctx );
 	privateState.set( ref, {
 		closeButtons,
 		handleCloseClick,
 		handleBackdropClick,
 		handleNativeClose,
 		modal,
+		ctx,
 	} );
 }
 

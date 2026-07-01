@@ -94,10 +94,20 @@ class Theme_Action extends Action_Renderer {
 	 * @return void
 	 */
 	public function enqueue_view_script( string $action_id ): void {
+		// N blocks carrying the same action call this once per render.
+		// wp_enqueue_script_module de-dupes registration, but the
+		// file_exists/filemtime pair below would still stat the theme
+		// file every time — and its mtime can't change mid-request.
+		static $enqueued = array();
+		if ( isset( $enqueued[ $action_id ] ) ) {
+			return;
+		}
+
 		$action = $this->find_action( $action_id );
 		if ( null === $action ) {
 			return;
 		}
+		$enqueued[ $action_id ] = true;
 
 		$version = file_exists( $action['path'] )
 			? (string) filemtime( $action['path'] )

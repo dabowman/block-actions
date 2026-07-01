@@ -38,7 +38,11 @@ if ( ! defined( 'Block_Actions\\URL' ) ) {
 	define( 'Block_Actions\\URL', plugin_dir_url( __FILE__ ) );
 }
 
-if ( version_compare( get_bloginfo( 'version' ), MIN_WP_VERSION, '<' ) ) {
+// Strip pre-release suffixes before comparing: version_compare() sorts
+// "7.0-beta2" / "7.0-RC1" BEFORE "7.0", so without this the guard would
+// deactivate the plugin on the exact pre-release builds of the minimum
+// version it targets (and again on every future minimum bump).
+if ( version_compare( preg_replace( '/[-+].*$/', '', (string) get_bloginfo( 'version' ) ), MIN_WP_VERSION, '<' ) ) {
 	add_action(
 		'admin_notices',
 		function (): void {
@@ -188,6 +192,24 @@ function get_action_directories(): array {
 }
 
 /**
+ * Log a developer diagnostic when WP_DEBUG is on.
+ *
+ * One home for the debug guard, the `[Block Actions]` prefix, and the
+ * phpcs suppression, so the call sites can't drift apart.
+ *
+ * @since 3.0.0
+ *
+ * @param string $message The message to log (unprefixed).
+ * @return void
+ */
+function debug_log( string $message ): void {
+	if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		error_log( '[Block Actions] ' . $message );
+	}
+}
+
+/**
  * Discover action files in registered directories.
  *
  * Results are cached in a static variable to avoid repeated
@@ -233,9 +255,8 @@ function discover_theme_actions(): array {
 			if ( '' === $action_id ) {
 				continue;
 			}
-			if ( $action_id !== $filename && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				error_log( sprintf( '[Block Actions] Theme action file "%s.js" registered as "%s" — prefer kebab-case filenames so the ID matches the file.', $filename, $action_id ) );
+			if ( $action_id !== $filename ) {
+				debug_log( sprintf( 'Theme action file "%s.js" registered as "%s" — prefer kebab-case filenames so the ID matches the file.', $filename, $action_id ) );
 			}
 
 			// Two files normalizing to the same ID (e.g. "Hero.js" + "hero.js"
@@ -243,10 +264,7 @@ function discover_theme_actions(): array {
 			// only the first would ever load, silently. Keep the first and
 			// warn so the collision is diagnosable.
 			if ( isset( $seen[ $action_id ] ) ) {
-				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-					error_log( sprintf( '[Block Actions] Theme action "%s" from "%s" is ignored — ID already provided by "%s". Use a unique filename.', $action_id, $file_path, $seen[ $action_id ] ) );
-				}
+				debug_log( sprintf( 'Theme action "%s" from "%s" is ignored — ID already provided by "%s". Use a unique filename.', $action_id, $file_path, $seen[ $action_id ] ) );
 				continue;
 			}
 
@@ -302,10 +320,7 @@ function init_interactivity_api(): void {
 		// file would then never be enqueued (the built-in's enqueue path
 		// runs instead), so warn rather than fail silently on upgrade.
 		if ( in_array( $action['id'], $transformer->get_registered_ids(), true ) ) {
-			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				error_log( sprintf( '[Block Actions] Theme action "%s" is ignored because a built-in action with that ID already exists. Rename the theme action file to use a unique ID.', $action['id'] ) );
-			}
+			debug_log( sprintf( 'Theme action "%s" is ignored because a built-in action with that ID already exists. Rename the theme action file to use a unique ID.', $action['id'] ) );
 			continue;
 		}
 		$transformer->register_renderer( $action['id'], $theme_renderer );
