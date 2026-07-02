@@ -92,7 +92,7 @@ class Test_Query_Action extends WP_UnitTestCase {
 		while ( $p->next_tag( 'a' ) ) {
 			if ( 'actions.navigate' === $p->get_attribute( 'data-wp-on--click' ) ) {
 				$wired[] = (string) $p->get_attribute( 'href' );
-				$this->assertSame( 'actions.prefetch', $p->get_attribute( 'data-wp-on-async--mouseenter' ) );
+				$this->assertSame( 'actions.prefetch', $p->get_attribute( 'data-wp-on--mouseenter' ) );
 			}
 		}
 		$this->assertCount( 3, $wired );

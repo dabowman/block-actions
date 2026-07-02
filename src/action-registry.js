@@ -26,11 +26,13 @@
 const BUILT_IN_ACTIONS = [
 	{
 		id: 'scroll-to-top',
+		blocks: [ 'core/button', 'core/group' ],
 		label: 'Scroll To Top',
 		fields: [],
 	},
 	{
 		id: 'carousel',
+		blocks: [ 'core/button', 'core/group' ],
 		label: 'Carousel',
 		fields: [
 			{
@@ -46,6 +48,7 @@ const BUILT_IN_ACTIONS = [
 	},
 	{
 		id: 'toggle-visibility',
+		blocks: [ 'core/button', 'core/group' ],
 		label: 'Toggle Visibility',
 		fields: [
 			{
@@ -69,6 +72,7 @@ const BUILT_IN_ACTIONS = [
 	},
 	{
 		id: 'modal-toggle',
+		blocks: [ 'core/button', 'core/group' ],
 		label: 'Modal Toggle',
 		fields: [
 			{
@@ -84,6 +88,7 @@ const BUILT_IN_ACTIONS = [
 	},
 	{
 		id: 'smooth-scroll',
+		blocks: [ 'core/button', 'core/group' ],
 		label: 'Smooth Scroll',
 		fields: [
 			{
@@ -108,6 +113,7 @@ const BUILT_IN_ACTIONS = [
 	},
 	{
 		id: 'copy-to-clipboard',
+		blocks: [ 'core/button', 'core/group' ],
 		label: 'Copy To Clipboard',
 		fields: [
 			{

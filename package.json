@@ -73,5 +73,8 @@
       "!src/**/*.test.{js,jsx}",
       "!src/index.js"
     ]
-  }
+  },
+  "browserslist": [
+    "extends @wordpress/browserslist-config"
+  ]
 }

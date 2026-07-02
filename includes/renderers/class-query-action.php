@@ -147,7 +147,7 @@ class Query_Action extends Action_Renderer {
 
 			case 'query-filter':
 				$processor->set_attribute( 'data-wp-on--click', 'actions.applyFilter' );
-				$processor->set_attribute( 'data-wp-on-async--mouseenter', 'actions.prefetchFilter' );
+				$processor->set_attribute( 'data-wp-on--mouseenter', 'actions.prefetchFilter' );
 				$processor->set_attribute( 'data-wp-on-window--popstate', 'actions.syncUrl' );
 				break;
 
@@ -209,7 +209,7 @@ class Query_Action extends Action_Renderer {
 				continue;
 			}
 			$p->set_attribute( 'data-wp-on--click', 'actions.navigate' );
-			$p->set_attribute( 'data-wp-on-async--mouseenter', 'actions.prefetch' );
+			$p->set_attribute( 'data-wp-on--mouseenter', 'actions.prefetch' );
 		}
 		return $p->get_updated_html();
 	}
