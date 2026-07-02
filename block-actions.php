@@ -64,6 +64,7 @@ if ( version_compare( preg_replace( '/[-+].*$/', '', (string) get_bloginfo( 'ver
 // Load Interactivity API infrastructure.
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-action-renderer.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-directive-transformer.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-interactions.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-scroll-to-top.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-carousel.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-toggle-visibility.php';
@@ -132,9 +133,12 @@ function enqueue_block_editor_assets(): void {
 		// inspector fields.
 		$manifest         = is_array( $action['manifest'] ?? null ) ? $action['manifest'] : array();
 		$editor_actions[] = array(
-			'id'     => $action['id'],
-			'label'  => $manifest['label'] ?? ucwords( str_replace( array( '-', '_' ), ' ', $action['id'] ) ),
-			'fields' => $manifest['fields'] ?? array(),
+			'id'         => $action['id'],
+			'label'      => $manifest['label'] ?? ucwords( str_replace( array( '-', '_' ), ' ', $action['id'] ) ),
+			'fields'     => $manifest['fields'] ?? array(),
+			'entry'      => $manifest['entry'] ?? 'actions.handleClick',
+			'triggers'   => $manifest['triggers'] ?? Interactions::TRIGGERS,
+			'structural' => ! empty( $manifest['structural'] ),
 		);
 	}
 	if ( ! empty( $editor_actions ) ) {
@@ -380,6 +384,19 @@ function read_action_manifest( string $js_path ): ?array {
 	}
 	if ( isset( $data['directives'] ) && is_array( $data['directives'] ) ) {
 		$manifest['directives'] = sanitize_manifest_directives( $data['directives'] );
+	}
+	if ( isset( $data['entry'] ) && is_string( $data['entry'] )
+		&& 1 === preg_match( '/^actions\.[A-Za-z_][A-Za-z0-9_]*$/', $data['entry'] ) ) {
+		$manifest['entry'] = $data['entry'];
+	}
+	if ( isset( $data['triggers'] ) && is_array( $data['triggers'] ) ) {
+		$triggers = array_values( array_intersect( $data['triggers'], Interactions::TRIGGERS ) );
+		if ( $triggers ) {
+			$manifest['triggers'] = $triggers;
+		}
+	}
+	if ( isset( $data['structural'] ) ) {
+		$manifest['structural'] = (bool) $data['structural'];
 	}
 
 	return empty( $manifest ) ? null : $manifest;

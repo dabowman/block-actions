@@ -844,6 +844,83 @@ describe( 'block-extensions', () => {
 		} );
 	} );
 
+	describe( 'progressive interaction serialization', () => {
+		function getSaveFilterFn() {
+			loadModule();
+			const { addFilter } = require( '@wordpress/hooks' );
+			return addFilter.mock.calls.find(
+				( c ) => c[ 0 ] === 'blocks.getSaveContent.extraProps'
+			)[ 2 ];
+		}
+
+		test( 'default click with no conditions emits NO data-interactions', () => {
+			const filterFn = getSaveFilterFn();
+			const props = filterFn(
+				{},
+				{ name: 'core/button' },
+				{
+					customAction: 'scroll-to-top',
+					actionData: {},
+					interactionSettings: {},
+				}
+			);
+			expect( props[ 'data-action' ] ).toBe( 'scroll-to-top' );
+			expect( props[ 'data-interactions' ] ).toBeUndefined();
+		} );
+
+		test( 'a non-default trigger emits the tuple (with timer delay)', () => {
+			const filterFn = getSaveFilterFn();
+			const props = filterFn(
+				{},
+				{ name: 'core/button' },
+				{
+					customAction: 'scroll-to-top',
+					actionData: {},
+					interactionSettings: { trigger: 'timer', delay: 2500 },
+				}
+			);
+			expect( props[ 'data-action' ] ).toBe( 'scroll-to-top' );
+			expect(
+				JSON.parse( props[ 'data-interactions' ] )
+			).toEqual( [
+				{ action: 'scroll-to-top', trigger: 'timer', delay: 2500 },
+			] );
+		} );
+
+		test( 'conditions alone make the tuple rich', () => {
+			const filterFn = getSaveFilterFn();
+			const props = filterFn(
+				{},
+				{ name: 'core/button' },
+				{
+					customAction: 'scroll-to-top',
+					actionData: {},
+					interactionSettings: {
+						minWidth: 782,
+						reducedMotion: true,
+					},
+				}
+			);
+			expect(
+				JSON.parse( props[ 'data-interactions' ] )[ 0 ].conditions
+			).toEqual( { minWidth: 782, reducedMotion: 'skip' } );
+		} );
+
+		test( 'downgrade: resetting the trigger returns to the simple format', () => {
+			const filterFn = getSaveFilterFn();
+			const props = filterFn(
+				{},
+				{ name: 'core/button' },
+				{
+					customAction: 'scroll-to-top',
+					actionData: {},
+					interactionSettings: { trigger: 'click' },
+				}
+			);
+			expect( props[ 'data-interactions' ] ).toBeUndefined();
+		} );
+	} );
+
 	describe( 'actionData in save filter', () => {
 		function getSaveFilter() {
 			loadModule();

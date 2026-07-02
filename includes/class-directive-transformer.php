@@ -98,6 +98,24 @@ class Directive_Transformer {
 			// Apply action-specific directives to the root element.
 			$renderer->apply_directives( $processor, $block );
 
+			// Behavioral actions: the transformer owns trigger wiring.
+			// The default (click, no conditions) injects exactly what
+			// renderers used to hardcode — byte-identical output; a
+			// data-interactions tuple swaps the trigger and/or routes
+			// through the dispatcher engine. Structural actions (null
+			// entry) keep full control of their own wiring.
+			$entry = $renderer->get_entry_action( $action_id );
+			if ( null !== $entry ) {
+				$tuple = Interactions::parse(
+					$processor->get_attribute( 'data-interactions' ),
+					$action_id,
+					$renderer->get_supported_triggers( $action_id )
+				);
+				if ( Interactions::apply_trigger( $processor, $namespace, $entry, $tuple ) ) {
+					Interactions::enqueue_engine();
+				}
+			}
+
 			// Enqueue the view script module and any on-demand stylesheet.
 			$renderer->enqueue_view_script( $action_id );
 			$renderer->enqueue_view_style( $action_id );

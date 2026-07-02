@@ -32,6 +32,7 @@ const ACTIONS = [
 	'modal-toggle',
 	'smooth-scroll',
 	'copy-to-clipboard',
+	'interactions',
 ];
 
 const moduleEntries = Object.fromEntries(

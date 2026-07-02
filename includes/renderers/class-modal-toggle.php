@@ -53,7 +53,6 @@ class Modal_Toggle extends Action_Renderer {
 	 * @return void
 	 */
 	public function apply_directives( \WP_HTML_Tag_Processor $processor, array $block ): void {
-		$processor->set_attribute( 'data-wp-on--click', 'actions.toggle' );
 		$processor->set_attribute( 'data-wp-init', 'callbacks.init' );
 		$processor->set_attribute( 'data-wp-bind--aria-expanded', 'context.isOpen' );
 		$processor->set_attribute( 'aria-haspopup', 'dialog' );
@@ -62,5 +61,17 @@ class Modal_Toggle extends Action_Renderer {
 		if ( is_string( $modal_id ) && '' !== $modal_id ) {
 			$processor->set_attribute( 'aria-controls', $modal_id );
 		}
+	}
+
+	/**
+	 * Trigger entry point — the transformer wires the trigger directive.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return string Entry action reference.
+	 */
+	public function get_entry_action( string $action_id ): ?string {
+		return 'actions.toggle';
 	}
 }
