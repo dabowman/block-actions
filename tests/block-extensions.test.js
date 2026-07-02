@@ -880,9 +880,7 @@ describe( 'block-extensions', () => {
 				}
 			);
 			expect( props[ 'data-action' ] ).toBe( 'scroll-to-top' );
-			expect(
-				JSON.parse( props[ 'data-interactions' ] )
-			).toEqual( [
+			expect( JSON.parse( props[ 'data-interactions' ] ) ).toEqual( [
 				{ action: 'scroll-to-top', trigger: 'timer', delay: 2500 },
 			] );
 		} );

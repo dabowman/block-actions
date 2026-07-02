@@ -143,13 +143,13 @@ class Interactions {
 	 *
 	 * @since 3.1.0
 	 *
-	 * @param \WP_HTML_Tag_Processor $p         Processor at the root element.
-	 * @param string                 $namespace The action's store namespace.
-	 * @param string                 $entry     Entry action ref (e.g. 'actions.toggle').
-	 * @param array                  $tuple     Validated tuple from parse().
+	 * @param \WP_HTML_Tag_Processor $p               Processor at the root element.
+	 * @param string                 $store_namespace The action's store namespace.
+	 * @param string                 $entry           Entry action ref (e.g. 'actions.toggle').
+	 * @param array                  $tuple           Validated tuple from parse().
 	 * @return bool True when the dispatcher engine is needed.
 	 */
-	public static function apply_trigger( \WP_HTML_Tag_Processor $p, string $namespace, string $entry, array $tuple ): bool {
+	public static function apply_trigger( \WP_HTML_Tag_Processor $p, string $store_namespace, string $entry, array $tuple ): bool {
 		$has_conditions = ! empty( $tuple['conditions'] );
 
 		if ( ! $has_conditions && 'click' === $tuple['trigger'] ) {
@@ -168,7 +168,7 @@ class Interactions {
 		// Engine path. Config travels as validated data-ba-* attributes;
 		// the dispatcher reads them at fire time (conditions included —
 		// resize after load behaves correctly).
-		$p->set_attribute( 'data-ba-entry', $namespace . '::' . $entry );
+		$p->set_attribute( 'data-ba-entry', $store_namespace . '::' . $entry );
 		$p->set_attribute( 'data-ba-trigger', $tuple['trigger'] );
 
 		if ( 'timer' === $tuple['trigger'] ) {

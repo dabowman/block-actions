@@ -59,7 +59,7 @@ abstract class Action_Renderer {
 	 * @param string $action_id The action identifier.
 	 * @return string|null Entry action reference, or null when structural.
 	 */
-	public function get_entry_action( string $action_id ): ?string {
+	public function get_entry_action( string $action_id ): ?string { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Interface contract; overrides dispatch on it.
 		return null;
 	}
 
@@ -74,7 +74,7 @@ abstract class Action_Renderer {
 	 * @param string $action_id The action identifier.
 	 * @return string[] Supported trigger names.
 	 */
-	public function get_supported_triggers( string $action_id ): array {
+	public function get_supported_triggers( string $action_id ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Interface contract; overrides dispatch on it.
 		return Interactions::TRIGGERS;
 	}
 

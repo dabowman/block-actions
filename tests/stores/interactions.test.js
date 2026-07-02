@@ -75,12 +75,12 @@ describe( 'conditionsMet', () => {
 
 	it( 'gates on min/max viewport width', () => {
 		const cfg = { minWidth: 782, maxWidth: 0, reducedMotion: false };
-		expect( helpers.conditionsMet( cfg, mmFactory( { width: 500 } ) ) ).toBe(
-			false
-		);
-		expect( helpers.conditionsMet( cfg, mmFactory( { width: 800 } ) ) ).toBe(
-			true
-		);
+		expect(
+			helpers.conditionsMet( cfg, mmFactory( { width: 500 } ) )
+		).toBe( false );
+		expect(
+			helpers.conditionsMet( cfg, mmFactory( { width: 800 } ) )
+		).toBe( true );
 
 		const cfgMax = { minWidth: 0, maxWidth: 600, reducedMotion: false };
 		expect(
