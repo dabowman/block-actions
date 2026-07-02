@@ -314,10 +314,11 @@ const { state, actions } = store( 'block-actions/query', {
 			}
 
 			ctx.isFetching = true;
-			state.navigatingQueries = {
-				...state.navigatingQueries,
-				[ ctx.queryId ]: true,
-			};
+			// Imperative feedback: this region has no reactive bindings
+			// (see the renderer — a re-render would clobber the appended
+			// DOM), so the loading class is applied directly.
+			region.classList.add( 'is-loading' );
+			region.setAttribute( 'aria-busy', 'true' );
 			try {
 				const response = yield fetch( nextLink.href );
 				const text = yield response.text();
@@ -354,7 +355,8 @@ const { state, actions } = store( 'block-actions/query', {
 				);
 			} finally {
 				ctx.isFetching = false;
-				clearNavigating( ctx.queryId );
+				region.classList.remove( 'is-loading' );
+				region.setAttribute( 'aria-busy', 'false' );
 			}
 		},
 	},
@@ -369,6 +371,13 @@ const { state, actions } = store( 'block-actions/query', {
 			const { ref } = getElement();
 			const sentinel = ref.querySelector( '.ba-query-sentinel' );
 			if ( ! sentinel ) {
+				return;
+			}
+
+			if ( ! ref.querySelector( '.wp-block-query-pagination' ) ) {
+				console.warn(
+					'[block-actions/query] Infinite scroll needs a Query Pagination block inside the Query Loop — it is hidden automatically once JavaScript takes over, and serves as the no-JS fallback and the next-page URL source.'
+				);
 				return;
 			}
 

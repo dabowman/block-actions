@@ -107,6 +107,12 @@ class Test_Query_Action extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( 'data-wp-init="callbacks.initInfiniteScroll"', $html );
 		$this->assertStringContainsString( 'class="ba-query-sentinel"', $html );
+		// Deliberately NO reactive bindings on this region: the append
+		// path mutates the DOM imperatively, and a signal-driven binding
+		// would make the hydrated island re-render — wiping imperative
+		// classes and duplicating appended items (found in manual testing).
+		$this->assertStringNotContainsString( 'data-wp-class--is-loading', $html );
+		$this->assertStringNotContainsString( 'data-wp-bind--aria-busy', $html );
 		// Sentinel sits INSIDE the region root.
 		$this->assertMatchesRegularExpression( '/ba-query-sentinel[^>]*><\/div><\/div>$/', $html );
 	}

@@ -179,12 +179,18 @@ class Query_Action extends Action_Renderer {
 				// The region id doubles as the client-side anchor→queryId
 				// resolution channel: triggers parse the id back out of it.
 				$processor->set_attribute( 'data-wp-router-region', "block-actions-query-{$query_id}" );
-				$processor->set_attribute( 'data-wp-class--is-loading', 'state.isLoading' );
-				$processor->set_attribute( 'data-wp-bind--aria-busy', 'state.isLoading' );
 				if ( 'query-infinite-scroll' === $action ) {
-					// The class hides the pagination fallback once JS took
-					// over (set via init so no-JS keeps working links).
+					// NO reactive bindings on this region — deliberately.
+					// Infinite scroll appends fetched posts imperatively,
+					// and any signal-driven binding here would make the
+					// hydrated island re-render on state changes: Preact
+					// then reconciles against its original vdom, wiping
+					// imperative classes and duplicating appended items.
+					// Loading feedback is applied imperatively in loadMore.
 					$processor->set_attribute( 'data-wp-init', 'callbacks.initInfiniteScroll' );
+				} else {
+					$processor->set_attribute( 'data-wp-class--is-loading', 'state.isLoading' );
+					$processor->set_attribute( 'data-wp-bind--aria-busy', 'state.isLoading' );
 				}
 				break;
 
