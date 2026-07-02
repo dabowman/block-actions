@@ -48,6 +48,28 @@ class Test_Manifests extends WP_UnitTestCase {
 		$this->assertSame( 'text', $fields[0]['type'] );
 	}
 
+	public function test_target_field_type_and_constraints_survive(): void {
+		$fields = \Block_Actions\sanitize_manifest_fields(
+			array(
+				array(
+					'key'           => 'panel',
+					'type'          => 'target',
+					'dataAttribute' => 'data-panel',
+					'optional'      => true,
+					'targets'       => array(
+						'blocks' => array( 'core/group', 42 ),
+						'shape'  => 'Dialog!',
+					),
+				),
+			)
+		);
+		$this->assertSame( 'target', $fields[0]['type'] );
+		$this->assertTrue( $fields[0]['optional'] );
+		// Non-string block entries dropped; shape run through sanitize_key.
+		$this->assertSame( array( 'core/group' ), $fields[0]['targets']['blocks'] );
+		$this->assertSame( 'dialog', $fields[0]['targets']['shape'] );
+	}
+
 	public function test_reserved_data_attributes_dropped(): void {
 		// data-action would overwrite the routing id; data-wp-* would
 		// smuggle a live directive through the fields path.

@@ -17,16 +17,24 @@
 import { addFilter, applyFilters } from '@wordpress/hooks';
 import { createHigherOrderComponent } from '@wordpress/compose';
 import { Fragment } from '@wordpress/element';
-import { InspectorAdvancedControls } from '@wordpress/block-editor';
+import {
+	InspectorAdvancedControls,
+	BlockControls,
+} from '@wordpress/block-editor';
 import {
 	TextControl,
-	ComboboxControl,
 	ToggleControl,
+	ToolbarGroup,
+	ToolbarButton,
 } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import actions from './action-registry';
 import { registerModalDialogVariation } from './block-variations';
 import { setupAnchorUniqueness } from './anchor-uniqueness';
+import { InteractionsPanel } from './interactions-panel';
+import { TargetPicker } from './target-picker';
+import { validateInteraction } from './interaction-validation';
+import { registerPrePublishCheck } from './pre-publish';
 import './block-variations.css';
 
 /**
@@ -81,7 +89,7 @@ function registerEditorAction( id, label, fieldsOrInit, maybeInit ) {
 	}
 
 	// Validate fields
-	const validTypes = [ 'text', 'number', 'toggle' ];
+	const validTypes = [ 'text', 'number', 'toggle', 'target' ];
 	for ( const field of fields ) {
 		if ( ! field.key || typeof field.key !== 'string' ) {
 			console.error( `${ prefix } Field key must be a non-empty string` );
@@ -161,95 +169,91 @@ function getFieldsForAction( actionId ) {
 }
 
 /**
- * Render inspector controls for action-specific fields.
+ * Render the control for ONE action field.
  *
- * Maps field definitions to WordPress editor components based on field type.
- * Each control updates the actionData object attribute on change.
+ * Maps a field definition to its editor component. `type: 'target'`
+ * fields render the TargetPicker (pick a block; the anchor is created
+ * for you) instead of a hand-typed id.
  *
- * @since 2.1.0
+ * @since 3.1.0
  *
- * @param {Array}    fields        Field definitions for the selected action.
- * @param {Object}   actionData    Current field values.
- * @param {Function} setAttributes Block setAttributes function.
- * @return {Array} Array of rendered control elements.
+ * @param {Object}   field    Field definition.
+ * @param {*}        value    Current value (or the field default).
+ * @param {Function} onChange Receives the new value.
+ * @param {string}   clientId The host block's clientId (target fields).
+ * @return {Object} Element.
  */
-function renderActionFields( fields, actionData, setAttributes ) {
-	return fields.map( ( field ) => {
-		const value =
-			actionData[ field.key ] !== undefined
-				? actionData[ field.key ]
-				: field.default;
+function renderFieldControl( field, value, onChange, clientId ) {
+	// Advisory (never save-blocking): a required field left empty
+	// means the action silently does nothing on the frontend — say so
+	// where the author is looking.
+	const requiredWarning =
+		field.required && ( value === undefined || value === '' )
+			? __(
+					'Required — the action does nothing until this is set.',
+					'block-actions'
+			  )
+			: '';
+	const helpWithWarning = requiredWarning
+		? `${ requiredWarning } ${ field.help || '' }`.trim()
+		: field.help || '';
 
-		const onChange = ( newValue ) => {
-			setAttributes( {
-				actionData: {
-					...actionData,
-					[ field.key ]: newValue,
-				},
-			} );
-		};
-
-		// Advisory (never save-blocking): a required field left empty
-		// means the action silently does nothing on the frontend — say so
-		// where the author is looking.
-		const requiredWarning =
-			field.required && ( value === undefined || value === '' )
-				? __(
-						'Required — the action does nothing until this is set.',
-						'block-actions'
-				  )
-				: '';
-		const helpWithWarning = requiredWarning
-			? `${ requiredWarning } ${ field.help || '' }`.trim()
-			: field.help || '';
-
-		switch ( field.type ) {
-			case 'number':
-				return (
-					<TextControl
-						key={ field.key }
-						label={ field.label }
-						type="number"
-						value={
-							value !== undefined && value !== null
-								? String( value )
-								: ''
+	switch ( field.type ) {
+		case 'target':
+			return (
+				<TargetPicker
+					key={ field.key }
+					field={ { ...field, help: helpWithWarning } }
+					value={ value || '' }
+					clientId={ clientId }
+					onChange={ onChange }
+				/>
+			);
+		case 'number':
+			return (
+				<TextControl
+					key={ field.key }
+					label={ field.label }
+					type="number"
+					value={
+						value !== undefined && value !== null
+							? String( value )
+							: ''
+					}
+					onChange={ ( val ) => {
+						let parsed = 0;
+						if ( val !== '' ) {
+							parsed = Number( val );
+						} else if ( field.default !== undefined ) {
+							parsed = field.default;
 						}
-						onChange={ ( val ) => {
-							let parsed = 0;
-							if ( val !== '' ) {
-								parsed = Number( val );
-							} else if ( field.default !== undefined ) {
-								parsed = field.default;
-							}
-							onChange( parsed );
-						} }
-						help={ helpWithWarning }
-					/>
-				);
-			case 'toggle':
-				return (
-					<ToggleControl
-						key={ field.key }
-						label={ field.label }
-						checked={ !! value }
-						onChange={ onChange }
-						help={ helpWithWarning }
-					/>
-				);
-			case 'text':
-			default:
-				return (
-					<TextControl
-						key={ field.key }
-						label={ field.label }
-						value={ value || '' }
-						onChange={ onChange }
-						help={ helpWithWarning }
-					/>
-				);
-		}
-	} );
+						onChange( parsed );
+					} }
+					help={ helpWithWarning }
+				/>
+			);
+		case 'toggle':
+			return (
+				<ToggleControl
+					key={ field.key }
+					label={ field.label }
+					checked={ !! value }
+					onChange={ onChange }
+					help={ helpWithWarning }
+				/>
+			);
+		case 'text':
+		default:
+			return (
+				<TextControl
+					key={ field.key }
+					label={ field.label }
+					value={ value || '' }
+					onChange={ onChange }
+					help={ helpWithWarning }
+				/>
+			);
+	}
 }
 
 // Expose registration API globally for theme actions (editor dropdown)
@@ -464,7 +468,7 @@ const withActionInspectorControl = createHigherOrderComponent(
 					return <BlockEdit { ...props } />;
 				}
 
-				const { attributes, setAttributes } = props;
+				const { attributes, setAttributes, clientId } = props;
 				const { customAction, actionData = {} } = attributes;
 				const blockConfig = supportedBlocks[ props.name ];
 				const fields = getFieldsForAction( customAction );
@@ -481,56 +485,99 @@ const withActionInspectorControl = createHigherOrderComponent(
 					} ) ),
 				];
 
+				const onSelectAction = ( value ) => {
+					try {
+						// Seed actionData with the fields' meaningful
+						// defaults — display-only defaults never reached
+						// the saved markup. Falsy defaults ('' / false /
+						// 0) are equivalent to absent and stay unseeded.
+						const seeded = {};
+						getFieldsForAction( value ).forEach( ( f ) => {
+							if ( f.default ) {
+								seeded[ f.key ] = f.default;
+							}
+						} );
+						setAttributes( {
+							customAction: value,
+							actionData: seeded,
+						} );
+					} catch ( error ) {
+						log( 'error', 'Failed to set action attribute', error );
+					}
+				};
+
+				const setFieldValue = ( key, newValue ) => {
+					const next = { ...actionData };
+					if ( newValue === undefined ) {
+						delete next[ key ];
+					} else {
+						next[ key ] = newValue;
+					}
+					setAttributes( { actionData: next } );
+				};
+
+				// Glanceable per-block indicator (the List View spike's
+				// fallback): Gutenberg exposes no supported API for
+				// decorating List View rows, so the indicator lives in
+				// the block toolbar instead — visible wherever the block
+				// is selected, warning-labelled when validation found
+				// issues.
+				const issues = customAction
+					? validateInteraction( { clientId, attributes }, fields )
+					: [];
+				const actionLabel =
+					allActions.find( ( a ) => a.id === customAction )?.label ||
+					customAction;
+
 				return (
 					<Fragment>
 						<BlockEdit { ...props } />
-						<InspectorAdvancedControls>
-							<ComboboxControl
-								label={ blockConfig.label }
-								value={ customAction }
-								options={ actionOptions }
-								onChange={ ( value ) => {
-									try {
-										// Seed actionData with the fields'
-										// meaningful defaults — display-only
-										// defaults never reached the saved
-										// markup, so e.g. a manifest field
-										// default silently vanished on the
-										// frontend. Falsy defaults ('' /
-										// false / 0) are equivalent to
-										// absent and stay unseeded.
-										const seeded = {};
-										getFieldsForAction( value ).forEach(
-											( f ) => {
-												if ( f.default ) {
-													seeded[ f.key ] = f.default;
-												}
-											}
-										);
-										setAttributes( {
-											customAction: value,
-											actionData: seeded,
-										} );
-									} catch ( error ) {
-										log(
-											'error',
-											'Failed to set action attribute',
-											error
-										);
-									}
-								} }
-								help={ `${ blockConfig.help } ${ __(
-									'Choose “None” to remove an action. Actions should be paired with meaningful labels and remain keyboard accessible.',
-									'block-actions'
-								) }` }
-							/>
-							{ fields.length > 0 &&
-								renderActionFields(
-									fields,
-									actionData,
-									setAttributes
-								) }
-						</InspectorAdvancedControls>
+						{ !! customAction && (
+							<BlockControls group="other">
+								<ToolbarGroup>
+									<ToolbarButton
+										icon="admin-links"
+										label={
+											issues.length
+												? sprintf(
+														/* translators: %s: action label. */
+														__(
+															'Interaction: %s — needs attention',
+															'block-actions'
+														),
+														actionLabel
+												  )
+												: sprintf(
+														/* translators: %s: action label. */
+														__(
+															'Interaction: %s',
+															'block-actions'
+														),
+														actionLabel
+												  )
+										}
+										isPressed={ issues.length > 0 }
+									/>
+								</ToolbarGroup>
+							</BlockControls>
+						) }
+						<InteractionsPanel
+							block={ { clientId, name: props.name, attributes } }
+							blockConfig={ blockConfig }
+							actionOptions={ actionOptions }
+							fields={ fields }
+							onSelectAction={ onSelectAction }
+							renderField={ ( field, value, onChange ) =>
+								renderFieldControl(
+									field,
+									value,
+									onChange,
+									clientId
+								)
+							}
+							setFieldValue={ setFieldValue }
+							onResetAll={ () => onSelectAction( '' ) }
+						/>
 					</Fragment>
 				);
 			} catch ( error ) {
@@ -624,6 +671,7 @@ try {
 	);
 
 	registerModalDialogVariation();
+	registerPrePublishCheck( getFieldsForAction );
 	// The watcher lives for the whole editor session by design (it must
 	// see every insertion). The unsubscribe handle is exposed on the
 	// public namespace so tests and debugging can tear it down instead
