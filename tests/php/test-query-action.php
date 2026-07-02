@@ -204,6 +204,53 @@ class Test_Query_Action extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'data-wp-on--input="actions.search"', $out );
 	}
 
+	public function test_dynamic_block_field_values_come_from_action_data(): void {
+		// core/search has no saved wrapper, so the editor's field values
+		// never become data-* markup attributes — the renderer must read
+		// them from the actionData block attribute or a pattern's Target
+		// Query silently vanishes (found in manual multi-query testing).
+		$transformer = new Block_Actions\Directive_Transformer();
+		$transformer->register_renderer( 'query-live-search', new Query_Action() );
+
+		$out = $transformer->transform(
+			'<form class="wp-block-search"><input type="search" name="s" /></form>',
+			array(
+				'blockName' => 'core/search',
+				'attrs'     => array(
+					'customAction' => 'query-live-search',
+					'actionData'   => array(
+						'targetQuery' => 'ba-live-search-list',
+						'debounce'    => 150,
+						'minChars'    => 2,
+					),
+				),
+			)
+		);
+
+		$p = new \WP_HTML_Tag_Processor( $out );
+		$p->next_tag();
+		$ctx = json_decode( (string) $p->get_attribute( 'data-wp-context' ), true );
+		$this->assertSame( 'ba-live-search-list', $ctx['targetQuery'] );
+		$this->assertSame( 150, $ctx['debounce'] );
+		$this->assertSame( 2, $ctx['minChars'] );
+	}
+
+	public function test_anchor_targets_preserve_case(): void {
+		// HTML ids are case-sensitive; sanitize_key() would lowercase a
+		// camelCase anchor into an unresolvable target.
+		$renderer = new Query_Action();
+		$p        = new \WP_HTML_Tag_Processor( '<div data-action="query-filter" data-query="myGrid" data-taxonomy="category" data-term="news"></div>' );
+		$p->next_tag();
+		$ctx = $renderer->get_initial_context(
+			$p,
+			array(
+				'blockName' => 'core/button',
+				'attrs'     => array(),
+			)
+		);
+		$this->assertSame( 'myGrid', $ctx['targetQuery'] );
+	}
+
 	/* ---- Query var mapping ---- */
 
 	public function test_maps_tax_and_search_params_for_opted_in_query(): void {

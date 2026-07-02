@@ -73,6 +73,49 @@ class Query_Action extends Action_Renderer {
 	}
 
 	/**
+	 * Read a trigger config value: markup data attribute first, block
+	 * actionData attribute as fallback.
+	 *
+	 * Static blocks (core/button) carry field values as data-*
+	 * attributes written by the editor's save filter. DYNAMIC blocks
+	 * (core/search) have no saved wrapper — their field values only
+	 * exist in the block's actionData attribute, so the renderer must
+	 * read them from there or a pattern's Target Query silently
+	 * vanishes.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param \WP_HTML_Tag_Processor $processor The processor.
+	 * @param array                  $block     The parsed block data.
+	 * @param string                 $attr_name Markup attribute name.
+	 * @param string                 $data_key  actionData key.
+	 * @return string The value, or ''.
+	 */
+	private function config( \WP_HTML_Tag_Processor $processor, array $block, string $attr_name, string $data_key ): string {
+		$value = $this->attr( $processor, $attr_name );
+		if ( '' !== $value ) {
+			return $value;
+		}
+		$data  = $block['attrs']['actionData'] ?? array();
+		$value = $data[ $data_key ] ?? '';
+		return is_scalar( $value ) ? (string) $value : '';
+	}
+
+	/**
+	 * Sanitize an anchor reference: conservative charset, case preserved
+	 * (HTML ids are case-sensitive — sanitize_key() would lowercase a
+	 * camelCase anchor into an unresolvable one).
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $anchor Raw anchor value.
+	 * @return string Sanitized anchor.
+	 */
+	private function sanitize_anchor( string $anchor ): string {
+		return (string) preg_replace( '/[^A-Za-z0-9_-]/', '', $anchor );
+	}
+
+	/**
 	 * Initial context per action.
 	 *
 	 * @since 3.1.0
@@ -97,18 +140,18 @@ class Query_Action extends Action_Renderer {
 			case 'query-filter':
 				return array(
 					'action'      => 'query-filter',
-					'targetQuery' => sanitize_key( $this->attr( $processor, 'data-query' ) ),
-					'taxonomy'    => sanitize_key( $this->attr( $processor, 'data-taxonomy' ) ),
-					'term'        => sanitize_title( $this->attr( $processor, 'data-term' ) ),
+					'targetQuery' => $this->sanitize_anchor( $this->config( $processor, $block, 'data-query', 'targetQuery' ) ),
+					'taxonomy'    => sanitize_key( $this->config( $processor, $block, 'data-taxonomy', 'taxonomy' ) ),
+					'term'        => sanitize_title( $this->config( $processor, $block, 'data-term', 'term' ) ),
 				);
 
 			case 'query-live-search':
-				$debounce = $this->attr( $processor, 'data-debounce' );
+				$debounce = $this->config( $processor, $block, 'data-debounce', 'debounce' );
 				return array(
 					'action'      => 'query-live-search',
-					'targetQuery' => sanitize_key( $this->attr( $processor, 'data-query' ) ),
+					'targetQuery' => $this->sanitize_anchor( $this->config( $processor, $block, 'data-query', 'targetQuery' ) ),
 					'debounce'    => '' === $debounce ? 300 : absint( $debounce ),
-					'minChars'    => absint( $this->attr( $processor, 'data-min-chars' ) ),
+					'minChars'    => absint( $this->config( $processor, $block, 'data-min-chars', 'minChars' ) ),
 					'timer'       => 0,
 				);
 		}
