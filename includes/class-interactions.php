@@ -210,6 +210,78 @@ class Interactions {
 	}
 
 	/**
+	 * Ensure a user-activated trigger is keyboard-operable.
+	 *
+	 * A default core/button renders an <a> WITHOUT href — invisible to
+	 * the tab order, so a keyboard user tabs straight past the action
+	 * (and a hover/focus trigger never receives focusin). When the
+	 * block contains no natively focusable control, the preferred host
+	 * (the inner .wp-block-button__link, else the root) gets:
+	 *
+	 * - click trigger: tabindex="0" + role="button" + an Enter/Space
+	 *   activation handler (role=button elements don't synthesize
+	 *   clicks from the keyboard on their own);
+	 * - hover trigger: tabindex="0" only — focusability is what lets
+	 *   the paired focusin fire; button semantics would overpromise.
+	 *
+	 * Blocks that already contain a real control (<button>, <a href>,
+	 * an explicit tabindex, form fields) are left byte-untouched.
+	 * Non-interactive triggers (load/timer/scroll-into-view) need no
+	 * operability and never reach this.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $html    The block HTML after post-processing.
+	 * @param string $trigger The tuple's trigger ('click' or 'hover').
+	 * @return array{0: string, 1: bool} Updated HTML + whether the
+	 *                                   engine module is needed.
+	 */
+	public static function ensure_keyboard_operable( string $html, string $trigger ): array {
+		$focusable_tags = array( 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'SUMMARY' );
+
+		$scan = new \WP_HTML_Tag_Processor( $html );
+		while ( $scan->next_tag() ) {
+			$tag = $scan->get_tag();
+			if ( in_array( $tag, $focusable_tags, true ) ) {
+				return array( $html, false );
+			}
+			if ( 'A' === $tag && null !== $scan->get_attribute( 'href' ) ) {
+				return array( $html, false );
+			}
+			if ( null !== $scan->get_attribute( 'tabindex' ) ) {
+				return array( $html, false );
+			}
+		}
+
+		// Nothing focusable: fix up the preferred host.
+		$p     = new \WP_HTML_Tag_Processor( $html );
+		$found = false;
+		while ( $p->next_tag() ) {
+			if ( $p->has_class( 'wp-block-button__link' ) ) {
+				$found = true;
+				break;
+			}
+		}
+		if ( ! $found ) {
+			$p = new \WP_HTML_Tag_Processor( $html );
+			if ( ! $p->next_tag() ) {
+				return array( $html, false );
+			}
+		}
+
+		$p->set_attribute( 'tabindex', '0' );
+		if ( 'hover' === $trigger ) {
+			return array( $p->get_updated_html(), false );
+		}
+
+		if ( null === $p->get_attribute( 'role' ) ) {
+			$p->set_attribute( 'role', 'button' );
+		}
+		$p->set_attribute( 'data-wp-on--keydown', 'block-actions/interactions::actions.keyActivate' );
+		return array( $p->get_updated_html(), true );
+	}
+
+	/**
 	 * Enqueue the dispatcher engine's view module.
 	 *
 	 * @since 3.1.0

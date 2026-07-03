@@ -121,6 +121,7 @@ class Directive_Transformer {
 			// through the dispatcher engine. Structural actions (null
 			// entry) keep full control of their own wiring.
 			$entry = $renderer->get_entry_action( $action_id );
+			$tuple = null;
 			if ( null !== $entry ) {
 				$tuple = Interactions::parse(
 					$processor->get_attribute( 'data-interactions' ),
@@ -140,6 +141,16 @@ class Directive_Transformer {
 
 			// Allow the renderer to post-process for child element directives.
 			$html = $renderer->post_process_html( $html );
+
+			// User-activated triggers must be reachable by keyboard —
+			// a default core/button is an href-less <a>, invisible to
+			// the tab order (found in manual a11y testing).
+			if ( null !== $tuple && in_array( $tuple['trigger'], array( 'click', 'hover' ), true ) ) {
+				list( $html, $needs_engine ) = Interactions::ensure_keyboard_operable( $html, $tuple['trigger'] );
+				if ( $needs_engine ) {
+					Interactions::enqueue_engine();
+				}
+			}
 
 			return $html;
 		} catch ( \Throwable $e ) {

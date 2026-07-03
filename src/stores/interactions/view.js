@@ -137,6 +137,25 @@ store( 'block-actions/interactions', {
 			}
 			fire( ref );
 		} ),
+
+		/**
+		 * Enter/Space activation for controls the transformer had to
+		 * make focusable (role=button elements don't synthesize clicks
+		 * from the keyboard on their own). Re-dispatches as a click so
+		 * the normal pipeline — fast path or conditioned dispatch —
+		 * handles it uniformly.
+		 *
+		 * @param {KeyboardEvent} event The keydown event.
+		 */
+		keyActivate: withSyncEvent( function ( event ) {
+			if ( event.key !== 'Enter' && event.key !== ' ' ) {
+				return;
+			}
+			// Space would scroll the page.
+			event.preventDefault();
+			const { ref } = getElement();
+			ref.click();
+		} ),
 	},
 
 	callbacks: {

@@ -141,6 +141,29 @@ describe( 'dispatch (conditioned click/hover)', () => {
 	} );
 } );
 
+describe( 'keyActivate (keyboard operability)', () => {
+	it( 'Enter and Space re-dispatch as a click; other keys ignored', () => {
+		const el = element( {} );
+		const clicked = [];
+		el.addEventListener( 'click', () => clicked.push( 1 ) );
+		interactivityMock.__setElement( el );
+
+		const enter = { key: 'Enter', preventDefault: jest.fn() };
+		engine.actions.keyActivate( enter );
+		expect( enter.preventDefault ).toHaveBeenCalled();
+		expect( clicked ).toHaveLength( 1 );
+
+		const space = { key: ' ', preventDefault: jest.fn() };
+		engine.actions.keyActivate( space );
+		expect( clicked ).toHaveLength( 2 );
+
+		const other = { key: 'a', preventDefault: jest.fn() };
+		engine.actions.keyActivate( other );
+		expect( other.preventDefault ).not.toHaveBeenCalled();
+		expect( clicked ).toHaveLength( 2 );
+	} );
+} );
+
 describe( 'initTrigger', () => {
 	beforeEach( () => {
 		window.matchMedia = mmFactory();

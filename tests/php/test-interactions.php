@@ -148,6 +148,67 @@ class Test_Interactions extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'data-ba-reduced-motion="skip"', $html );
 	}
 
+	/* ---- Keyboard operability (manual a11y finding) ---- */
+
+	public function test_hrefless_link_button_becomes_keyboard_operable(): void {
+		// Default core/button: an <a> without href — invisible to the
+		// tab order, so the action was unreachable by keyboard.
+		$html = '<div class="wp-block-button" data-action="x">'
+			. '<a class="wp-block-button__link">Open</a></div>';
+		list( $out, $engine ) = Interactions::ensure_keyboard_operable( $html, 'click' );
+
+		$this->assertTrue( $engine );
+		$p = new \WP_HTML_Tag_Processor( $out );
+		while ( $p->next_tag() ) {
+			if ( $p->has_class( 'wp-block-button__link' ) ) {
+				$this->assertSame( '0', $p->get_attribute( 'tabindex' ) );
+				$this->assertSame( 'button', $p->get_attribute( 'role' ) );
+				$this->assertSame( 'block-actions/interactions::actions.keyActivate', $p->get_attribute( 'data-wp-on--keydown' ) );
+			}
+		}
+	}
+
+	public function test_hover_trigger_gets_focusability_only(): void {
+		$html = '<div class="wp-block-button" data-action="x">'
+			. '<a class="wp-block-button__link">Reveal</a></div>';
+		list( $out, $engine ) = Interactions::ensure_keyboard_operable( $html, 'hover' );
+
+		$this->assertFalse( $engine );
+		$this->assertStringContainsString( 'tabindex="0"', $out );
+		// No click semantics are wired on a hover trigger — a button
+		// role would overpromise; focusability lets focusin fire.
+		$this->assertStringNotContainsString( 'role="button"', $out );
+		$this->assertStringNotContainsString( 'keyActivate', $out );
+	}
+
+	public function test_native_controls_are_left_byte_untouched(): void {
+		$button = '<div class="wp-block-button"><button class="wp-block-button__link">Go</button></div>';
+		list( $out, $engine ) = Interactions::ensure_keyboard_operable( $button, 'click' );
+		$this->assertSame( $button, $out );
+		$this->assertFalse( $engine );
+
+		$link = '<div class="wp-block-button"><a href="/x" class="wp-block-button__link">Go</a></div>';
+		list( $out2 ) = Interactions::ensure_keyboard_operable( $link, 'click' );
+		$this->assertSame( $link, $out2 );
+	}
+
+	public function test_transformer_applies_keyboard_operability(): void {
+		$transformer = new Directive_Transformer();
+		$transformer->register_renderer( 'modal-toggle', new Modal_Toggle() );
+
+		$out = $transformer->transform(
+			'<div class="wp-block-button" data-action="modal-toggle" data-modal="m">'
+				. '<a class="wp-block-button__link">Open</a></div>',
+			array(
+				'blockName' => 'core/button',
+				'attrs'     => array(),
+			)
+		);
+
+		$this->assertStringContainsString( 'tabindex="0"', $out );
+		$this->assertStringContainsString( 'actions.keyActivate', $out );
+	}
+
 	/* ---- Transformer integration ---- */
 
 	public function test_simple_case_output_is_unchanged_by_the_migration(): void {
