@@ -62,7 +62,9 @@
     "moduleNameMapper": {
       "\\.(css|less|scss|sass)$": "<rootDir>/tests/__mocks__/styleMock.js",
       "@wordpress/interactivity-router$": "<rootDir>/tests/__mocks__/interactivity-router.js",
-      "@wordpress/interactivity$": "<rootDir>/tests/__mocks__/interactivity.js"
+      "@wordpress/interactivity$": "<rootDir>/tests/__mocks__/interactivity.js",
+      "@wordpress/plugins$": "<rootDir>/tests/__mocks__/wp-plugins.js",
+      "@wordpress/editor$": "<rootDir>/tests/__mocks__/wp-editor.js"
     },
     "testPathIgnorePatterns": [
       "/node_modules/",

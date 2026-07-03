@@ -408,7 +408,7 @@ function read_action_manifest( string $js_path ): ?array {
  * @return array Sanitized field definitions.
  */
 function sanitize_manifest_fields( array $fields ): array {
-	$allowed_types = array( 'text', 'number', 'toggle' );
+	$allowed_types = array( 'text', 'number', 'toggle', 'target' );
 	$clean         = array();
 
 	foreach ( $fields as $field ) {
@@ -447,6 +447,21 @@ function sanitize_manifest_fields( array $fields ): array {
 		}
 		if ( isset( $field['default'] ) && is_scalar( $field['default'] ) ) {
 			$entry['default'] = $field['default'];
+		}
+		if ( isset( $field['optional'] ) ) {
+			$entry['optional'] = (bool) $field['optional'];
+		}
+		if ( isset( $field['targets'] ) && is_array( $field['targets'] ) ) {
+			$targets = array();
+			if ( isset( $field['targets']['blocks'] ) && is_array( $field['targets']['blocks'] ) ) {
+				$targets['blocks'] = array_values( array_filter( $field['targets']['blocks'], 'is_string' ) );
+			}
+			if ( isset( $field['targets']['shape'] ) && is_string( $field['targets']['shape'] ) ) {
+				$targets['shape'] = sanitize_key( $field['targets']['shape'] );
+			}
+			if ( $targets ) {
+				$entry['targets'] = $targets;
+			}
 		}
 
 		$clean[] = $entry;

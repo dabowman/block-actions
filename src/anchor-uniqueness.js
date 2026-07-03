@@ -54,6 +54,28 @@ export function flattenBlocks( blocks, out = [] ) {
 }
 
 /**
+ * Generate a collision-free anchor: the base itself when free, else
+ * base-2, base-3, … — ONE scheme shared by the insertion watcher and
+ * the target picker so the two can't drift.
+ *
+ * @since 3.1.0
+ *
+ * @param {string} base     Candidate anchor.
+ * @param {Set}    existing Anchors already in use.
+ * @return {string} A free anchor.
+ */
+export function uniqueAnchor( base, existing ) {
+	if ( ! existing.has( base ) ) {
+		return base;
+	}
+	let n = 2;
+	while ( existing.has( `${ base }-${ n }` ) ) {
+		n++;
+	}
+	return `${ base }-${ n }`;
+}
+
+/**
  * The anchor a block's action references, if any.
  *
  * @since 3.0.0
@@ -116,11 +138,7 @@ export function resolveAnchorCollisions( ordered, newIds, genId ) {
 	const makeId =
 		genId ||
 		( ( base ) => {
-			let n = 2;
-			while ( existing.has( `${ base }-${ n }` ) ) {
-				n++;
-			}
-			const id = `${ base }-${ n }`;
+			const id = uniqueAnchor( base, existing );
 			existing.add( id );
 			return id;
 		} );

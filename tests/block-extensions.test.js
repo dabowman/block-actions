@@ -33,16 +33,26 @@ jest.mock( '@wordpress/element', () => ( {
 
 jest.mock( '@wordpress/block-editor', () => ( {
 	InspectorAdvancedControls: 'InspectorAdvancedControls',
+	InspectorControls: 'InspectorControls',
+	BlockControls: 'BlockControls',
 } ) );
 
 jest.mock( '@wordpress/components', () => ( {
 	TextControl: 'TextControl',
 	ComboboxControl: 'ComboboxControl',
 	ToggleControl: 'ToggleControl',
+	Notice: 'Notice',
+	Button: 'Button',
+	ToolbarGroup: 'ToolbarGroup',
+	ToolbarButton: 'ToolbarButton',
+	__experimentalToolsPanel: 'ToolsPanel',
+	__experimentalToolsPanelItem: 'ToolsPanelItem',
 } ) );
 
 jest.mock( '@wordpress/i18n', () => ( {
 	__: ( text ) => text,
+	sprintf: ( fmt, ...args ) =>
+		args.reduce( ( out, arg ) => out.replace( /%\d*\$?[sd]/, arg ), fmt ),
 } ) );
 
 jest.mock( 'lodash', () => ( {
@@ -73,9 +83,10 @@ jest.mock( '../src/action-registry', () => [
 		fields: [
 			{
 				key: 'target',
-				type: 'text',
-				label: 'Target Element ID',
+				type: 'target',
+				label: 'Scroll target',
 				dataAttribute: 'data-target',
+				targets: {},
 				required: true,
 				default: '',
 			},
@@ -85,6 +96,7 @@ jest.mock( '../src/action-registry', () => [
 				label: 'Scroll Offset (px)',
 				dataAttribute: 'data-offset',
 				required: false,
+				optional: true,
 				default: 0,
 			},
 		],
@@ -143,7 +155,14 @@ describe( 'block-extensions', () => {
 			ComboboxControl: 'ComboboxControl',
 			ToggleControl: 'ToggleControl',
 		} ) );
-		jest.mock( '@wordpress/i18n', () => ( { __: ( text ) => text } ) );
+		jest.mock( '@wordpress/i18n', () => ( {
+			__: ( text ) => text,
+			sprintf: ( fmt, ...args ) =>
+				args.reduce(
+					( out, arg ) => out.replace( /%\d*\$?[sd]/, arg ),
+					fmt
+				),
+		} ) );
 		jest.mock( 'lodash', () => ( { assign: Object.assign } ) );
 		jest.mock( '../src/action-registry', () => [
 			{ id: 'scroll-to-top', label: 'Scroll To Top', fields: [] },
@@ -168,9 +187,10 @@ describe( 'block-extensions', () => {
 				fields: [
 					{
 						key: 'target',
-						type: 'text',
-						label: 'Target Element ID',
+						type: 'target',
+						label: 'Scroll target',
 						dataAttribute: 'data-target',
+						targets: {},
 						required: true,
 						default: '',
 					},
@@ -180,6 +200,7 @@ describe( 'block-extensions', () => {
 						label: 'Scroll Offset (px)',
 						dataAttribute: 'data-offset',
 						required: false,
+						optional: true,
 						default: 0,
 					},
 				],
@@ -195,6 +216,35 @@ describe( 'block-extensions', () => {
 
 	function loadModule() {
 		return require( '../src/block-extensions' );
+	}
+
+	// The inspector UI is now composed from function components
+	// (InteractionsPanel → InteractionItem → controls). The fake
+	// createElement never executes those, so walk the element tree and
+	// invoke them, letting every leaf control get recorded.
+	function deepRender( node ) {
+		if ( ! node ) {
+			return;
+		}
+		if ( Array.isArray( node ) ) {
+			node.forEach( deepRender );
+			return;
+		}
+		if ( typeof node !== 'object' ) {
+			return;
+		}
+		if ( typeof node.type === 'function' ) {
+			deepRender(
+				node.type( {
+					...( node.props || {} ),
+					children: node.children,
+				} )
+			);
+		}
+		deepRender( node.children );
+		if ( node.props && node.props.children ) {
+			deepRender( node.props.children );
+		}
 	}
 
 	test( 'registers four filters on load', () => {
@@ -649,6 +699,7 @@ describe( 'block-extensions', () => {
 			};
 			const result = Component( props );
 			expect( result ).toBeDefined();
+			deepRender( result );
 
 			// Should have rendered a ComboboxControl
 			const comboCall = global.wp.element.createElement.mock.calls.find(
@@ -903,11 +954,13 @@ describe( 'block-extensions', () => {
 			const MockBlockEdit = jest.fn( () => null );
 			const Component = hoc( MockBlockEdit );
 
-			Component( {
-				name: 'core/button',
-				attributes: { customAction: 'carousel', actionData: {} },
-				setAttributes: jest.fn(),
-			} );
+			deepRender(
+				Component( {
+					name: 'core/button',
+					attributes: { customAction: 'carousel', actionData: {} },
+					setAttributes: jest.fn(),
+				} )
+			);
 
 			const toggleCall = global.wp.element.createElement.mock.calls.find(
 				( call ) => call[ 0 ] === 'ToggleControl'
@@ -921,19 +974,28 @@ describe( 'block-extensions', () => {
 			const MockBlockEdit = jest.fn( () => null );
 			const Component = hoc( MockBlockEdit );
 
-			Component( {
-				name: 'core/button',
-				attributes: { customAction: 'smooth-scroll', actionData: {} },
-				setAttributes: jest.fn(),
-			} );
+			deepRender(
+				Component( {
+					name: 'core/button',
+					attributes: {
+						customAction: 'smooth-scroll',
+						actionData: {},
+					},
+					setAttributes: jest.fn(),
+				} )
+			);
 
+			// The target field is a TargetPicker now (a ComboboxControl of
+			// candidate blocks); the offset stays a number TextControl.
+			const comboCalls =
+				global.wp.element.createElement.mock.calls.filter(
+					( call ) => call[ 0 ] === 'ComboboxControl'
+				);
+			const targetControl = comboCalls.find(
+				( c ) => c[ 1 ].label === 'Scroll target'
+			);
 			const textCalls = global.wp.element.createElement.mock.calls.filter(
 				( call ) => call[ 0 ] === 'TextControl'
-			);
-			// Should have at least 2 TextControls for the smooth-scroll fields
-			// (target as text, offset as number rendered via TextControl type=number)
-			const targetControl = textCalls.find(
-				( c ) => c[ 1 ].label === 'Target Element ID'
 			);
 			const offsetControl = textCalls.find(
 				( c ) => c[ 1 ].label === 'Scroll Offset (px)'
@@ -948,11 +1010,16 @@ describe( 'block-extensions', () => {
 			const MockBlockEdit = jest.fn( () => null );
 			const Component = hoc( MockBlockEdit );
 
-			Component( {
-				name: 'core/button',
-				attributes: { customAction: 'scroll-to-top', actionData: {} },
-				setAttributes: jest.fn(),
-			} );
+			deepRender(
+				Component( {
+					name: 'core/button',
+					attributes: {
+						customAction: 'scroll-to-top',
+						actionData: {},
+					},
+					setAttributes: jest.fn(),
+				} )
+			);
 
 			const toggleCall = global.wp.element.createElement.mock.calls.find(
 				( call ) => call[ 0 ] === 'ToggleControl'
@@ -966,11 +1033,13 @@ describe( 'block-extensions', () => {
 			const Component = hoc( MockBlockEdit );
 			const setAttributes = jest.fn();
 
-			Component( {
-				name: 'core/button',
-				attributes: { customAction: 'carousel', actionData: {} },
-				setAttributes,
-			} );
+			deepRender(
+				Component( {
+					name: 'core/button',
+					attributes: { customAction: 'carousel', actionData: {} },
+					setAttributes,
+				} )
+			);
 
 			const toggleCall = global.wp.element.createElement.mock.calls.find(
 				( call ) => call[ 0 ] === 'ToggleControl'
@@ -988,11 +1057,13 @@ describe( 'block-extensions', () => {
 			const MockBlockEdit = jest.fn( () => null );
 			const Component = hoc( MockBlockEdit );
 
-			Component( {
-				name: 'core/button',
-				attributes: { customAction: 'carousel', actionData: {} },
-				setAttributes: jest.fn(),
-			} );
+			deepRender(
+				Component( {
+					name: 'core/button',
+					attributes: { customAction: 'carousel', actionData: {} },
+					setAttributes: jest.fn(),
+				} )
+			);
 
 			const toggleCall = global.wp.element.createElement.mock.calls.find(
 				( call ) => call[ 0 ] === 'ToggleControl'
@@ -1119,7 +1190,14 @@ describe( 'block-extensions', () => {
 				ComboboxControl: 'ComboboxControl',
 				ToggleControl: 'ToggleControl',
 			} ) );
-			jest.mock( '@wordpress/i18n', () => ( { __: ( text ) => text } ) );
+			jest.mock( '@wordpress/i18n', () => ( {
+				__: ( text ) => text,
+				sprintf: ( fmt, ...args ) =>
+					args.reduce(
+						( out, arg ) => out.replace( /%\d*\$?[sd]/, arg ),
+						fmt
+					),
+			} ) );
 			jest.mock( 'lodash', () => ( { assign: Object.assign } ) );
 			jest.mock( '../src/action-registry', () => [] );
 
