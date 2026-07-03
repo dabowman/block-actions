@@ -18,6 +18,20 @@ jest.mock( '@wordpress/data', () => ( {
 
 jest.mock( '@wordpress/components', () => ( {
 	ComboboxControl: 'ComboboxControl',
+	Notice: 'Notice',
+	SelectControl: 'SelectControl',
+	TextControl: 'TextControl',
+	ToggleControl: 'ToggleControl',
+	__experimentalToolsPanel: 'ToolsPanel',
+	__experimentalToolsPanelItem: 'ToolsPanelItem',
+} ) );
+
+jest.mock( '@wordpress/block-editor', () => ( {
+	InspectorControls: 'InspectorControls',
+} ) );
+
+jest.mock( '@wordpress/hooks', () => ( {
+	applyFilters: ( name, value ) => value,
 } ) );
 
 // JSX in the sources compiles to wp.element.createElement (babel pragma).
@@ -138,6 +152,39 @@ describe( 'getTargetCandidates', () => {
 		expect( candidates ).toHaveLength( 1 );
 		expect( candidates[ 0 ].block.clientId ).toBe( 'dialog-1' );
 	} );
+
+	it( 'excludes block types that cannot persist an anchor', () => {
+		// A generated anchor on core/html never serializes — the action
+		// would silently fail while looking configured.
+		mockSelect.mockImplementation( ( store ) => {
+			if ( store === 'core/block-editor' ) {
+				return {
+					getBlocks: () => [
+						plainGroup( 'g1' ),
+						{
+							clientId: 'html-1',
+							name: 'core/html',
+							attributes: {},
+							innerBlocks: [],
+						},
+					],
+				};
+			}
+			if ( store === 'core/blocks' ) {
+				return {
+					getBlockType: ( name ) =>
+						name === 'core/group'
+							? { supports: { anchor: true } }
+							: { supports: {} },
+				};
+			}
+			return undefined;
+		} );
+
+		const candidates = getTargetCandidates( {}, 'trigger' );
+		expect( candidates ).toHaveLength( 1 );
+		expect( candidates[ 0 ].block.clientId ).toBe( 'g1' );
+	} );
 } );
 
 describe( 'ensureAnchor', () => {
@@ -152,17 +199,33 @@ describe( 'ensureAnchor', () => {
 		const updateBlockAttributes = jest.fn();
 		mockSelect.mockImplementation( () => ( {
 			getBlocks: () => [
-				plainGroup( 'x', 'ba-group-1' ),
+				plainGroup( 'x', 'ba-group' ),
 				plainGroup( 'y', 'ba-group-2' ),
 			],
 		} ) );
 		mockDispatch.mockImplementation( () => ( { updateBlockAttributes } ) );
 
+		// Shared generator scheme: bare base when free, else -2, -3, …
 		const anchor = ensureAnchor( plainGroup( 'new-block' ) );
 		expect( anchor ).toBe( 'ba-group-3' );
 		expect( updateBlockAttributes ).toHaveBeenCalledWith( 'new-block', {
 			anchor: 'ba-group-3',
 		} );
+	} );
+
+	it( 'normalizes namespaced block names into valid ids', () => {
+		const updateBlockAttributes = jest.fn();
+		mockSelect.mockImplementation( () => ( { getBlocks: () => [] } ) );
+		mockDispatch.mockImplementation( () => ( { updateBlockAttributes } ) );
+
+		const anchor = ensureAnchor( {
+			clientId: 'c',
+			name: 'acme/card',
+			attributes: {},
+		} );
+		// acme/card must not yield "ba-acme/card-…" (invalid HTML id).
+		expect( anchor ).toBe( 'ba-acme-card' );
+		expect( anchor ).not.toContain( '/' );
 	} );
 } );
 
@@ -191,11 +254,11 @@ describe( 'TargetPicker', () => {
 
 		// Simulate the user picking the anchor-less candidate.
 		element.props.onChange( '__client:pick-me' );
-		expect( onChange ).toHaveBeenCalledWith( 'ba-group-1' );
+		expect( onChange ).toHaveBeenCalledWith( 'ba-group' );
 		expect( updateBlockAttributes ).toHaveBeenCalled();
 	} );
 
-	it( 'passes free text through unchanged', () => {
+	it( 'passes genuinely novel free text through', () => {
 		mockSelect.mockImplementation( () => ( { getBlocks: () => [] } ) );
 		const onChange = jest.fn();
 		const element = TargetPicker( {
@@ -206,6 +269,46 @@ describe( 'TargetPicker', () => {
 		} );
 		element.props.onFilterValueChange( 'template-part-anchor' );
 		expect( onChange ).toHaveBeenCalledWith( 'template-part-anchor' );
+	} );
+
+	it( 'never commits text resembling an option (the pick-clobber blocker)', () => {
+		mockSelect.mockImplementation( ( store ) => {
+			if ( store === 'core/block-editor' ) {
+				return {
+					getBlocks: () => [ dialogGroup( 'd1', 'my-dialog' ) ],
+				};
+			}
+			if ( store === 'core/blocks' ) {
+				return {
+					getBlockType: () => ( {
+						title: 'Group',
+						supports: { anchor: true },
+					} ),
+				};
+			}
+			return undefined;
+		} );
+		const onChange = jest.fn();
+		const element = TargetPicker( {
+			field: { key: 'target', label: 'Target', targets: {} },
+			value: 'my-dialog',
+			clientId: 'trigger',
+			onChange,
+		} );
+
+		const optionLabel = element.props.options.find(
+			( o ) => o.value === 'my-dialog'
+		).label;
+
+		// (a) downshift rewrites the input with the option LABEL right
+		// after a pick — must not overwrite the committed anchor.
+		element.props.onFilterValueChange( optionLabel );
+		// (b) typing a fragment of a label = filtering, not setting.
+		element.props.onFilterValueChange( 'grou' );
+		// (c) empty text (input cleared while browsing) — no commit.
+		element.props.onFilterValueChange( '' );
+
+		expect( onChange ).not.toHaveBeenCalled();
 	} );
 } );
 
@@ -279,5 +382,45 @@ describe( 'validateInteraction', () => {
 			[]
 		);
 		expect( issues ).toEqual( [] );
+	} );
+} );
+
+describe( 'InteractionItem optional-field semantics', () => {
+	const { InteractionItem } = require( '../src/interactions-panel' );
+	const wrapField = {
+		key: 'wrapAround',
+		type: 'toggle',
+		label: 'Wrap Around',
+		optional: true,
+		default: true,
+	};
+
+	function itemFor( actionData, setFieldValue = jest.fn() ) {
+		const items = InteractionItem( {
+			blockConfig: { label: 'Action', help: '' },
+			actionOptions: [],
+			customAction: 'carousel',
+			actionData,
+			fields: [ wrapField ],
+			onSelectAction: jest.fn(),
+			renderField: () => null,
+			setFieldValue,
+		} );
+		return items.find( ( el ) => el.props.label === 'Wrap Around' );
+	}
+
+	it( 'a seeded default COUNTS as a value (panel item visible)', () => {
+		// value === default must not hide the item — reset would then
+		// silently drop the seeded value, reintroducing the "default
+		// never reaches the frontend" bug the seeding fixes.
+		const item = itemFor( { wrapAround: true } );
+		expect( item.props.hasValue() ).toBe( true );
+	} );
+
+	it( 'deselect restores a meaningful default instead of deleting', () => {
+		const setFieldValue = jest.fn();
+		const item = itemFor( { wrapAround: false }, setFieldValue );
+		item.props.onDeselect();
+		expect( setFieldValue ).toHaveBeenCalledWith( 'wrapAround', true );
 	} );
 } );

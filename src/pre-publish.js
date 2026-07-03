@@ -41,6 +41,8 @@ function blockTitle( block ) {
  * The panel body. Computed per render (the pre-publish sidebar mounts
  * when opened, so the check is fresh); renders nothing when clean.
  *
+ * @since 3.1.0
+ *
  * @param {Object}   props           Component props.
  * @param {Function} props.getFields Action id → field definitions.
  * @return {Object|null} Element or null.

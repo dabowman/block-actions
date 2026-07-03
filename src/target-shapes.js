@@ -18,6 +18,22 @@
 
 import { applyFilters } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
+import actions from './action-registry';
+
+/**
+ * Action ids hosted on core/query — derived from the registry's
+ * `blocks` hosting constraints (single source; mirrors the PHP
+ * Query_Params::QUERY_HOSTED_ACTIONS constant server-side).
+ *
+ * @type {string[]}
+ */
+const QUERY_HOSTED_ACTIONS = actions
+	.filter(
+		( action ) =>
+			Array.isArray( action.blocks ) &&
+			action.blocks.includes( 'core/query' )
+	)
+	.map( ( action ) => action.id );
 
 const BUILT_IN_SHAPES = {
 	/**
@@ -58,10 +74,7 @@ const BUILT_IN_SHAPES = {
 			);
 		}
 		const action = block.attributes?.customAction;
-		if (
-			action !== 'query-paginate' &&
-			action !== 'query-infinite-scroll'
-		) {
+		if ( ! QUERY_HOSTED_ACTIONS.includes( action ) ) {
 			return __(
 				'The Query Loop must carry a query action (e.g. Query Pagination — Instant) before triggers can target it.',
 				'block-actions'
@@ -93,11 +106,12 @@ export function getTargetShapes() {
  *
  * @since 3.1.0
  *
+ * @param          shapes
  * @param {Object} block   Candidate block object.
  * @param {Object} targets Field constraint: { blocks?: string[], shape?: string }.
  * @return {true|string} True when eligible; a reason string otherwise.
  */
-export function matchesTarget( block, targets = {} ) {
+export function matchesTarget( block, targets = {}, shapes ) {
 	if (
 		Array.isArray( targets.blocks ) &&
 		targets.blocks.length &&
@@ -109,7 +123,9 @@ export function matchesTarget( block, targets = {} ) {
 		);
 	}
 	if ( targets.shape ) {
-		const predicate = getTargetShapes()[ targets.shape ];
+		// Callers iterating many candidates resolve the shape map once
+		// and pass it in; the default keeps single checks convenient.
+		const predicate = ( shapes || getTargetShapes() )[ targets.shape ];
 		if ( typeof predicate === 'function' ) {
 			return predicate( block );
 		}
