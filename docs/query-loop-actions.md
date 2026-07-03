@@ -96,6 +96,16 @@ per-visitor state. If a CDN normalizes query strings, include `bq-*`
 and `query-*-page` in the cache key (the same requirement core's
 pagination already has).
 
+## No-JS behavior
+
+Pagination and infinite scroll degrade to ordinary page links; live
+search on a core Search block falls back to the site-wide search.
+Filter buttons degrade to real toggle links **when they are link-style
+buttons** (the pattern's default) — a `tagName: "button"` button has no
+href to fall back to and is JavaScript-only. Queries living in template
+parts can't be resolved at trigger render time, so their filter links
+are also JS-only.
+
 ## Limitations
 
 - Filters and live search require a **non-inherited** query (untick

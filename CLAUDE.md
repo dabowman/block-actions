@@ -17,33 +17,45 @@ The plugin uses the WordPress Interactivity API for its frontend: declarative st
 block-actions/
 ├── block-actions.php              # Main plugin entry point (PHP)
 ├── package.json                   # Dependencies, scripts, Jest config
-├── webpack.config.js              # Multi-entry webpack config (7 entries)
-├── .babelrc                       # Babel config (WP element pragmas)
+├── webpack.config.js              # Multi-entry webpack config (9 entries)
+├── .babelrc                       # Babel config (WP element pragmas; browserslist in package.json keeps generators NATIVE — see Gotchas)
 ├── .eslintrc.js                   # ESLint config (extends @wordpress/eslint-plugin)
 ├── .github/workflows/ci.yml      # GitHub Actions CI
 ├── includes/                      # PHP classes for Interactivity API
-│   ├── class-directive-transformer.php  # render_block filter, WP_HTML_Tag_Processor
-│   ├── class-action-renderer.php        # Abstract base for action renderers
+│   ├── class-directive-transformer.php  # render_block filter, trigger wiring, keyboard-operability pass
+│   ├── class-action-renderer.php        # Abstract base (get_namespace/get_entry_action/get_supported_triggers)
+│   ├── class-interactions.php           # Trigger×behavior tuples: data-interactions parsing, trigger injection, engine enqueue
+│   ├── class-query-params.php           # Query actions: bq-* param→query-var mapping, enhancedPagination force-off, no-JS hrefs
 │   └── renderers/                       # Per-action PHP renderers
 │       ├── class-scroll-to-top.php
-│       ├── class-carousel.php
+│       ├── class-carousel.php           # Structural (owns its lifecycle; no trigger UI)
 │       ├── class-toggle-visibility.php
 │       ├── class-modal-toggle.php
 │       ├── class-smooth-scroll.php
-│       ├── class-copy-to-clipboard.php
+│       ├── class-copy-to-clipboard.php  # Click-only triggers (clipboard needs user activation)
+│       ├── class-query-action.php       # ONE renderer for all four query-* action ids (shared namespace block-actions/query)
 │       └── class-theme-action.php       # Generic renderer for theme actions
 ├── assets/
 │   └── actions/                   # Per-action minimal functional CSS (enqueued on demand)
 │       ├── carousel.css           # Carousel layout mechanics (theme owns appearance)
-│       └── toggle-visibility.css  # `.is-hidden` utility
+│       ├── query.css              # Region loading state + infinite-scroll pagination hiding
+│       └── toggle-visibility.css  # `.is-hidden` utility (+ editor-canvas visibility override)
 ├── patterns/                      # Block patterns (registered from PHP)
 │   ├── modal-with-trigger.php
 │   ├── disclosure.php             # Button (toggle-visibility) + hidden Group
-│   └── carousel.php               # Carousel built from core blocks
+│   ├── carousel.php               # Carousel built from core blocks
+│   ├── filterable-grid.php        # Category filter buttons + Query Loop (link-style buttons = no-JS capable)
+│   ├── live-search-list.php       # Search block wired to a Query Loop
+│   └── infinite-scroll-feed.php   # Query Loop with query-infinite-scroll
 ├── src/
-│   ├── block-extensions.js        # Editor-side: block attribute registration, inspector UI
-│   ├── action-registry.js         # Static list of built-in action IDs and labels
-│   ├── anchor-uniqueness.js       # Editor: re-keys duplicate pattern anchors
+│   ├── block-extensions.js        # Editor-side: attribute registration, HOCs, save filter (progressive data-interactions serialization)
+│   ├── action-registry.js         # Built-in actions: ids/labels/fields + blocks hosting, entry/triggers/defaultTrigger/structural vocabulary
+│   ├── interactions-panel.js      # "Interactions" ToolsPanel (InteractionItem is 6.3+'s repeatable unit)
+│   ├── target-picker.js           # type:'target' fields: candidate dropdown, anchor generation, free text
+│   ├── target-shapes.js           # Named shape predicates (dialog, query) + blockActions.targetShapes filter
+│   ├── interaction-validation.js  # Advisory validation (panel notice / pre-publish / toolbar indicator)
+│   ├── pre-publish.js             # PluginPrePublishPanel listing blocks with issues
+│   ├── anchor-uniqueness.js       # Insertion-scoped re-keying: pattern anchors AND duplicate core/query queryIds
 │   ├── block-variations.js        # Dialog variation of core/group
 │   └── stores/                    # Interactivity API stores
 │       ├── carousel/view.js       # Carousel store (directives for slides, imperative for touch/lazy)
@@ -52,6 +64,8 @@ block-actions/
 │       ├── modal-toggle/view.js
 │       ├── smooth-scroll/view.js
 │       ├── copy-to-clipboard/view.js  # Generator function wrapped in withSyncEvent
+│       ├── query/view.js          # ALL four query actions: URL-driven router-region engine
+│       ├── interactions/view.js   # Trigger dispatcher: conditions + synthetic ba-fire event (runtime binds scope)
 │       └── utils/                 # Shared utilities for stores
 │           └── create-feedback-store.js # Shared feedback pattern helpers + getter
 ├── build/                         # Compiled output (gitignored, generated by `npm run build`)
@@ -78,17 +92,25 @@ block-actions/
 │   │   ├── test-renderers.php
 │   │   ├── test-theme-action.php
 │   │   ├── test-action-directories.php
+│   │   ├── test-action-styles.php
 │   │   ├── test-manifests.php
+│   │   ├── test-query-action.php  # Query renderer, bq-* mapping, no-JS hrefs, cache invariants
+│   │   ├── test-interactions.php  # Tuple parsing, trigger injection, kses survival, keyboard operability
 │   │   └── test-modal-dialog.php
 │   └── __mocks__/
 │       ├── styleMock.js           # CSS mock for Jest
-│       └── interactivity.js       # @wordpress/interactivity mock with helpers
+│       ├── interactivity.js       # @wordpress/interactivity mock (store REGISTRY + __setContext/__setElement)
+│       ├── interactivity-router.js # navigate/prefetch spies
+│       ├── wp-plugins.js          # registerPlugin stub (build-time external)
+│       └── wp-editor.js           # PluginPrePublishPanel stub (build-time external)
 ├── scripts/
 │   └── create-action.js           # CLI wizard: generate new action boilerplate
 ├── docs/                          # Guides, API reference, examples
 │   ├── THEME-ACTIONS.md
 │   ├── EXAMPLES.md
 │   ├── carousel-action.md
+│   ├── query-loop-actions.md      # User guide for the four query actions
+│   ├── specs/                     # Design specs (query-loop-actions, interactions-panel, trigger-behavior-model)
 │   └── examples/                  # Copy-paste action templates
 └── README.md
 ```
@@ -97,9 +119,9 @@ block-actions/
 
 ```bash
 npm ci                  # Install dependencies (use this in CI, not npm install)
-npm run build           # Production build → build/ (webpack, 7 entries; cleans build/ first)
+npm run build           # Production build → build/ (webpack, 9 entries; cleans build/ first)
 npm run start           # Development watch mode with hot reload
-npm test                # Run Jest (JS) tests once (150 tests across 9 suites)
+npm test                # Run Jest (JS) tests once (221 tests across 12 suites)
 npm run test:watch      # Jest in watch mode
 npm run test:coverage   # Jest with coverage report
 npm run test:php        # PHPUnit (PHP) in the wp-env tests-cli container (needs composer install + wp-env)
@@ -117,19 +139,11 @@ npm run env:logs        # Tail container logs
 npm run env:cli -- <args>  # wp-cli inside container (e.g. `npm run env:cli -- user list`)
 ```
 
-Build uses a custom `webpack.config.js` extending `@wordpress/scripts`. Seven entry points:
-
-| Entry | Source | Output |
-|-------|--------|--------|
-| `block-extensions` | `src/block-extensions.js` | `build/block-extensions.js` (editor) |
-| `actions/scroll-to-top/view` | `src/stores/scroll-to-top/view.js` | `build/actions/scroll-to-top/view.js` |
-| `actions/carousel/view` | `src/stores/carousel/view.js` | `build/actions/carousel/view.js` |
-| `actions/toggle-visibility/view` | `src/stores/toggle-visibility/view.js` | `build/actions/toggle-visibility/view.js` |
-| `actions/modal-toggle/view` | `src/stores/modal-toggle/view.js` | `build/actions/modal-toggle/view.js` |
-| `actions/smooth-scroll/view` | `src/stores/smooth-scroll/view.js` | `build/actions/smooth-scroll/view.js` |
-| `actions/copy-to-clipboard/view` | `src/stores/copy-to-clipboard/view.js` | `build/actions/copy-to-clipboard/view.js` |
+Build uses a custom `webpack.config.js` extending `@wordpress/scripts`. Nine entry points: `block-extensions` (classic editor script) plus one ES-module entry per store — the six classic actions, `actions/query/view` (all four query actions share it), and `actions/interactions/view` (the trigger dispatcher).
 
 Note: The `webpack.config.js` destructures away the default `entry` function from `@wordpress/scripts` config to avoid conflicts. Build scripts use `webpack --config webpack.config.js` directly instead of `wp-scripts build`.
+
+**CRITICAL — `browserslist` in package.json must stay** (`extends @wordpress/browserslist-config`). Without it, bare `@babel/preset-env` transpiles generators to regenerator wrappers, and the WP 7.0 Interactivity runtime detects generator actions via `constructor.name === 'GeneratorFunction'` — every `withSyncEvent(function*)` action then silently does nothing in the browser while all unit tests stay green.
 
 ## Local Dev Environment (@wordpress/env)
 
@@ -181,7 +195,7 @@ Two suites: JS unit tests (Jest, no WordPress) and PHP integration tests (PHPUni
 - **Setup:** `tests/setup.js` — mocks `wp.i18n`, `window.blockActions`, fake timers, fetch
 - **Test patterns:** `tests/**/*.test.js` and `tests/**/test-*.js`
 - **Interactivity mock:** `tests/__mocks__/interactivity.js` — `store`, `getContext`, `getElement` with `__setContext()`, `__setElement()`, `__reset()` helpers
-- **Stats:** 150 tests across 9 suites. Run: `npm test`.
+- **Stats:** 221 tests across 12 suites. Run: `npm test`.
 
 ### PHP (PHPUnit, integration)
 
@@ -190,7 +204,7 @@ Two suites: JS unit tests (Jest, no WordPress) and PHP integration tests (PHPUni
 - **Config:** `phpunit.xml.dist` (suite = `tests/php/`, `prefix="test-"` so `bootstrap.php` is excluded).
 - **Run:** `npm run test:php` (needs `composer install` once + a running wp-env). Real `WP_HTML_Tag_Processor` output is asserted, so these are integration tests, not mocked units.
 - **Coverage:** transformer (fast path, directive injection, context escaping, renderer error isolation), every renderer's context/directives/`post_process_html`, `Theme_Action` context forwarding (the scalar/key-validation security boundary), `force_dialog_for_modal_groups`, and pattern registration.
-- **Stats:** 47 tests, 98 assertions.
+- **Stats:** 106 tests, 251 assertions.
 - **Note:** `discover_theme_actions()` caches in a `static`, so glob/ID-normalization isn't unit-tested here (proven via wp-env smoke tests instead); the cache-free `Theme_Action` forwarding is covered.
 
 Run both before submitting:
@@ -214,7 +228,7 @@ npm test && npm run test:php
 
 1. **Editor side** (`block-extensions.js`): Uses WordPress `hooks` to add `data-action` and `data-*` attributes to supported blocks via inspector panel controls. Action list comes from `action-registry.js` (static list) plus theme actions registered via `window.BlockActions.registerAction()`.
 2. **PHP renderers** (`includes/renderers/*.php`): Each action has a renderer that declares initial context and directives. Extends `Action_Renderer` abstract class.
-3. **Directive Transformer** (`includes/class-directive-transformer.php`): Hooked to `render_block` filter. Uses `WP_HTML_Tag_Processor` to find `data-action` on root elements and inject `data-wp-interactive`, `data-wp-context`, and action-specific directives.
+3. **Directive Transformer** (`includes/class-directive-transformer.php`): Hooked to `render_block` filter. Uses `WP_HTML_Tag_Processor` to find `data-action` on root elements (falling back to the `customAction` block attribute for dynamic blocks like core/search, mirroring it into the markup) and inject `data-wp-interactive`, `data-wp-context`, and action-specific directives. Since the trigger model, the TRANSFORMER also owns trigger wiring for behavioral actions (renderers declare `get_entry_action()`; default click compiles byte-identical to the old renderer-injected handler) and runs a keyboard-operability pass (href-less `<a>` controls get tabindex/role/Enter-Space activation).
 4. **JS stores** (`src/stores/*/view.js`): Each action is an Interactivity API `store()` with `state`, `actions`, and `callbacks`. Loaded as script modules via `wp_enqueue_script_module()`.
 5. **Theme actions**: Theme devs drop ES module `.js` files in their theme's `/actions` directory using `@wordpress/interactivity`. PHP auto-discovers and enqueues them. `window.BlockActions.registerAction()` is available in the editor to populate the action dropdown.
 
@@ -239,12 +253,25 @@ Carousel view script module enqueued via wp_enqueue_script_module()
 Browser: Interactivity API processes directives, store hydrates
 ```
 
+### Query Loop actions (one URL-driven engine)
+
+`query-paginate` / `query-infinite-scroll` host on `core/query`; `query-filter` (Button) and `query-live-search` (Search/Group) target a query by anchor. Every state is a real GET URL: `bq-{queryId}-tax-{tax}` / `bq-{queryId}-s` params map to query vars via `query_loop_block_query_vars` (opt-in registry recorded at `render_block_data` — that filter receives the INNER post-template block, context only). The renderer injects a router region (`block-actions-query-{queryId}` — the id doubles as the client-side anchor→queryId channel) and force-disables core's enhancedPagination on opted-in queries. No REST, no nonces (page-cache requirement). Filter links get server-computed no-JS toggle hrefs (link-style buttons only). Infinite scroll fetch-and-appends and REQUIRES a Query Pagination block (hidden once JS activates; it's the no-JS fallback and the next-URL source).
+
+### Trigger × behavior model
+
+Behavioral actions (all but carousel and the query actions) support triggers click / hover(+focus) / scroll-into-view / load / timer and viewport/reduced-motion conditions. Progressive serialization: the default click case keeps classic `data-action` + `data-*` markup forever; a non-default trigger or conditions ADD one validated `data-interactions` JSON tuple (kses entity-encodes it; `get_attribute()` decodes byte-identical — verified). Editor state lives in ONE registered attribute (`interactionSettings`), cleared on action change. Engine dispatch is scope-correct by construction: the transformer arms `data-wp-on--ba-fire="{entry}"` against the action's own store and the dispatcher (`block-actions/interactions`) fires a synthetic cancelable `ba-fire` event when conditions pass — the RUNTIME evaluates the entry in the element's real namespace (never call `store(ns).actions.x()` programmatically; wrong scope). One interaction per block in v1; multi-interaction awaits the context-multiplexing spike.
+
+### Interactions panel (editor)
+
+The "Interactions" ToolsPanel replaces the old Advanced-section control. `type:'target'` fields render the TargetPicker (candidate dropdown constrained by `targets: { blocks, shape }` named predicates — `dialog`, `query`, extensible via the `blockActions.targetShapes` filter; picking an anchor-less block generates a collision-safe anchor via the shared `uniqueAnchor()`). Validation is advisory-never-blocking (unresolved targets may live in template parts) and surfaces in the panel notice, a pre-publish check, and a block-toolbar indicator (List View has no supported decoration API). All panel components are hook-free so the direct-call test harness works.
+
 ### Key Extension Points
 
-- **`window.BlockActions.registerAction(id, label, init)`** — Register actions from theme JS (populates the editor action dropdown)
+- **`window.BlockActions.registerAction(id, label, fieldsOrInit, init, extras)`** — Register actions from theme JS (populates the editor action dropdown; `extras` carries entry/triggers/defaultTrigger/structural)
 - **`blockActions.supportedBlocks` filter (JS)** — Opt additional block types into the action UI
 - **`block_actions_directories` filter (PHP)** — Add custom action directories (string paths under theme/wp-content auto-map to URLs; `{ path, url }` pairs for anywhere else)
-- **Theme-action manifests** — a `{action}.json` sidecar declares editor `label`, inspector `fields`, and extra `data-wp-*` `directives` (validated server-side); no editor script needed
+- **Theme-action manifests** — a `{action}.json` sidecar declares editor `label`, inspector `fields` (incl. `type:'target'` + `targets`), extra `data-wp-*` `directives`, and the trigger vocabulary (`entry`/`triggers`/`structural`) — all validated server-side; no editor script needed. A `{action}.css` sidecar ships functional CSS.
+- **`blockActions.targetShapes` filter (JS)** — Register named target-shape predicates for `type:'target'` fields
 - **`Action_Renderer` abstract class (PHP)** — Extend for custom action renderers; optional `assets/actions/{id}.css` ships minimal functional CSS, enqueued on demand
 
 ### Modal Toggle — target markup contract
@@ -285,6 +312,10 @@ All built-in stores follow the same declarative contract:
 - **Async actions use generator functions, never `async`/`await`.** `copy-to-clipboard` is the example.
 - **Shared state across instances goes in `state`, not a module-level `let`.** Modal open-count is in `state.openCount`.
 - **Rate limiting is for network I/O, not UI clicks.** No limiter ships in the plugin; a copy-paste pattern lives in `docs/examples/rate-limited-action.js`. UI click guards use context flags (see carousel's `isAnimating`).
+- **`data-wp-on-async` is deprecated in WP 7.0** — plain `data-wp-on` is async by default; `withSyncEvent` marks the sync handlers. Never inject the `-async` variant.
+- **NO reactive bindings on regions whose DOM is mutated imperatively.** A signal-driven binding makes the hydrated Preact island re-render and reconcile against its original vdom — wiping imperative classes and duplicating appended nodes (infinite scroll learned this the hard way). Such regions apply feedback imperatively.
+- **Never invoke another store's action programmatically** (`store(ns).actions.x()`) — it runs in the CALLER's scope, so `getContext()` inside resolves the wrong namespace. Dispatch a DOM event that a directive on the element handles instead (the interactions engine's `ba-fire` pattern).
+- **Config for dynamic blocks comes from `actionData` block attributes.** Blocks with no saved wrapper (core/search) never carry the editor's `data-*` field attributes in rendered markup — renderers read the markup attribute first and fall back to `$block['attrs']['actionData']`.
 
 ## Code Conventions
 
@@ -321,7 +352,7 @@ All built-in stores follow the same declarative contract:
 
 ## Important Notes
 
-- **Supported blocks:** `core/button` and `core/group` by default; extend via the `blockActions.supportedBlocks` JS filter (`getSupportedBlocks()` in `block-extensions.js` resolves it at call time, routing attribute registration + inspector + save through one source of truth)
+- **Supported blocks:** `core/button`, `core/group`, `core/query`, and `core/search` by default; extend via the `blockActions.supportedBlocks` JS filter. Actions may declare `blocks` hosting constraints so they only appear in the right dropdowns (`getSupportedBlocks()` in `block-extensions.js` resolves it at call time, routing attribute registration + inspector + save through one source of truth)
 - **Build output is gitignored:** The `build/` and `dist/` directories are not committed; run `npm run build` after cloning
 - **Theme actions don't require rebuild:** They're ES module JS files auto-discovered by PHP
 - **Action IDs come from filenames:** `my-action.js` → action ID `my-action` (normalized via `sanitize_key()`, so use lowercase kebab-case)
