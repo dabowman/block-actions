@@ -176,6 +176,15 @@ class Query_Action extends Action_Renderer {
 			case 'query-paginate':
 			case 'query-infinite-scroll':
 				$query_id = absint( $block['attrs']['queryId'] ?? 0 );
+				// Duplicate queryIds (a pattern inserted twice under a
+				// pre-3.1 editor, or hand-copied markup) mean colliding
+				// region ids and shared URL params — the queries sync.
+				// The editor re-keys new insertions; flag legacy content.
+				static $seen_region_ids = array();
+				if ( isset( $seen_region_ids[ $query_id ] ) ) {
+					\Block_Actions\debug_log( sprintf( 'Two Query Loops on this page share queryId %d — their regions and URL params collide, so they will filter/paginate in sync. Re-insert one of them (the editor assigns a fresh id) or change its queryId.', $query_id ) );
+				}
+				$seen_region_ids[ $query_id ] = true;
 				// The region id doubles as the client-side anchor→queryId
 				// resolution channel: triggers parse the id back out of it.
 				$processor->set_attribute( 'data-wp-router-region', "block-actions-query-{$query_id}" );
