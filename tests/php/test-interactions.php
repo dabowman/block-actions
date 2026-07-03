@@ -122,7 +122,10 @@ class Test_Interactions extends WP_UnitTestCase {
 			)
 		);
 		$this->assertTrue( $engine );
-		$this->assertStringContainsString( 'data-ba-entry="block-actions/t::actions.go"', $html );
+		// The entry is armed as a runtime directive against the action's
+		// own store (scope-correct dispatch), not a data-ba-entry the
+		// engine would call programmatically.
+		$this->assertStringContainsString( 'data-wp-on--ba-fire="actions.go"', $html );
 		$this->assertStringContainsString( 'data-ba-trigger="timer"', $html );
 		$this->assertStringContainsString( 'data-ba-delay="2500"', $html );
 		$this->assertStringContainsString( 'data-wp-init--ba-trigger="block-actions/interactions::callbacks.initTrigger"', $html );
@@ -166,6 +169,23 @@ class Test_Interactions extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'block-actions/interactions', $out );
 	}
 
+	public function test_allowed_list_can_forbid_click(): void {
+		// Absent attribute: the default must respect the allowlist.
+		$tuple = Interactions::parse( null, 'x', array( 'scroll-into-view' ) );
+		$this->assertSame( 'scroll-into-view', $tuple['trigger'] );
+
+		// A bogus tuple falls back to the first ALLOWED trigger, not click.
+		$raw   = wp_json_encode( array( array( 'action' => 'x', 'trigger' => 'shake' ) ) );
+		$tuple = Interactions::parse( $raw, 'x', array( 'scroll-into-view', 'load' ) );
+		$this->assertSame( 'scroll-into-view', $tuple['trigger'] );
+	}
+
+	public function test_copy_to_clipboard_is_click_only(): void {
+		// Clipboard writes need transient user activation.
+		$renderer = new Block_Actions\Renderers\Copy_To_Clipboard();
+		$this->assertSame( array( 'click' ), $renderer->get_supported_triggers( 'copy-to-clipboard' ) );
+	}
+
 	public function test_rich_tuple_swaps_the_trigger_via_transformer(): void {
 		$transformer = new Directive_Transformer();
 		$transformer->register_renderer( 'modal-toggle', new Modal_Toggle() );
@@ -180,7 +200,7 @@ class Test_Interactions extends WP_UnitTestCase {
 		);
 
 		$this->assertStringNotContainsString( 'data-wp-on--click="actions.toggle"', $out );
-		$this->assertStringContainsString( 'data-ba-entry="block-actions/modal-toggle::actions.toggle"', $out );
+		$this->assertStringContainsString( 'data-wp-on--ba-fire="actions.toggle"', $out );
 		$this->assertStringContainsString( 'data-ba-delay="3000"', $out );
 	}
 

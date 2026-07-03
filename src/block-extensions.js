@@ -62,9 +62,10 @@ const editorActionRegistry = [];
  * @param {string}              label        Action label.
  * @param {Array|Function|null} fieldsOrInit Field definitions array or init function.
  * @param {Function|null}       [maybeInit]  Init function when fields are provided.
+ * @param {Object}              [extras]     Trigger vocabulary (entry/triggers/defaultTrigger/structural).
  * @return {boolean} Success status.
  */
-function registerEditorAction( id, label, fieldsOrInit, maybeInit ) {
+function registerEditorAction( id, label, fieldsOrInit, maybeInit, extras ) {
 	const prefix = '[Block Actions]';
 
 	// Validate parameters
@@ -127,8 +128,18 @@ function registerEditorAction( id, label, fieldsOrInit, maybeInit ) {
 		return false;
 	}
 
-	// Register the action (just for the dropdown, won't execute in editor)
-	editorActionRegistry.push( { id, label, fields, init } );
+	// Register the action (just for the dropdown, won't execute in
+	// editor). `extras` carries the trigger vocabulary (entry/triggers/
+	// defaultTrigger/structural) — theme actions' manifests declare it
+	// and PHP forwards it; without it the Trigger UI never appears for
+	// theme actions even though the frontend fully supports them.
+	editorActionRegistry.push( {
+		id,
+		label,
+		fields,
+		init,
+		...( extras && typeof extras === 'object' ? extras : {} ),
+	} );
 
 	return true;
 }
@@ -290,7 +301,14 @@ if ( typeof window !== 'undefined' ) {
 					action.id,
 					action.label,
 					Array.isArray( action.fields ) ? action.fields : [],
-					() => {}
+					() => {},
+					{
+						entry: action.entry,
+						triggers: Array.isArray( action.triggers )
+							? action.triggers
+							: undefined,
+						structural: !! action.structural,
+					}
 				);
 			}
 		} );
@@ -418,6 +436,10 @@ function addCustomDataAttribute( settings ) {
 				default: '',
 			},
 			actionData: {
+				type: 'object',
+				default: {},
+			},
+			interactionSettings: {
 				type: 'object',
 				default: {},
 			},
@@ -565,6 +587,12 @@ const withActionInspectorControl = createHigherOrderComponent(
 						setAttributes( {
 							customAction: value,
 							actionData: seeded,
+							// Trigger/conditions belong to the PREVIOUS
+							// action — leaking them onto the new one
+							// (worse: onto a structural action with no
+							// trigger UI to clear them) serializes bogus
+							// data-interactions.
+							interactionSettings: {},
 						} );
 					} catch ( error ) {
 						log( 'error', 'Failed to set action attribute', error );
@@ -726,7 +754,11 @@ function addCustomDataToSave( extraProps, blockType, attributes ) {
 			// the classic attributes stay (they remain the config
 			// channel renderers read).
 			const settings = attributes.interactionSettings || {};
-			const trigger = settings.trigger || 'click';
+			const actionDef = getEditorRegisteredActions().find(
+				( a ) => a.id === customAction
+			);
+			const simpleTrigger = actionDef?.defaultTrigger || 'click';
+			const trigger = settings.trigger || simpleTrigger;
 			const conditions = {};
 			if ( Number( settings.minWidth ) > 0 ) {
 				conditions.minWidth = Number( settings.minWidth );
@@ -738,7 +770,8 @@ function addCustomDataToSave( extraProps, blockType, attributes ) {
 				conditions.reducedMotion = 'skip';
 			}
 			const isRich =
-				trigger !== 'click' || Object.keys( conditions ).length > 0;
+				trigger !== simpleTrigger ||
+				Object.keys( conditions ).length > 0;
 			if ( isRich ) {
 				const tuple = { action: customAction, trigger };
 				if ( trigger === 'timer' ) {

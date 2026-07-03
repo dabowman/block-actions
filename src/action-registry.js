@@ -138,7 +138,9 @@ const BUILT_IN_ACTIONS = [
 		id: 'copy-to-clipboard',
 		blocks: [ 'core/button', 'core/group' ],
 		entry: 'actions.copy',
-		triggers: [ 'click', 'hover', 'scroll-into-view', 'load', 'timer' ],
+		// Clipboard writes need transient user activation; only a real
+		// click has it (timers/observers/load/hover reject).
+		triggers: [ 'click' ],
 		defaultTrigger: 'click',
 		label: 'Copy To Clipboard',
 		fields: [

@@ -2,8 +2,10 @@
  * Interactions dispatcher engine tests.
  *
  * The engine reads validated data-ba-* config off the element, checks
- * conditions at fire time, and invokes the target store's entry action
- * (via the mock's store registry here).
+ * conditions at fire time, and dispatches a synthetic `ba-fire` event —
+ * the RUNTIME's `data-wp-on--ba-fire` directive then evaluates the
+ * entry in the element's own namespace scope. Tests listen for that
+ * event the way the runtime would.
  */
 
 const interactivityMock = require( '@wordpress/interactivity' );
@@ -11,26 +13,7 @@ const interactivityMock = require( '@wordpress/interactivity' );
 let engine;
 let helpers;
 
-// A fake behavioral store the engine dispatches into.
-const targetToggle = jest.fn();
-const targetGen = jest.fn();
-
 beforeAll( () => {
-	// The interactivity mock keeps a store registry: registering returns
-	// the definition; a bare store( ns ) fetches it — exactly what the
-	// engine's cross-store dispatch relies on.
-	// Register the fake target BEFORE loading the engine module (the
-	// mock keeps a registry, so store('fake/target') resolves).
-	interactivityMock.store( 'fake/target', {
-		actions: {
-			toggle: targetToggle,
-			*copy() {
-				targetGen();
-				yield Promise.resolve();
-				targetGen();
-			},
-		},
-	} );
 	helpers = require( '../../src/stores/interactions/view' );
 	engine =
 		interactivityMock.store.mock.calls[
@@ -44,6 +27,13 @@ function element( attrs ) {
 		el.setAttribute( k, String( v ) )
 	);
 	return el;
+}
+
+// Attach a runtime-like listener and return its call log.
+function armFireListener( el ) {
+	const fired = [];
+	el.addEventListener( helpers.FIRE_EVENT, ( e ) => fired.push( e ) );
+	return fired;
 }
 
 const mmFactory = ( { width = 1024, reduced = false } = {} ) => {
@@ -103,7 +93,6 @@ describe( 'readConfig', () => {
 	it( 'parses the injected data-ba-* attributes', () => {
 		const cfg = helpers.readConfig(
 			element( {
-				'data-ba-entry': 'fake/target::actions.toggle',
 				'data-ba-trigger': 'timer',
 				'data-ba-delay': '2500',
 				'data-ba-min-width': '782',
@@ -111,7 +100,6 @@ describe( 'readConfig', () => {
 			} )
 		);
 		expect( cfg ).toEqual( {
-			entry: 'fake/target::actions.toggle',
 			trigger: 'timer',
 			delay: 2500,
 			minWidth: 782,
@@ -121,98 +109,77 @@ describe( 'readConfig', () => {
 	} );
 } );
 
-describe( 'dispatch (click/hover with conditions)', () => {
+describe( 'dispatch (conditioned click/hover)', () => {
 	beforeEach( () => {
-		targetToggle.mockClear();
 		window.matchMedia = mmFactory( { width: 1024 } );
 	} );
 
-	it( 'invokes the entry when conditions pass', () => {
-		interactivityMock.__setElement(
-			element( {
-				'data-ba-entry': 'fake/target::actions.toggle',
-				'data-ba-trigger': 'click',
-				'data-ba-min-width': '782',
-			} )
-		);
-		const event = { type: 'click' };
-		engine.actions.dispatch( event );
-		expect( targetToggle ).toHaveBeenCalledWith( event );
+	it( 'preventDefaults the original event and fires ba-fire when conditions pass', () => {
+		const el = element( { 'data-ba-min-width': '782' } );
+		const fired = armFireListener( el );
+		interactivityMock.__setElement( el );
+
+		const original = { preventDefault: jest.fn() };
+		engine.actions.dispatch( original );
+
+		expect( original.preventDefault ).toHaveBeenCalled();
+		expect( fired ).toHaveLength( 1 );
+		expect( fired[ 0 ].cancelable ).toBe( true );
 	} );
 
-	it( 'skips when conditions fail (evaluated at fire time)', () => {
+	it( 'lets the original interaction proceed when conditions fail', () => {
 		window.matchMedia = mmFactory( { width: 500 } );
-		interactivityMock.__setElement(
-			element( {
-				'data-ba-entry': 'fake/target::actions.toggle',
-				'data-ba-min-width': '782',
-			} )
-		);
-		engine.actions.dispatch( { type: 'click' } );
-		expect( targetToggle ).not.toHaveBeenCalled();
-	} );
+		const el = element( { 'data-ba-min-width': '782' } );
+		const fired = armFireListener( el );
+		interactivityMock.__setElement( el );
 
-	it( 'drives generator entries to completion', async () => {
-		targetGen.mockClear();
-		interactivityMock.__setElement(
-			element( { 'data-ba-entry': 'fake/target::actions.copy' } )
-		);
-		await engine.actions.dispatch( { type: 'click' } );
-		expect( targetGen ).toHaveBeenCalledTimes( 2 );
-	} );
+		const original = { preventDefault: jest.fn() };
+		engine.actions.dispatch( original );
 
-	it( 'warns on an unresolvable entry', () => {
-		const warn = jest
-			.spyOn( console, 'warn' )
-			.mockImplementation( () => {} );
-		interactivityMock.__setElement(
-			element( { 'data-ba-entry': 'missing/store::actions.nope' } )
-		);
-		engine.actions.dispatch( { type: 'click' } );
-		expect( warn ).toHaveBeenCalled();
-		warn.mockRestore();
+		expect( original.preventDefault ).not.toHaveBeenCalled();
+		expect( fired ).toHaveLength( 0 );
 	} );
 } );
 
 describe( 'initTrigger', () => {
 	beforeEach( () => {
-		targetToggle.mockClear();
 		window.matchMedia = mmFactory();
 	} );
 
-	it( 'load: fires immediately when conditions pass', () => {
-		interactivityMock.__setElement(
-			element( {
-				'data-ba-entry': 'fake/target::actions.toggle',
-				'data-ba-trigger': 'load',
-			} )
-		);
+	it( 'load: fires DEFERRED (after target inits settle), not synchronously', () => {
+		jest.useFakeTimers();
+		const el = element( { 'data-ba-trigger': 'load' } );
+		const fired = armFireListener( el );
+		interactivityMock.__setElement( el );
+
 		engine.callbacks.initTrigger();
-		expect( targetToggle ).toHaveBeenCalled();
+		// Synchronous fire would run before the target store's own
+		// data-wp-init populated its context.
+		expect( fired ).toHaveLength( 0 );
+		jest.advanceTimersByTime( 0 );
+		expect( fired ).toHaveLength( 1 );
+		jest.useRealTimers();
 	} );
 
 	it( 'timer: fires after the delay; cleanup cancels', () => {
 		jest.useFakeTimers();
-		interactivityMock.__setElement(
-			element( {
-				'data-ba-entry': 'fake/target::actions.toggle',
-				'data-ba-trigger': 'timer',
-				'data-ba-delay': '1000',
-			} )
-		);
-		const cleanup = engine.callbacks.initTrigger();
-		jest.advanceTimersByTime( 999 );
-		expect( targetToggle ).not.toHaveBeenCalled();
-		jest.advanceTimersByTime( 1 );
-		expect( targetToggle ).toHaveBeenCalledTimes( 1 );
+		const el = element( {
+			'data-ba-trigger': 'timer',
+			'data-ba-delay': '1000',
+		} );
+		const fired = armFireListener( el );
+		interactivityMock.__setElement( el );
 
-		// A second armed timer dies with its element.
-		targetToggle.mockClear();
-		const cleanup2 = engine.callbacks.initTrigger();
-		cleanup2();
+		engine.callbacks.initTrigger();
+		jest.advanceTimersByTime( 999 );
+		expect( fired ).toHaveLength( 0 );
+		jest.advanceTimersByTime( 1 );
+		expect( fired ).toHaveLength( 1 );
+
+		const cleanup = engine.callbacks.initTrigger();
+		cleanup();
 		jest.advanceTimersByTime( 5000 );
-		expect( targetToggle ).not.toHaveBeenCalled();
-		expect( typeof cleanup ).toBe( 'function' );
+		expect( fired ).toHaveLength( 1 );
 		jest.useRealTimers();
 	} );
 
@@ -225,41 +192,39 @@ describe( 'initTrigger', () => {
 			return { observe, disconnect };
 		} );
 
-		interactivityMock.__setElement(
-			element( {
-				'data-ba-entry': 'fake/target::actions.toggle',
-				'data-ba-trigger': 'scroll-into-view',
-			} )
-		);
+		const el = element( { 'data-ba-trigger': 'scroll-into-view' } );
+		const fired = armFireListener( el );
+		interactivityMock.__setElement( el );
+
 		const cleanup = engine.callbacks.initTrigger();
 		expect( observe ).toHaveBeenCalled();
 
 		observerCallback( [ { isIntersecting: false } ] );
-		expect( targetToggle ).not.toHaveBeenCalled();
+		expect( fired ).toHaveLength( 0 );
 
 		observerCallback( [ { isIntersecting: true } ] );
-		expect( targetToggle ).toHaveBeenCalledTimes( 1 );
+		expect( fired ).toHaveLength( 1 );
 		expect( disconnect ).toHaveBeenCalled();
 
 		cleanup();
 	} );
 
-	it( 'timer conditions are checked at FIRE time, not arm time', () => {
+	it( 'conditions are checked at FIRE time, not arm time', () => {
 		jest.useFakeTimers();
 		window.matchMedia = mmFactory( { width: 1024 } );
-		interactivityMock.__setElement(
-			element( {
-				'data-ba-entry': 'fake/target::actions.toggle',
-				'data-ba-trigger': 'timer',
-				'data-ba-delay': '100',
-				'data-ba-min-width': '782',
-			} )
-		);
+		const el = element( {
+			'data-ba-trigger': 'timer',
+			'data-ba-delay': '100',
+			'data-ba-min-width': '782',
+		} );
+		const fired = armFireListener( el );
+		interactivityMock.__setElement( el );
+
 		engine.callbacks.initTrigger();
 		// Viewport shrinks below the threshold before the timer fires.
 		window.matchMedia = mmFactory( { width: 400 } );
 		jest.advanceTimersByTime( 100 );
-		expect( targetToggle ).not.toHaveBeenCalled();
+		expect( fired ).toHaveLength( 0 );
 		jest.useRealTimers();
 	} );
 } );

@@ -73,8 +73,15 @@ class Interactions {
 	 * @return array{trigger: string, delay: int, conditions: array} Tuple.
 	 */
 	public static function parse( ?string $raw, string $action_id, array $allowed = self::TRIGGERS ): array {
+		// The fallback trigger must itself be ALLOWED: an action that
+		// deliberately omits click (a scroll-reveal-only theme action)
+		// must not be silently wired to click anyway.
+		$fallback = in_array( 'click', $allowed, true )
+			? 'click'
+			: ( $allowed[0] ?? 'click' );
+
 		$default = array(
-			'trigger'    => 'click',
+			'trigger'    => $fallback,
 			'delay'      => self::DEFAULT_DELAY,
 			'conditions' => array(),
 		);
@@ -99,14 +106,14 @@ class Interactions {
 				continue;
 			}
 
-			$trigger = $tuple['trigger'] ?? 'click';
+			$trigger = $tuple['trigger'] ?? $fallback;
 			if ( ! in_array( $trigger, self::TRIGGERS, true ) ) {
-				debug_log( sprintf( 'Unknown trigger "%s" on a "%s" block — falling back to click.', (string) $trigger, $action_id ) );
-				$trigger = 'click';
+				debug_log( sprintf( 'Unknown trigger "%s" on a "%s" block — falling back to "%s".', (string) $trigger, $action_id, $fallback ) );
+				$trigger = $fallback;
 			}
 			if ( ! in_array( $trigger, $allowed, true ) ) {
-				debug_log( sprintf( 'Trigger "%s" is not supported by action "%s" — falling back to click.', $trigger, $action_id ) );
-				$trigger = 'click';
+				debug_log( sprintf( 'Trigger "%s" is not supported by action "%s" — falling back to "%s".', $trigger, $action_id, $fallback ) );
+				$trigger = $fallback;
 			}
 
 			$conditions = array();
@@ -165,10 +172,13 @@ class Interactions {
 			return false;
 		}
 
-		// Engine path. Config travels as validated data-ba-* attributes;
-		// the dispatcher reads them at fire time (conditions included —
-		// resize after load behaves correctly).
-		$p->set_attribute( 'data-ba-entry', $store_namespace . '::' . $entry );
+		// Engine path. The entry is armed as a directive against the
+		// action's OWN store, listening for the engine's synthetic
+		// ba-fire event — the RUNTIME then evaluates it in the element's
+		// real namespace scope (a programmatic store(ns) call from the
+		// engine would bind the wrong context; review #11). Config
+		// travels as validated data-ba-* attributes read at fire time.
+		$p->set_attribute( 'data-wp-on--ba-fire', $entry );
 		$p->set_attribute( 'data-ba-trigger', $tuple['trigger'] );
 
 		if ( 'timer' === $tuple['trigger'] ) {
@@ -207,6 +217,15 @@ class Interactions {
 	 * @return void
 	 */
 	public static function enqueue_engine(): void {
+		// One stat/include cycle per request — N engine-routed blocks on
+		// a page would otherwise re-run it N times (the module registry
+		// de-dupes, this work wouldn't).
+		static $done = false;
+		if ( $done ) {
+			return;
+		}
+		$done = true;
+
 		$js_path = 'build/actions/interactions/view.js';
 		if ( ! file_exists( DIR . $js_path ) ) {
 			return;

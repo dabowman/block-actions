@@ -828,6 +828,15 @@ describe( 'block-extensions', () => {
 				type: 'object',
 				default: {},
 			} );
+			// The trigger/conditions attribute must be REGISTERED or
+			// rich interactions can't round-trip: the save filter would
+			// emit data-interactions from an in-memory value that never
+			// reaches the block comment, invalidating the block on
+			// reload (review #11 blocker).
+			expect( result.attributes.interactionSettings ).toEqual( {
+				type: 'object',
+				default: {},
+			} );
 		} );
 
 		test( 'adds actionData to unsupported blocks too (late-filter round-trip)', () => {
