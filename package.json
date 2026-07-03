@@ -61,7 +61,8 @@
     ],
     "moduleNameMapper": {
       "\\.(css|less|scss|sass)$": "<rootDir>/tests/__mocks__/styleMock.js",
-      "@wordpress/interactivity": "<rootDir>/tests/__mocks__/interactivity.js"
+      "@wordpress/interactivity-router$": "<rootDir>/tests/__mocks__/interactivity-router.js",
+      "@wordpress/interactivity$": "<rootDir>/tests/__mocks__/interactivity.js"
     },
     "testPathIgnorePatterns": [
       "/node_modules/",
@@ -72,5 +73,8 @@
       "!src/**/*.test.{js,jsx}",
       "!src/index.js"
     ]
-  }
+  },
+  "browserslist": [
+    "extends @wordpress/browserslist-config"
+  ]
 }
