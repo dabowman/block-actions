@@ -39,6 +39,42 @@ const BUILT_IN_SHAPES = {
 			'block-actions'
 		);
 	},
+
+	/**
+	 * An actions-enabled Query Loop — the query-filter/live-search
+	 * targeting contract: the query must carry a query-hosted action
+	 * (that opt-in is the server-side security boundary) and must not
+	 * inherit the template query (inherited queries are structurally
+	 * unfilterable).
+	 *
+	 * @param {Object} block Candidate block.
+	 * @return {true|string} True or the reason it doesn't fit.
+	 */
+	query( block ) {
+		if ( block.name !== 'core/query' ) {
+			return __(
+				'Filter and search targets must be a Query Loop block.',
+				'block-actions'
+			);
+		}
+		const action = block.attributes?.customAction;
+		if (
+			action !== 'query-paginate' &&
+			action !== 'query-infinite-scroll'
+		) {
+			return __(
+				'The Query Loop must carry a query action (e.g. Query Pagination — Instant) before triggers can target it.',
+				'block-actions'
+			);
+		}
+		if ( block.attributes?.query?.inherit ) {
+			return __(
+				'Inherited queries ("Inherit query from template") cannot be filtered or searched — turn inheritance off.',
+				'block-actions'
+			);
+		}
+		return true;
+	},
 };
 
 /**

@@ -11,6 +11,7 @@ jest.mock( '@wordpress/data', () => ( {
 import {
 	flattenBlocks,
 	resolveAnchorCollisions,
+	resolveQueryIdCollisions,
 } from '../src/anchor-uniqueness';
 
 // Deterministic id generator for assertions.
@@ -195,5 +196,97 @@ describe( 'resolveAnchorCollisions', () => {
 		);
 		const g2 = updates.find( ( u ) => u.clientId === 'g2' );
 		expect( g2.attributes.anchor ).toBe( 'm1-3' );
+	} );
+} );
+
+describe( 'resolveQueryIdCollisions', () => {
+	const query = ( clientId, queryId ) => ( {
+		clientId,
+		name: 'core/query',
+		attributes: { queryId },
+	} );
+
+	it( 're-keys a newly inserted duplicate queryId', () => {
+		const blocks = [ query( 'old', 10 ), query( 'new', 10 ) ];
+		const updates = resolveQueryIdCollisions(
+			blocks,
+			new Set( [ 'new' ] )
+		);
+		expect( updates ).toEqual( [
+			{ clientId: 'new', attributes: { queryId: 11 } },
+		] );
+	} );
+
+	it( 'skips ids already in use when picking a fresh one', () => {
+		const blocks = [
+			query( 'a', 10 ),
+			query( 'b', 11 ),
+			query( 'new', 10 ),
+		];
+		const updates = resolveQueryIdCollisions(
+			blocks,
+			new Set( [ 'new' ] )
+		);
+		expect( updates[ 0 ].attributes.queryId ).toBe( 12 );
+	} );
+
+	it( 'two copies in one paste each get distinct ids', () => {
+		const blocks = [
+			query( 'old', 10 ),
+			query( 'n1', 10 ),
+			query( 'n2', 10 ),
+		];
+		const updates = resolveQueryIdCollisions(
+			blocks,
+			new Set( [ 'n1', 'n2' ] )
+		);
+		const ids = updates.map( ( u ) => u.attributes.queryId );
+		expect( ids ).toHaveLength( 2 );
+		expect( new Set( ids ).size ).toBe( 2 );
+	} );
+
+	it( 'never touches pre-existing queries or unique new ones', () => {
+		const blocks = [ query( 'old1', 10 ), query( 'old2', 10 ) ];
+		expect( resolveQueryIdCollisions( blocks, new Set() ) ).toEqual( [] );
+		expect(
+			resolveQueryIdCollisions(
+				[ query( 'old', 10 ), query( 'new', 42 ) ],
+				new Set( [ 'new' ] )
+			)
+		).toEqual( [] );
+	} );
+
+	it( 'query-filter triggers follow a re-keyed target anchor', () => {
+		// The filterable-grid pattern inserted twice: the new copy's
+		// query anchor is re-keyed and its own filter button follows.
+		const blocks = [
+			{
+				clientId: 't1',
+				attributes: {
+					customAction: 'query-filter',
+					actionData: { targetQuery: 'grid' },
+				},
+			},
+			{ clientId: 'g1', attributes: { anchor: 'grid' } },
+			{
+				clientId: 't2',
+				attributes: {
+					customAction: 'query-filter',
+					actionData: { targetQuery: 'grid' },
+				},
+			},
+			{ clientId: 'g2', attributes: { anchor: 'grid' } },
+		];
+		const updates = resolveAnchorCollisions(
+			blocks,
+			new Set( [ 't2', 'g2' ] ),
+			( base ) => `${ base }-2`
+		);
+		const byClient = Object.fromEntries(
+			updates.map( ( u ) => [ u.clientId, u.attributes ] )
+		);
+		expect( byClient.g2 ).toEqual( { anchor: 'grid-2' } );
+		expect( byClient.t2.actionData.targetQuery ).toBe( 'grid-2' );
+		expect( byClient.t1 ).toBeUndefined();
 	} );
 } );

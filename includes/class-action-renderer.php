@@ -45,6 +45,22 @@ abstract class Action_Renderer {
 	abstract public function apply_directives( \WP_HTML_Tag_Processor $processor, array $block ): void;
 
 	/**
+	 * The Interactivity API store namespace for this action.
+	 *
+	 * Defaults to one store per action id. Renderers that serve several
+	 * action ids from a single store (the query actions all live in
+	 * `block-actions/query`) override this.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return string The `data-wp-interactive` namespace.
+	 */
+	public function get_namespace( string $action_id ): string {
+		return 'block-actions/' . $action_id;
+	}
+
+	/**
 	 * Post-process the full HTML to add directives to child elements.
 	 *
 	 * Override this for complex actions (like carousel) that need

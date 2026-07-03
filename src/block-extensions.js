@@ -140,13 +140,19 @@ function registerEditorAction( id, label, fieldsOrInit, maybeInit ) {
  * @return {Array} Array of action objects.
  */
 function getEditorRegisteredActions() {
-	const builtInActions = actions.map( ( { id, label, fields } ) => ( {
+	const builtInActions = actions.map( ( { id, label, fields, blocks } ) => ( {
 		id,
 		label,
 		fields: fields || [],
+		blocks,
 	} ) );
 	const themeActions = editorActionRegistry.map(
-		( { id, label, fields } ) => ( { id, label, fields: fields || [] } )
+		( { id, label, fields, blocks } ) => ( {
+			id,
+			label,
+			fields: fields || [],
+			blocks,
+		} )
 	);
 	return [ ...builtInActions, ...themeActions ];
 }
@@ -322,6 +328,20 @@ const BLOCKS_WITH_ACTIONS = {
 			'block-actions'
 		),
 	},
+	'core/query': {
+		label: __( 'Query Action', 'block-actions' ),
+		help: __(
+			'Add instant pagination or infinite scroll to this Query Loop. Also required before filter/search triggers can target it.',
+			'block-actions'
+		),
+	},
+	'core/search': {
+		label: __( 'Search Action', 'block-actions' ),
+		help: __(
+			'Wire this search box to a Query Loop for live results.',
+			'block-actions'
+		),
+	},
 };
 
 /**
@@ -475,8 +495,14 @@ const withActionInspectorControl = createHigherOrderComponent(
 
 				// Create action options from all registered actions
 				// (built-in + theme). ComboboxControl filters these
-				// internally as the user types.
-				const allActions = getEditorRegisteredActions();
+				// internally as the user types. Actions declaring a
+				// `blocks` hosting constraint only appear in those
+				// blocks' dropdowns (query-paginate on core/query, not
+				// on a button); unconstrained actions appear everywhere.
+				const allActions = getEditorRegisteredActions().filter(
+					( action ) =>
+						! action.blocks || action.blocks.includes( props.name )
+				);
 				const actionOptions = [
 					{ value: '', label: __( 'None', 'block-actions' ) },
 					...allActions.map( ( action ) => ( {

@@ -85,6 +85,38 @@ describe( 'target shapes', () => {
 
 	it( 'built-in shapes are exposed for the filter', () => {
 		expect( typeof getTargetShapes().dialog ).toBe( 'function' );
+		expect( typeof getTargetShapes().query ).toBe( 'function' );
+	} );
+
+	it( 'query shape requires an opted-in, non-inherited Query Loop', () => {
+		const q = ( attrs ) => ( {
+			clientId: 'q',
+			name: 'core/query',
+			attributes: attrs,
+		} );
+		expect(
+			matchesTarget( q( { customAction: 'query-paginate' } ), {
+				shape: 'query',
+			} )
+		).toBe( true );
+		// No query action → the opt-in reason.
+		expect( matchesTarget( q( {} ), { shape: 'query' } ) ).toContain(
+			'query action'
+		);
+		// Inherited → the inheritance reason.
+		expect(
+			matchesTarget(
+				q( {
+					customAction: 'query-paginate',
+					query: { inherit: true },
+				} ),
+				{ shape: 'query' }
+			)
+		).toContain( 'Inherit' );
+		// Not a query at all.
+		expect(
+			typeof matchesTarget( heading( 'h' ), { shape: 'query' } )
+		).toBe( 'string' );
 	} );
 } );
 

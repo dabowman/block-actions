@@ -71,6 +71,12 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-modal-toggl
 require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-smooth-scroll.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-copy-to-clipboard.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-theme-action.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-query-params.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/renderers/class-query-action.php';
+
+// URL-param → query-var mapping + core enhanced-pagination interop for
+// the query actions.
+Query_Params::register();
 
 // Translations are auto-loaded by WordPress.org for this plugin slug.
 
@@ -231,7 +237,11 @@ function enqueue_action_styles(): void {
 	}
 
 	foreach ( $styles as $id => $style ) {
-		if ( ! $enqueue_all && false === strpos( $haystack, 'data-action="' . $id . '"' ) ) {
+		// Prefix match (no closing quote): a stylesheet may serve a family
+		// of action ids — query.css covers data-action="query-paginate",
+		// "query-filter", etc. Worst case a prefix-sibling over-enqueues a
+		// few hundred bytes of functional CSS.
+		if ( ! $enqueue_all && false === strpos( $haystack, 'data-action="' . $id ) ) {
 			continue;
 		}
 		$handle = "block-actions-{$id}";
@@ -613,6 +623,12 @@ function init_interactivity_api(): void {
 	$transformer->register_renderer( 'modal-toggle', new Renderers\Modal_Toggle() );
 	$transformer->register_renderer( 'smooth-scroll', new Renderers\Smooth_Scroll() );
 	$transformer->register_renderer( 'copy-to-clipboard', new Renderers\Copy_To_Clipboard() );
+
+	// The four query actions share one renderer + one store.
+	$query_renderer = new Renderers\Query_Action();
+	foreach ( Query_Params::QUERY_ACTIONS as $query_action_id ) {
+		$transformer->register_renderer( $query_action_id, $query_renderer );
+	}
 
 	// Register generic renderer for theme actions.
 	$theme_actions  = discover_theme_actions();
