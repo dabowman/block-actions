@@ -15,6 +15,7 @@
  */
 
 import { addFilter, applyFilters } from '@wordpress/hooks';
+import { select, dispatch } from '@wordpress/data';
 import { createHigherOrderComponent } from '@wordpress/compose';
 import { Fragment } from '@wordpress/element';
 import {
@@ -30,7 +31,7 @@ import {
 import { __, sprintf } from '@wordpress/i18n';
 import actions from './action-registry';
 import { registerModalDialogVariation } from './block-variations';
-import { setupAnchorUniqueness } from './anchor-uniqueness';
+import { setupAnchorUniqueness, flattenBlocks } from './anchor-uniqueness';
 import { InteractionsPanel } from './interactions-panel';
 import { TargetPicker } from './target-picker';
 import { validateInteraction } from './interaction-validation';
@@ -183,13 +184,14 @@ function getFieldsForAction( actionId ) {
  *
  * @since 3.1.0
  *
- * @param {Object}   field    Field definition.
- * @param {*}        value    Current value (or the field default).
- * @param {Function} onChange Receives the new value.
- * @param {string}   clientId The host block's clientId (target fields).
+ * @param {Object}   field         Field definition.
+ * @param {*}        value         Current value (or the field default).
+ * @param            orderedBlocks
+ * @param {Function} onChange      Receives the new value.
+ * @param {string}   clientId      The host block's clientId (target fields).
  * @return {Object} Element.
  */
-function renderFieldControl( field, value, onChange, clientId ) {
+function renderFieldControl( field, value, onChange, clientId, orderedBlocks ) {
 	// Advisory (never save-blocking): a required field left empty
 	// means the action silently does nothing on the frontend — say so
 	// where the author is looking.
@@ -213,6 +215,7 @@ function renderFieldControl( field, value, onChange, clientId ) {
 					value={ value || '' }
 					clientId={ clientId }
 					onChange={ onChange }
+					orderedBlocks={ orderedBlocks }
 				/>
 			);
 		case 'number':
@@ -470,6 +473,34 @@ const withInspectorControl = createHigherOrderComponent( ( BlockEdit ) => {
 }, 'withInspectorControl' );
 
 /**
+ * Best-effort: open the block inspector so the toolbar interaction
+ * indicator leads somewhere (it previously announced as a toggle and
+ * did nothing). Editor surfaces differ; every path is guarded.
+ *
+ * @since 3.1.0
+ *
+ * @return {void}
+ */
+function openBlockInspector() {
+	const sidebars = [
+		[ 'core/edit-post', 'edit-post/block' ],
+		[ 'core/edit-site', 'edit-site/block-inspector' ],
+		[ 'core/editor', 'edit-post/block' ],
+	];
+	for ( const [ storeName, area ] of sidebars ) {
+		try {
+			const d = dispatch( storeName );
+			if ( d?.openGeneralSidebar ) {
+				d.openGeneralSidebar( area );
+				return;
+			}
+		} catch ( e ) {
+			// Try the next surface.
+		}
+	}
+}
+
+/**
  * Higher-order component that adds the action selector to supported blocks.
  * Uses ComboboxControl for searchable action selection.
  *
@@ -548,8 +579,20 @@ const withActionInspectorControl = createHigherOrderComponent(
 				// the block toolbar instead — visible wherever the block
 				// is selected, warning-labelled when validation found
 				// issues.
+				// ONE tree flatten + ONE validation per render, threaded
+				// into the toolbar, the panel notice, and the target
+				// pickers (each used to walk the whole tree separately).
+				const orderedBlocks = customAction
+					? flattenBlocks(
+							select( 'core/block-editor' )?.getBlocks() || []
+					  )
+					: [];
 				const issues = customAction
-					? validateInteraction( { clientId, attributes }, fields )
+					? validateInteraction(
+							{ clientId, attributes },
+							fields,
+							orderedBlocks
+					  )
 					: [];
 				const actionLabel =
 					allActions.find( ( a ) => a.id === customAction )?.label ||
@@ -563,6 +606,7 @@ const withActionInspectorControl = createHigherOrderComponent(
 								<ToolbarGroup>
 									<ToolbarButton
 										icon="admin-links"
+										onClick={ openBlockInspector }
 										label={
 											issues.length
 												? sprintf(
@@ -588,6 +632,7 @@ const withActionInspectorControl = createHigherOrderComponent(
 							</BlockControls>
 						) }
 						<InteractionsPanel
+							issues={ issues }
 							block={ { clientId, name: props.name, attributes } }
 							blockConfig={ blockConfig }
 							actionOptions={ actionOptions }
@@ -598,7 +643,8 @@ const withActionInspectorControl = createHigherOrderComponent(
 									field,
 									value,
 									onChange,
-									clientId
+									clientId,
+									orderedBlocks
 								)
 							}
 							setFieldValue={ setFieldValue }

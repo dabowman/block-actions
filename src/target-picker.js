@@ -25,8 +25,8 @@
 import { select, dispatch } from '@wordpress/data';
 import { ComboboxControl } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
-import { flattenBlocks } from './anchor-uniqueness';
-import { matchesTarget } from './target-shapes';
+import { flattenBlocks, uniqueAnchor } from './anchor-uniqueness';
+import { matchesTarget, getTargetShapes } from './target-shapes';
 
 /**
  * A short human label for a candidate block: its display name plus a
@@ -60,22 +60,50 @@ export function candidateLabel( block ) {
  *
  * @since 3.1.0
  *
- * @param {Object} targets  Field constraint ({ blocks, shape }).
- * @param {string} clientId The trigger block (excluded from candidates).
+ * @param {Object} targets         Field constraint ({ blocks, shape }).
+ * @param {string} clientId        The trigger block (excluded from candidates).
+ * @param {Array}  [orderedBlocks] Precomputed flattened block list.
  * @return {Array<{block: Object, eligible: true|string}>} Candidates.
  */
-export function getTargetCandidates( targets, clientId ) {
-	const editor = select( 'core/block-editor' );
-	if ( ! editor ) {
-		return [];
-	}
-	return flattenBlocks( editor.getBlocks() )
-		.filter( ( block ) => block.clientId !== clientId )
+export function getTargetCandidates( targets, clientId, orderedBlocks ) {
+	const ordered =
+		orderedBlocks ||
+		flattenBlocks( select( 'core/block-editor' )?.getBlocks() || [] );
+	const shapes = getTargetShapes();
+	return ordered
+		.filter(
+			( block ) => block.clientId !== clientId && canCarryAnchor( block )
+		)
 		.map( ( block ) => ( {
 			block,
-			eligible: matchesTarget( block, targets ),
+			eligible: matchesTarget( block, targets, shapes ),
 		} ) )
 		.filter( ( { eligible } ) => true === eligible );
+}
+
+/**
+ * Whether a block can actually persist an anchor.
+ *
+ * A generated anchor on a type without anchor support (Custom HTML,
+ * Shortcode, …) never serializes — the target would render with no id
+ * and the action silently fail while looking configured. When block
+ * type information isn't available, be permissive: a block already
+ * carrying an anchor is proof enough.
+ *
+ * @since 3.1.0
+ *
+ * @param {Object} block Candidate block.
+ * @return {boolean} True when the anchor will persist.
+ */
+function canCarryAnchor( block ) {
+	if ( block.attributes?.anchor ) {
+		return true;
+	}
+	const type = select( 'core/blocks' )?.getBlockType?.( block.name );
+	if ( ! type ) {
+		return true;
+	}
+	return !! ( type.supports?.anchor || type.attributes?.anchor );
 }
 
 /**
@@ -99,13 +127,14 @@ export function ensureAnchor( block ) {
 			.filter( Boolean )
 	);
 
-	const base = `ba-${ block.name.replace( /^core\//, '' ) }`;
-	let anchor = `${ base }-1`;
-	let n = 1;
-	while ( existing.has( anchor ) ) {
-		n++;
-		anchor = `${ base }-${ n }`;
-	}
+	// Normalize the WHOLE block name — acme/card must become
+	// ba-acme-card, not an invalid id with a slash in it.
+	const base = `ba-${ block.name
+		.toLowerCase()
+		.replace( /[^a-z0-9]+/g, '-' )
+		.replace( /^core-/, '' )
+		.replace( /^-+|-+$/g, '' ) }`;
+	const anchor = uniqueAnchor( base, existing );
 
 	dispatch( 'core/block-editor' ).updateBlockAttributes( block.clientId, {
 		anchor,
@@ -121,15 +150,26 @@ export function ensureAnchor( block ) {
  *
  * @since 3.1.0
  *
- * @param {Object}   props          Component props.
- * @param {Object}   props.field    Field definition (label, help, targets).
- * @param {string}   props.value    Current anchor value.
- * @param {string}   props.clientId The trigger block's clientId.
- * @param {Function} props.onChange Receives the new anchor string.
+ * @param {Object}   props                 Component props.
+ * @param {Object}   props.field           Field definition (label, help, targets).
+ * @param {string}   props.value           Current anchor value.
+ * @param {Array}    [props.orderedBlocks] Precomputed flattened block list.
+ * @param {string}   props.clientId        The trigger block's clientId.
+ * @param {Function} props.onChange        Receives the new anchor string.
  * @return {Object} Element.
  */
-export function TargetPicker( { field, value, clientId, onChange } ) {
-	const candidates = getTargetCandidates( field.targets || {}, clientId );
+export function TargetPicker( {
+	field,
+	value,
+	clientId,
+	onChange,
+	orderedBlocks,
+} ) {
+	const candidates = getTargetCandidates(
+		field.targets || {},
+		clientId,
+		orderedBlocks
+	);
 
 	const options = candidates.map( ( { block } ) => ( {
 		// The committed value for an anchor-less candidate is a marker
@@ -177,13 +217,27 @@ export function TargetPicker( { field, value, clientId, onChange } ) {
 				onChange( next || '' );
 			} }
 			onFilterValueChange={ ( text ) => {
-				// Free-text parity with the old TextControl: typing IS
-				// setting (cross-context targets can't be picked from a
-				// list). Selecting an option commits over it afterwards.
-				if (
-					typeof text === 'string' &&
-					! text.startsWith( '__client:' )
-				) {
+				// Free text serves CROSS-CONTEXT targets (template-part
+				// anchors that can't be picked from a list). But this
+				// callback also fires (a) with the option LABEL right
+				// after a pick — downshift rewrites the input — and
+				// (b) on every keystroke while the author merely filters
+				// the dropdown. Committing those would clobber the real
+				// anchor (review #10 blocker). Heuristic: only commit
+				// text that matches NO option (not a label, not a label
+				// prefix/fragment, not a value) — genuinely novel text
+				// is free-text entry; anything resembling the list is
+				// filtering.
+				if ( typeof text !== 'string' || text === '' ) {
+					return;
+				}
+				const needle = text.toLowerCase();
+				const resemblesOption = options.some(
+					( option ) =>
+						option.value === text ||
+						option.label.toLowerCase().includes( needle )
+				);
+				if ( ! resemblesOption && ! text.startsWith( '__client:' ) ) {
 					onChange( text );
 				}
 			} }

@@ -108,11 +108,20 @@ export function InteractionItem( {
 				// and always visible; `optional: true` fields get the
 				// standard default-hidden + per-item-reset affordance.
 				isShownByDefault={ ! isOptional }
-				hasValue={ () =>
-					actionData[ field.key ] !== undefined &&
-					actionData[ field.key ] !== field.default
+				// A SET value counts — including a seeded default. (A
+				// value!==default check would hide seeded truthy defaults
+				// and let reset silently drop them, reintroducing the
+				// "default never reaches the frontend" bug the seeding
+				// exists to fix.)
+				hasValue={ () => actionData[ field.key ] !== undefined }
+				onDeselect={ () =>
+					// Reset means "back to the default"; meaningful
+					// defaults stay materialized so they serialize.
+					setFieldValue(
+						field.key,
+						field.default ? field.default : undefined
+					)
 				}
-				onDeselect={ () => setFieldValue( field.key, undefined ) }
 			>
 				{ renderField( field, value, ( newValue ) =>
 					setFieldValue( field.key, newValue )
@@ -136,6 +145,7 @@ export function InteractionItem( {
  * @param {Array}    props.fields         Field definitions for the action.
  * @param {Function} props.onSelectAction Action-change handler.
  * @param {Function} props.renderField    Field renderer.
+ * @param            props.issues
  * @param {Function} props.setFieldValue  Field setter.
  * @param {Function} props.onResetAll     Clears the whole interaction.
  * @return {Object} Element.
@@ -149,9 +159,14 @@ export function InteractionsPanel( {
 	renderField,
 	setFieldValue,
 	onResetAll,
+	issues: issuesProp,
 } ) {
 	const { customAction, actionData = {} } = block.attributes;
-	const issues = customAction ? validateInteraction( block, fields ) : [];
+	// The HOC precomputes issues (it needs them for the toolbar anyway);
+	// standalone use falls back to computing here.
+	const issues =
+		issuesProp ??
+		( customAction ? validateInteraction( block, fields ) : [] );
 
 	return (
 		<InspectorControls>
