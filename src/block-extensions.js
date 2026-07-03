@@ -62,9 +62,10 @@ const editorActionRegistry = [];
  * @param {string}              label        Action label.
  * @param {Array|Function|null} fieldsOrInit Field definitions array or init function.
  * @param {Function|null}       [maybeInit]  Init function when fields are provided.
+ * @param {Object}              [extras]     Trigger vocabulary (entry/triggers/defaultTrigger/structural).
  * @return {boolean} Success status.
  */
-function registerEditorAction( id, label, fieldsOrInit, maybeInit ) {
+function registerEditorAction( id, label, fieldsOrInit, maybeInit, extras ) {
 	const prefix = '[Block Actions]';
 
 	// Validate parameters
@@ -127,8 +128,18 @@ function registerEditorAction( id, label, fieldsOrInit, maybeInit ) {
 		return false;
 	}
 
-	// Register the action (just for the dropdown, won't execute in editor)
-	editorActionRegistry.push( { id, label, fields, init } );
+	// Register the action (just for the dropdown, won't execute in
+	// editor). `extras` carries the trigger vocabulary (entry/triggers/
+	// defaultTrigger/structural) — theme actions' manifests declare it
+	// and PHP forwards it; without it the Trigger UI never appears for
+	// theme actions even though the frontend fully supports them.
+	editorActionRegistry.push( {
+		id,
+		label,
+		fields,
+		init,
+		...( extras && typeof extras === 'object' ? extras : {} ),
+	} );
 
 	return true;
 }
@@ -141,18 +152,26 @@ function registerEditorAction( id, label, fieldsOrInit, maybeInit ) {
  * @return {Array} Array of action objects.
  */
 function getEditorRegisteredActions() {
-	const builtInActions = actions.map( ( { id, label, fields, blocks } ) => ( {
-		id,
-		label,
-		fields: fields || [],
-		blocks,
-	} ) );
-	const themeActions = editorActionRegistry.map(
-		( { id, label, fields, blocks } ) => ( {
+	const builtInActions = actions.map(
+		( { id, label, fields, blocks, entry, triggers, structural } ) => ( {
 			id,
 			label,
 			fields: fields || [],
 			blocks,
+			entry,
+			triggers,
+			structural,
+		} )
+	);
+	const themeActions = editorActionRegistry.map(
+		( { id, label, fields, blocks, entry, triggers, structural } ) => ( {
+			id,
+			label,
+			fields: fields || [],
+			blocks,
+			entry,
+			triggers,
+			structural,
 		} )
 	);
 	return [ ...builtInActions, ...themeActions ];
@@ -282,7 +301,14 @@ if ( typeof window !== 'undefined' ) {
 					action.id,
 					action.label,
 					Array.isArray( action.fields ) ? action.fields : [],
-					() => {}
+					() => {},
+					{
+						entry: action.entry,
+						triggers: Array.isArray( action.triggers )
+							? action.triggers
+							: undefined,
+						structural: !! action.structural,
+					}
 				);
 			}
 		} );
@@ -410,6 +436,10 @@ function addCustomDataAttribute( settings ) {
 				default: '',
 			},
 			actionData: {
+				type: 'object',
+				default: {},
+			},
+			interactionSettings: {
 				type: 'object',
 				default: {},
 			},
@@ -557,10 +587,31 @@ const withActionInspectorControl = createHigherOrderComponent(
 						setAttributes( {
 							customAction: value,
 							actionData: seeded,
+							// Trigger/conditions belong to the PREVIOUS
+							// action — leaking them onto the new one
+							// (worse: onto a structural action with no
+							// trigger UI to clear them) serializes bogus
+							// data-interactions.
+							interactionSettings: {},
 						} );
 					} catch ( error ) {
 						log( 'error', 'Failed to set action attribute', error );
 					}
+				};
+
+				const actionDef = allActions.find(
+					( a ) => a.id === customAction
+				);
+				const interactionSettings =
+					attributes.interactionSettings || {};
+				const setInteractionSetting = ( key, newValue ) => {
+					const next = { ...interactionSettings };
+					if ( newValue === undefined ) {
+						delete next[ key ];
+					} else {
+						next[ key ] = newValue;
+					}
+					setAttributes( { interactionSettings: next } );
 				};
 
 				const setFieldValue = ( key, newValue ) => {
@@ -637,6 +688,9 @@ const withActionInspectorControl = createHigherOrderComponent(
 							blockConfig={ blockConfig }
 							actionOptions={ actionOptions }
 							fields={ fields }
+							actionDef={ actionDef }
+							interactionSettings={ interactionSettings }
+							setInteractionSetting={ setInteractionSetting }
 							onSelectAction={ onSelectAction }
 							renderField={ ( field, value, onChange ) =>
 								renderFieldControl(
@@ -648,7 +702,12 @@ const withActionInspectorControl = createHigherOrderComponent(
 								)
 							}
 							setFieldValue={ setFieldValue }
-							onResetAll={ () => onSelectAction( '' ) }
+							onResetAll={ () => {
+								onSelectAction( '' );
+								setAttributes( {
+									interactionSettings: {},
+								} );
+							} }
 						/>
 					</Fragment>
 				);
@@ -687,6 +746,42 @@ function addCustomDataToSave( extraProps, blockType, attributes ) {
 		// Add action attribute only to blocks that support actions
 		if ( getSupportedBlocks()[ blockType.name ] && customAction ) {
 			extraProps[ 'data-action' ] = customAction;
+
+			// Progressive serialization: the default (click, no
+			// conditions) writes NOTHING extra — today's markup is the
+			// canonical simple format. A non-default trigger or any
+			// condition adds one data-interactions JSON tuple on top;
+			// the classic attributes stay (they remain the config
+			// channel renderers read).
+			const settings = attributes.interactionSettings || {};
+			const actionDef = getEditorRegisteredActions().find(
+				( a ) => a.id === customAction
+			);
+			const simpleTrigger = actionDef?.defaultTrigger || 'click';
+			const trigger = settings.trigger || simpleTrigger;
+			const conditions = {};
+			if ( Number( settings.minWidth ) > 0 ) {
+				conditions.minWidth = Number( settings.minWidth );
+			}
+			if ( Number( settings.maxWidth ) > 0 ) {
+				conditions.maxWidth = Number( settings.maxWidth );
+			}
+			if ( settings.reducedMotion === true ) {
+				conditions.reducedMotion = 'skip';
+			}
+			const isRich =
+				trigger !== simpleTrigger ||
+				Object.keys( conditions ).length > 0;
+			if ( isRich ) {
+				const tuple = { action: customAction, trigger };
+				if ( trigger === 'timer' ) {
+					tuple.delay = Number( settings.delay ) || 4000;
+				}
+				if ( Object.keys( conditions ).length ) {
+					tuple.conditions = conditions;
+				}
+				extraProps[ 'data-interactions' ] = JSON.stringify( [ tuple ] );
+			}
 
 			// Map actionData fields to data-* attributes
 			if ( actionData && typeof actionData === 'object' ) {

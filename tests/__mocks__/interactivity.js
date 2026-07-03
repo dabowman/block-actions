@@ -7,7 +7,18 @@
 let currentContext = {};
 let currentElement = { ref: document.createElement( 'div' ) };
 
-const store = jest.fn( ( namespace, definition ) => definition );
+const storeRegistry = {};
+const store = jest.fn( ( namespace, definition ) => {
+	// Mirror the real API's merge-or-fetch behavior enough for tests:
+	// registering returns the definition; a bare store( ns ) call
+	// returns whatever was registered under that namespace (used by the
+	// interactions dispatcher for cross-store entry invocation).
+	if ( definition ) {
+		storeRegistry[ namespace ] = definition;
+		return definition;
+	}
+	return storeRegistry[ namespace ];
+} );
 const getContext = jest.fn( () => currentContext );
 const getElement = jest.fn( () => currentElement );
 

@@ -33,6 +33,7 @@ const ACTIONS = [
 	'smooth-scroll',
 	'copy-to-clipboard',
 	'query',
+	'interactions',
 ];
 
 const moduleEntries = Object.fromEntries(

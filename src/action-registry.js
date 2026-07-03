@@ -18,8 +18,12 @@
  *
  *                                                    Actions may declare a `blocks` array naming the block types they host
  *                                                    on; the editor only offers them in those blocks' action dropdowns.
- *                                                    Actions without `blocks` are offered everywhere (theme actions, the
- *                                                    classic built-ins).
+ *                                                    Actions without `blocks` are offered everywhere (theme actions).
+ *
+ *                                                    Behavioral actions declare `entry` (the store action a trigger
+ *                                                    invokes), `triggers` (supported trigger names), and `defaultTrigger`;
+ *                                                    structural actions (carousel) declare `structural: true` instead —
+ *                                                    they own their whole lifecycle and get no trigger UI.
  *
  * @type {Array<{id: string, label: string, fields: ActionField[], blocks?: string[]}>}
  */
@@ -27,12 +31,16 @@ const BUILT_IN_ACTIONS = [
 	{
 		id: 'scroll-to-top',
 		blocks: [ 'core/button', 'core/group' ],
+		entry: 'actions.scrollToTop',
+		triggers: [ 'click', 'hover', 'scroll-into-view', 'load', 'timer' ],
+		defaultTrigger: 'click',
 		label: 'Scroll To Top',
 		fields: [],
 	},
 	{
 		id: 'carousel',
 		blocks: [ 'core/button', 'core/group' ],
+		structural: true,
 		label: 'Carousel',
 		fields: [
 			{
@@ -50,6 +58,9 @@ const BUILT_IN_ACTIONS = [
 	{
 		id: 'toggle-visibility',
 		blocks: [ 'core/button', 'core/group' ],
+		entry: 'actions.toggle',
+		triggers: [ 'click', 'hover', 'scroll-into-view', 'load', 'timer' ],
+		defaultTrigger: 'click',
 		label: 'Toggle Visibility',
 		fields: [
 			{
@@ -76,6 +87,9 @@ const BUILT_IN_ACTIONS = [
 	{
 		id: 'modal-toggle',
 		blocks: [ 'core/button', 'core/group' ],
+		entry: 'actions.toggle',
+		triggers: [ 'click', 'hover', 'scroll-into-view', 'load', 'timer' ],
+		defaultTrigger: 'click',
 		label: 'Modal Toggle',
 		fields: [
 			{
@@ -93,6 +107,9 @@ const BUILT_IN_ACTIONS = [
 	{
 		id: 'smooth-scroll',
 		blocks: [ 'core/button', 'core/group' ],
+		entry: 'actions.scrollToTarget',
+		triggers: [ 'click', 'hover', 'scroll-into-view', 'load', 'timer' ],
+		defaultTrigger: 'click',
 		label: 'Smooth Scroll',
 		fields: [
 			{
@@ -120,6 +137,11 @@ const BUILT_IN_ACTIONS = [
 	{
 		id: 'copy-to-clipboard',
 		blocks: [ 'core/button', 'core/group' ],
+		entry: 'actions.copy',
+		// Clipboard writes need transient user activation; only a real
+		// click has it (timers/observers/load/hover reject).
+		triggers: [ 'click' ],
+		defaultTrigger: 'click',
 		label: 'Copy To Clipboard',
 		fields: [
 			{

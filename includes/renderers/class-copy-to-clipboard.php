@@ -51,7 +51,6 @@ class Copy_To_Clipboard extends Action_Renderer {
 	 * @return void
 	 */
 	public function apply_directives( \WP_HTML_Tag_Processor $processor, array $block ): void {
-		$processor->set_attribute( 'data-wp-on--click', 'actions.copy' );
 		$processor->set_attribute( 'data-wp-init', 'callbacks.init' );
 	}
 
@@ -75,5 +74,32 @@ class Copy_To_Clipboard extends Action_Renderer {
 			}
 		}
 		return $p->get_updated_html();
+	}
+
+	/**
+	 * Trigger entry point — the transformer wires the trigger directive.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return string Entry action reference.
+	 */
+	public function get_entry_action( string $action_id ): ?string {
+		return 'actions.copy';
+	}
+
+	/**
+	 * Clipboard writes require transient user activation — a timer,
+	 * observer, load, or even hover has none, so navigator.clipboard
+	 * rejects with NotAllowedError and the button shows "Copy failed".
+	 * Only a real click can succeed.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return string[] Supported trigger names.
+	 */
+	public function get_supported_triggers( string $action_id ): array {
+		return array( 'click' );
 	}
 }

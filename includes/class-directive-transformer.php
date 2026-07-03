@@ -114,6 +114,25 @@ class Directive_Transformer {
 			// Apply action-specific directives to the root element.
 			$renderer->apply_directives( $processor, $block );
 
+			// Behavioral actions: the transformer owns trigger wiring.
+			// The default (click, no conditions) injects exactly what
+			// renderers used to hardcode — byte-identical output; a
+			// data-interactions tuple swaps the trigger and/or routes
+			// through the dispatcher engine. Structural actions (null
+			// entry) keep full control of their own wiring.
+			$entry = $renderer->get_entry_action( $action_id );
+			$tuple = null;
+			if ( null !== $entry ) {
+				$tuple = Interactions::parse(
+					$processor->get_attribute( 'data-interactions' ),
+					$action_id,
+					$renderer->get_supported_triggers( $action_id )
+				);
+				if ( Interactions::apply_trigger( $processor, $namespace, $entry, $tuple ) ) {
+					Interactions::enqueue_engine();
+				}
+			}
+
 			// Enqueue the view script module and any on-demand stylesheet.
 			$renderer->enqueue_view_script( $action_id );
 			$renderer->enqueue_view_style( $action_id );
@@ -122,6 +141,16 @@ class Directive_Transformer {
 
 			// Allow the renderer to post-process for child element directives.
 			$html = $renderer->post_process_html( $html );
+
+			// User-activated triggers must be reachable by keyboard —
+			// a default core/button is an href-less <a>, invisible to
+			// the tab order (found in manual a11y testing).
+			if ( null !== $tuple && in_array( $tuple['trigger'], array( 'click', 'hover' ), true ) ) {
+				list( $html, $needs_engine ) = Interactions::ensure_keyboard_operable( $html, $tuple['trigger'] );
+				if ( $needs_engine ) {
+					Interactions::enqueue_engine();
+				}
+			}
 
 			return $html;
 		} catch ( \Throwable $e ) {

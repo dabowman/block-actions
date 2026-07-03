@@ -82,7 +82,6 @@ class Theme_Action extends Action_Renderer {
 	 */
 	public function apply_directives( \WP_HTML_Tag_Processor $processor, array $block ): void {
 		$processor->set_attribute( 'data-wp-init', 'callbacks.init' );
-		$processor->set_attribute( 'data-wp-on--click', 'actions.handleClick' );
 
 		$action_id = $processor->get_attribute( 'data-action' );
 		if ( ! is_string( $action_id ) ) {
@@ -204,5 +203,38 @@ class Theme_Action extends Action_Renderer {
 		}
 
 		return $map[ $action_id ] ?? null;
+	}
+
+	/**
+	 * Entry point from the manifest ('entry' key, validated at
+	 * discovery), defaulting to the classic actions.handleClick.
+	 * A manifest declaring `"structural": true` opts out of trigger
+	 * selection and keeps full control of its own wiring.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return string|null Entry action reference, or null when structural.
+	 */
+	public function get_entry_action( string $action_id ): ?string {
+		$manifest = $this->find_action( $action_id )['manifest'] ?? array();
+		if ( ! empty( $manifest['structural'] ) ) {
+			return null;
+		}
+		return $manifest['entry'] ?? 'actions.handleClick';
+	}
+
+	/**
+	 * Triggers from the manifest ('triggers' key, validated at
+	 * discovery), defaulting to the full vocabulary.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return string[] Supported trigger names.
+	 */
+	public function get_supported_triggers( string $action_id ): array {
+		$manifest = $this->find_action( $action_id )['manifest'] ?? array();
+		return $manifest['triggers'] ?? \Block_Actions\Interactions::TRIGGERS;
 	}
 }

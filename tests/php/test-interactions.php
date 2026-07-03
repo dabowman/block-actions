@@ -1,0 +1,297 @@
+<?php
+/**
+ * Trigger × behavior model tests: tuple parsing/validation, trigger
+ * directive injection, transformer byte-identity for the simple case,
+ * and kses survival of the JSON attribute (spike #2 as regression).
+ *
+ * @package Block_Actions
+ */
+
+use Block_Actions\Interactions;
+use Block_Actions\Directive_Transformer;
+use Block_Actions\Renderers\Modal_Toggle;
+
+class Test_Interactions extends WP_UnitTestCase {
+
+	/* ---- parse() ---- */
+
+	public function test_absent_attribute_yields_default_click(): void {
+		$tuple = Interactions::parse( null, 'modal-toggle' );
+		$this->assertSame( 'click', $tuple['trigger'] );
+		$this->assertSame( array(), $tuple['conditions'] );
+	}
+
+	public function test_valid_tuple_parses(): void {
+		$raw   = wp_json_encode(
+			array(
+				array(
+					'action'     => 'modal-toggle',
+					'trigger'    => 'timer',
+					'delay'      => 2500,
+					'conditions' => array(
+						'minWidth'      => 782,
+						'reducedMotion' => 'skip',
+					),
+				),
+			)
+		);
+		$tuple = Interactions::parse( $raw, 'modal-toggle' );
+		$this->assertSame( 'timer', $tuple['trigger'] );
+		$this->assertSame( 2500, $tuple['delay'] );
+		$this->assertSame( 782, $tuple['conditions']['minWidth'] );
+		$this->assertSame( 'skip', $tuple['conditions']['reducedMotion'] );
+	}
+
+	public function test_unknown_trigger_falls_back_to_click(): void {
+		$raw   = wp_json_encode( array( array( 'action' => 'x', 'trigger' => 'shake' ) ) );
+		$tuple = Interactions::parse( $raw, 'x' );
+		$this->assertSame( 'click', $tuple['trigger'] );
+	}
+
+	public function test_undeclared_trigger_falls_back_to_click(): void {
+		$raw   = wp_json_encode( array( array( 'action' => 'x', 'trigger' => 'timer' ) ) );
+		$tuple = Interactions::parse( $raw, 'x', array( 'click', 'hover' ) );
+		$this->assertSame( 'click', $tuple['trigger'] );
+	}
+
+	public function test_unknown_condition_keys_are_dropped(): void {
+		$raw   = wp_json_encode(
+			array(
+				array(
+					'action'     => 'x',
+					'trigger'    => 'load',
+					'conditions' => array(
+						'minWidth'  => '600px junk',
+						'loggedIn'  => true,
+						'evil'      => '<script>',
+					),
+				),
+			)
+		);
+		$tuple = Interactions::parse( $raw, 'x' );
+		$this->assertSame( array( 'minWidth' => 600 ), $tuple['conditions'] );
+	}
+
+	public function test_malformed_json_and_wrong_action_yield_default(): void {
+		$this->assertSame( 'click', Interactions::parse( '{not json', 'x' )['trigger'] );
+		$raw = wp_json_encode( array( array( 'action' => 'other', 'trigger' => 'timer' ) ) );
+		$this->assertSame( 'click', Interactions::parse( $raw, 'x' )['trigger'] );
+	}
+
+	/* ---- apply_trigger() ---- */
+
+	private function apply( array $tuple ): array {
+		$p = new \WP_HTML_Tag_Processor( '<button data-action="t">x</button>' );
+		$p->next_tag();
+		$engine = Interactions::apply_trigger( $p, 'block-actions/t', 'actions.go', $tuple );
+		return array( $engine, $p->get_updated_html() );
+	}
+
+	public function test_click_no_conditions_is_direct_and_engineless(): void {
+		list( $engine, $html ) = $this->apply(
+			array(
+				'trigger'    => 'click',
+				'delay'      => 4000,
+				'conditions' => array(),
+			)
+		);
+		$this->assertFalse( $engine );
+		$this->assertStringContainsString( 'data-wp-on--click="actions.go"', $html );
+		$this->assertStringNotContainsString( 'data-ba-', $html );
+	}
+
+	public function test_hover_always_pairs_focus(): void {
+		list( $engine, $html ) = $this->apply(
+			array(
+				'trigger'    => 'hover',
+				'delay'      => 4000,
+				'conditions' => array(),
+			)
+		);
+		$this->assertFalse( $engine );
+		$this->assertStringContainsString( 'data-wp-on--mouseenter="actions.go"', $html );
+		$this->assertStringContainsString( 'data-wp-on--focusin="actions.go"', $html );
+	}
+
+	public function test_timer_routes_through_the_engine(): void {
+		list( $engine, $html ) = $this->apply(
+			array(
+				'trigger'    => 'timer',
+				'delay'      => 2500,
+				'conditions' => array(),
+			)
+		);
+		$this->assertTrue( $engine );
+		// The entry is armed as a runtime directive against the action's
+		// own store (scope-correct dispatch), not a data-ba-entry the
+		// engine would call programmatically.
+		$this->assertStringContainsString( 'data-wp-on--ba-fire="actions.go"', $html );
+		$this->assertStringContainsString( 'data-ba-trigger="timer"', $html );
+		$this->assertStringContainsString( 'data-ba-delay="2500"', $html );
+		$this->assertStringContainsString( 'data-wp-init--ba-trigger="block-actions/interactions::callbacks.initTrigger"', $html );
+	}
+
+	public function test_conditioned_click_routes_through_the_engine(): void {
+		list( $engine, $html ) = $this->apply(
+			array(
+				'trigger'    => 'click',
+				'delay'      => 4000,
+				'conditions' => array(
+					'minWidth'      => 782,
+					'reducedMotion' => 'skip',
+				),
+			)
+		);
+		$this->assertTrue( $engine );
+		$this->assertStringContainsString( 'data-wp-on--click="block-actions/interactions::actions.dispatch"', $html );
+		$this->assertStringContainsString( 'data-ba-min-width="782"', $html );
+		$this->assertStringContainsString( 'data-ba-reduced-motion="skip"', $html );
+	}
+
+	/* ---- Keyboard operability (manual a11y finding) ---- */
+
+	public function test_hrefless_link_button_becomes_keyboard_operable(): void {
+		// Default core/button: an <a> without href — invisible to the
+		// tab order, so the action was unreachable by keyboard.
+		$html = '<div class="wp-block-button" data-action="x">'
+			. '<a class="wp-block-button__link">Open</a></div>';
+		list( $out, $engine ) = Interactions::ensure_keyboard_operable( $html, 'click' );
+
+		$this->assertTrue( $engine );
+		$p = new \WP_HTML_Tag_Processor( $out );
+		while ( $p->next_tag() ) {
+			if ( $p->has_class( 'wp-block-button__link' ) ) {
+				$this->assertSame( '0', $p->get_attribute( 'tabindex' ) );
+				$this->assertSame( 'button', $p->get_attribute( 'role' ) );
+				$this->assertSame( 'block-actions/interactions::actions.keyActivate', $p->get_attribute( 'data-wp-on--keydown' ) );
+			}
+		}
+	}
+
+	public function test_hover_trigger_gets_focusability_only(): void {
+		$html = '<div class="wp-block-button" data-action="x">'
+			. '<a class="wp-block-button__link">Reveal</a></div>';
+		list( $out, $engine ) = Interactions::ensure_keyboard_operable( $html, 'hover' );
+
+		$this->assertFalse( $engine );
+		$this->assertStringContainsString( 'tabindex="0"', $out );
+		// No click semantics are wired on a hover trigger — a button
+		// role would overpromise; focusability lets focusin fire.
+		$this->assertStringNotContainsString( 'role="button"', $out );
+		$this->assertStringNotContainsString( 'keyActivate', $out );
+	}
+
+	public function test_native_controls_are_left_byte_untouched(): void {
+		$button = '<div class="wp-block-button"><button class="wp-block-button__link">Go</button></div>';
+		list( $out, $engine ) = Interactions::ensure_keyboard_operable( $button, 'click' );
+		$this->assertSame( $button, $out );
+		$this->assertFalse( $engine );
+
+		$link = '<div class="wp-block-button"><a href="/x" class="wp-block-button__link">Go</a></div>';
+		list( $out2 ) = Interactions::ensure_keyboard_operable( $link, 'click' );
+		$this->assertSame( $link, $out2 );
+	}
+
+	public function test_transformer_applies_keyboard_operability(): void {
+		$transformer = new Directive_Transformer();
+		$transformer->register_renderer( 'modal-toggle', new Modal_Toggle() );
+
+		$out = $transformer->transform(
+			'<div class="wp-block-button" data-action="modal-toggle" data-modal="m">'
+				. '<a class="wp-block-button__link">Open</a></div>',
+			array(
+				'blockName' => 'core/button',
+				'attrs'     => array(),
+			)
+		);
+
+		$this->assertStringContainsString( 'tabindex="0"', $out );
+		$this->assertStringContainsString( 'actions.keyActivate', $out );
+	}
+
+	/* ---- Transformer integration ---- */
+
+	public function test_simple_case_output_is_unchanged_by_the_migration(): void {
+		// The default (click, no conditions) must compile to exactly what
+		// renderers used to hardcode — the fast path is byte-stable.
+		$transformer = new Directive_Transformer();
+		$transformer->register_renderer( 'modal-toggle', new Modal_Toggle() );
+
+		$out = $transformer->transform(
+			'<button data-action="modal-toggle" data-modal="m">Open</button>',
+			array(
+				'blockName' => 'core/button',
+				'attrs'     => array(),
+			)
+		);
+
+		$this->assertStringContainsString( 'data-wp-on--click="actions.toggle"', $out );
+		$this->assertStringNotContainsString( 'data-ba-', $out );
+		$this->assertStringNotContainsString( 'block-actions/interactions', $out );
+	}
+
+	public function test_allowed_list_can_forbid_click(): void {
+		// Absent attribute: the default must respect the allowlist.
+		$tuple = Interactions::parse( null, 'x', array( 'scroll-into-view' ) );
+		$this->assertSame( 'scroll-into-view', $tuple['trigger'] );
+
+		// A bogus tuple falls back to the first ALLOWED trigger, not click.
+		$raw   = wp_json_encode( array( array( 'action' => 'x', 'trigger' => 'shake' ) ) );
+		$tuple = Interactions::parse( $raw, 'x', array( 'scroll-into-view', 'load' ) );
+		$this->assertSame( 'scroll-into-view', $tuple['trigger'] );
+	}
+
+	public function test_copy_to_clipboard_is_click_only(): void {
+		// Clipboard writes need transient user activation.
+		$renderer = new Block_Actions\Renderers\Copy_To_Clipboard();
+		$this->assertSame( array( 'click' ), $renderer->get_supported_triggers( 'copy-to-clipboard' ) );
+	}
+
+	public function test_rich_tuple_swaps_the_trigger_via_transformer(): void {
+		$transformer = new Directive_Transformer();
+		$transformer->register_renderer( 'modal-toggle', new Modal_Toggle() );
+
+		$tuple = wp_json_encode( array( array( 'action' => 'modal-toggle', 'trigger' => 'timer', 'delay' => 3000 ) ) );
+		$out   = $transformer->transform(
+			'<button data-action="modal-toggle" data-modal="m" data-interactions=\'' . $tuple . '\'>Open</button>',
+			array(
+				'blockName' => 'core/button',
+				'attrs'     => array(),
+			)
+		);
+
+		$this->assertStringNotContainsString( 'data-wp-on--click="actions.toggle"', $out );
+		$this->assertStringContainsString( 'data-wp-on--ba-fire="actions.toggle"', $out );
+		$this->assertStringContainsString( 'data-ba-delay="3000"', $out );
+	}
+
+	public function test_structural_actions_are_untouched_by_trigger_wiring(): void {
+		$carousel = new Block_Actions\Renderers\Carousel();
+		$this->assertNull( $carousel->get_entry_action( 'carousel' ) );
+	}
+
+	/* ---- kses (spike #2 regression) ---- */
+
+	public function test_data_interactions_survives_kses_semantically(): void {
+		$json = wp_json_encode(
+			array(
+				array(
+					'action'     => 'modal-toggle',
+					'trigger'    => 'timer',
+					'conditions' => array( 'minWidth' => 782 ),
+				),
+			)
+		);
+		$html = '<div data-interactions=\'' . $json . '\'><p>x</p></div>';
+
+		// kses entity-encodes the quotes (Contributor/Author saves)…
+		$ksesed = wp_kses_post( $html );
+		$this->assertStringContainsString( 'data-interactions', $ksesed );
+
+		// …and WP_HTML_Tag_Processor decodes the value back byte-identical.
+		$p = new \WP_HTML_Tag_Processor( $ksesed );
+		$p->next_tag();
+		$this->assertSame( $json, $p->get_attribute( 'data-interactions' ) );
+		$this->assertSame( 'timer', Interactions::parse( $p->get_attribute( 'data-interactions' ), 'modal-toggle' )['trigger'] );
+	}
+}

@@ -28,6 +28,9 @@
 import {
 	ComboboxControl,
 	Notice,
+	SelectControl,
+	TextControl,
+	ToggleControl,
 	// ToolsPanel is the modern core inspector pattern (Dimensions/Border
 	// use it); it has shipped under the __experimental prefix for years
 	// and is the documented way to build default-hidden/resettable panel
@@ -47,15 +50,18 @@ import { validateInteraction } from './interaction-validation';
  *
  * @since 3.1.0
  *
- * @param {Object}   props                Component props.
- * @param {Object}   props.blockConfig    Supported-block config (label/help).
- * @param {Array}    props.actionOptions  Combobox options (incl. None).
- * @param {string}   props.customAction   Current action id.
- * @param {Object}   props.actionData     Current field values.
- * @param {Array}    props.fields         Field definitions for the action.
- * @param {Function} props.onSelectAction Receives the new action id.
- * @param {Function} props.renderField    ( field, value, onChange ) => element.
- * @param {Function} props.setFieldValue  ( key, value ) => void.
+ * @param {Object}   props                       Component props.
+ * @param {Object}   props.blockConfig           Supported-block config (label/help).
+ * @param {Array}    props.actionOptions         Combobox options (incl. None).
+ * @param {string}   props.customAction          Current action id.
+ * @param {Object}   props.actionData            Current field values.
+ * @param {Array}    props.fields                Field definitions for the action.
+ * @param {Function} props.onSelectAction        Receives the new action id.
+ * @param {Object}   props.actionDef             The selected action's registry definition.
+ * @param {Object}   props.interactionSettings   Trigger/conditions state.
+ * @param {Function} props.setInteractionSetting ( key, value ) => void.
+ * @param {Function} props.renderField           ( field, value, onChange ) => element.
+ * @param {Function} props.setFieldValue         ( key, value ) => void.
  * @return {Array} ToolsPanelItem elements.
  */
 export function InteractionItem( {
@@ -64,6 +70,9 @@ export function InteractionItem( {
 	customAction,
 	actionData,
 	fields,
+	actionDef,
+	interactionSettings = {},
+	setInteractionSetting,
 	onSelectAction,
 	renderField,
 	setFieldValue,
@@ -130,6 +139,157 @@ export function InteractionItem( {
 		);
 	}
 
+	// Trigger selection + conditions — behavioral actions only.
+	// Structural actions (carousel) own their whole lifecycle; trigger
+	// choice is meaningless there and the UI is hidden.
+	const behavioral =
+		actionDef &&
+		! actionDef.structural &&
+		Array.isArray( actionDef.triggers ) &&
+		actionDef.triggers.length > 0;
+
+	if ( behavioral && setInteractionSetting ) {
+		const trigger =
+			interactionSettings.trigger || actionDef.defaultTrigger || 'click';
+		const triggerLabels = {
+			click: __( 'Click', 'block-actions' ),
+			hover: __( 'Hover / focus', 'block-actions' ),
+			'scroll-into-view': __( 'Scrolled into view', 'block-actions' ),
+			load: __( 'Page load', 'block-actions' ),
+			timer: __( 'Timer', 'block-actions' ),
+		};
+
+		items.push(
+			<ToolsPanelItem
+				key="trigger"
+				label={ __( 'Trigger', 'block-actions' ) }
+				isShownByDefault
+				hasValue={ () => trigger !== 'click' }
+				onDeselect={ () =>
+					setInteractionSetting( 'trigger', undefined )
+				}
+			>
+				<SelectControl
+					label={ __( 'Trigger', 'block-actions' ) }
+					value={ trigger }
+					options={ actionDef.triggers.map( ( t ) => ( {
+						value: t,
+						label: triggerLabels[ t ] || t,
+					} ) ) }
+					onChange={ ( value ) =>
+						setInteractionSetting( 'trigger', value )
+					}
+					help={ __(
+						'When this action fires. Hover always pairs with keyboard focus.',
+						'block-actions'
+					) }
+				/>
+			</ToolsPanelItem>
+		);
+
+		if ( trigger === 'timer' ) {
+			items.push(
+				<ToolsPanelItem
+					key="delay"
+					label={ __( 'Delay (ms)', 'block-actions' ) }
+					isShownByDefault
+					hasValue={ () => !! interactionSettings.delay }
+					onDeselect={ () =>
+						setInteractionSetting( 'delay', undefined )
+					}
+				>
+					<TextControl
+						label={ __( 'Delay (ms)', 'block-actions' ) }
+						type="number"
+						value={ String( interactionSettings.delay || 4000 ) }
+						onChange={ ( value ) =>
+							setInteractionSetting(
+								'delay',
+								Number( value ) || 4000
+							)
+						}
+					/>
+				</ToolsPanelItem>
+			);
+		}
+
+		items.push(
+			<ToolsPanelItem
+				key="minWidth"
+				label={ __( 'Min viewport width (px)', 'block-actions' ) }
+				isShownByDefault={ false }
+				hasValue={ () => !! interactionSettings.minWidth }
+				onDeselect={ () =>
+					setInteractionSetting( 'minWidth', undefined )
+				}
+			>
+				<TextControl
+					label={ __( 'Min viewport width (px)', 'block-actions' ) }
+					type="number"
+					value={ String( interactionSettings.minWidth || '' ) }
+					onChange={ ( value ) =>
+						setInteractionSetting(
+							'minWidth',
+							Number( value ) || undefined
+						)
+					}
+					help={ __(
+						'Only fire at or above this viewport width (checked when the trigger fires).',
+						'block-actions'
+					) }
+				/>
+			</ToolsPanelItem>,
+			<ToolsPanelItem
+				key="maxWidth"
+				label={ __( 'Max viewport width (px)', 'block-actions' ) }
+				isShownByDefault={ false }
+				hasValue={ () => !! interactionSettings.maxWidth }
+				onDeselect={ () =>
+					setInteractionSetting( 'maxWidth', undefined )
+				}
+			>
+				<TextControl
+					label={ __( 'Max viewport width (px)', 'block-actions' ) }
+					type="number"
+					value={ String( interactionSettings.maxWidth || '' ) }
+					onChange={ ( value ) =>
+						setInteractionSetting(
+							'maxWidth',
+							Number( value ) || undefined
+						)
+					}
+				/>
+			</ToolsPanelItem>,
+			<ToolsPanelItem
+				key="reducedMotion"
+				label={ __( 'Reduced motion', 'block-actions' ) }
+				isShownByDefault={ false }
+				hasValue={ () => interactionSettings.reducedMotion === true }
+				onDeselect={ () =>
+					setInteractionSetting( 'reducedMotion', undefined )
+				}
+			>
+				<ToggleControl
+					label={ __(
+						'Skip for reduced-motion visitors',
+						'block-actions'
+					) }
+					checked={ interactionSettings.reducedMotion === true }
+					onChange={ ( value ) =>
+						setInteractionSetting(
+							'reducedMotion',
+							value ? true : undefined
+						)
+					}
+					help={ __(
+						'Don\u2019t run this interaction when the visitor prefers reduced motion.',
+						'block-actions'
+					) }
+				/>
+			</ToolsPanelItem>
+		);
+	}
+
 	return items;
 }
 
@@ -138,16 +298,19 @@ export function InteractionItem( {
  *
  * @since 3.1.0
  *
- * @param {Object}   props                Component props.
- * @param {Object}   props.block          { clientId, name, attributes }.
- * @param {Object}   props.blockConfig    Supported-block config.
- * @param {Array}    props.actionOptions  Combobox options.
- * @param {Array}    props.fields         Field definitions for the action.
- * @param {Function} props.onSelectAction Action-change handler.
- * @param {Function} props.renderField    Field renderer.
- * @param {Array}    [props.issues]       Precomputed validation issues.
- * @param {Function} props.setFieldValue  Field setter.
- * @param {Function} props.onResetAll     Clears the whole interaction.
+ * @param {Object}   props                       Component props.
+ * @param {Object}   props.block                 { clientId, name, attributes }.
+ * @param {Object}   props.blockConfig           Supported-block config.
+ * @param {Array}    props.actionOptions         Combobox options.
+ * @param {Array}    props.fields                Field definitions for the action.
+ * @param {Function} props.onSelectAction        Action-change handler.
+ * @param {Function} props.renderField           Field renderer.
+ * @param {Object}   props.actionDef             The selected action's registry definition.
+ * @param {Object}   props.interactionSettings   Trigger/conditions state.
+ * @param {Function} props.setInteractionSetting ( key, value ) => void.
+ * @param {Array}    [props.issues]              Precomputed validation issues.
+ * @param {Function} props.setFieldValue         Field setter.
+ * @param {Function} props.onResetAll            Clears the whole interaction.
  * @return {Object} Element.
  */
 export function InteractionsPanel( {
@@ -155,6 +318,9 @@ export function InteractionsPanel( {
 	blockConfig,
 	actionOptions,
 	fields,
+	actionDef,
+	interactionSettings,
+	setInteractionSetting,
 	onSelectAction,
 	renderField,
 	setFieldValue,
@@ -180,6 +346,9 @@ export function InteractionsPanel( {
 					customAction={ customAction }
 					actionData={ actionData }
 					fields={ fields }
+					actionDef={ actionDef }
+					interactionSettings={ interactionSettings }
+					setInteractionSetting={ setInteractionSetting }
 					onSelectAction={ onSelectAction }
 					renderField={ renderField }
 					setFieldValue={ setFieldValue }

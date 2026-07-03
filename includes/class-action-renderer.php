@@ -61,6 +61,40 @@ abstract class Action_Renderer {
 	}
 
 	/**
+	 * The store action a trigger invokes for this renderer, or null.
+	 *
+	 * Behavioral actions (modal-toggle, toggle-visibility, …) have one
+	 * entry point and return its reference ('actions.toggle'); the
+	 * TRANSFORMER then owns trigger wiring — renderers no longer inject
+	 * their own click handler. Structural actions (carousel) own their
+	 * whole lifecycle and return null: trigger selection doesn't apply
+	 * and their wiring is untouched.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return string|null Entry action reference, or null when structural.
+	 */
+	public function get_entry_action( string $action_id ): ?string { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Interface contract; overrides dispatch on it.
+		return null;
+	}
+
+	/**
+	 * The triggers this action supports.
+	 *
+	 * Only consulted for behavioral actions. Defaults to the full
+	 * vocabulary; override to restrict.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $action_id The action identifier.
+	 * @return string[] Supported trigger names.
+	 */
+	public function get_supported_triggers( string $action_id ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Interface contract; overrides dispatch on it.
+		return Interactions::TRIGGERS;
+	}
+
+	/**
 	 * Post-process the full HTML to add directives to child elements.
 	 *
 	 * Override this for complex actions (like carousel) that need

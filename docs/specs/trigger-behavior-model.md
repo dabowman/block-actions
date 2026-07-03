@@ -136,6 +136,17 @@ is not. Timeboxed spike; the outcome picks one of:
 The spec intentionally works under either outcome; the spike only
 determines plumbing.
 
+**v1 outcome (PR #11 review):** neither branch — a third design landed.
+The engine never dispatches programmatically at all: the transformer
+arms `data-wp-on--ba-fire="{entry}"` against the action's own store,
+and the engine dispatches a synthetic cancelable `ba-fire` DOM event
+when the trigger condition is met. The RUNTIME evaluates the entry in
+the element's real namespace scope (generators, withSyncEvent, all of
+it) exactly as a native click would. Verified in-browser: a timer
+tuple opens a modal whose action reads its own context correctly. The
+multiplexing question remains open only for MULTI-interaction blocks
+(several namespaces on one element), still deferred.
+
 ## Triggers (v1 semantics)
 
 | Trigger | Wiring | Notes |

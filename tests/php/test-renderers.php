@@ -29,6 +29,19 @@ class Test_Renderers extends WP_UnitTestCase {
 		);
 		$ctx  = $renderer->get_initial_context( $p, $block );
 		$renderer->apply_directives( $p, $block );
+
+		// Mirror the transformer: trigger wiring for behavioral actions
+		// moved out of the renderers (they declare an entry action; the
+		// transformer injects the trigger directive — click by default).
+		$entry = $renderer->get_entry_action( 'test' );
+		if ( null !== $entry ) {
+			\Block_Actions\Interactions::apply_trigger(
+				$p,
+				'block-actions/test',
+				$entry,
+				\Block_Actions\Interactions::parse( $p->get_attribute( 'data-interactions' ), 'test' )
+			);
+		}
 		return array( $ctx, $p->get_updated_html() );
 	}
 

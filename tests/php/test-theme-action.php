@@ -76,6 +76,9 @@ class Test_Theme_Action extends WP_UnitTestCase {
 		$renderer->apply_directives( $processor, array( 'attrs' => array() ) );
 		$html = $processor->get_updated_html();
 		$this->assertStringContainsString( 'data-wp-init="callbacks.init"', $html );
-		$this->assertStringContainsString( 'data-wp-on--click="actions.handleClick"', $html );
+		// The click handler is no longer the renderer's job — the
+		// transformer wires the trigger from get_entry_action().
+		$this->assertStringNotContainsString( 'data-wp-on--click', $html );
+		$this->assertSame( 'actions.handleClick', $renderer->get_entry_action( 'x' ) );
 	}
 }
