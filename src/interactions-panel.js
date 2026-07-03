@@ -145,7 +145,7 @@ export function InteractionItem( {
  * @param {Array}    props.fields         Field definitions for the action.
  * @param {Function} props.onSelectAction Action-change handler.
  * @param {Function} props.renderField    Field renderer.
- * @param            props.issues
+ * @param {Array}    [props.issues]       Precomputed validation issues.
  * @param {Function} props.setFieldValue  Field setter.
  * @param {Function} props.onResetAll     Clears the whole interaction.
  * @return {Object} Element.

@@ -184,11 +184,11 @@ function getFieldsForAction( actionId ) {
  *
  * @since 3.1.0
  *
- * @param {Object}   field         Field definition.
- * @param {*}        value         Current value (or the field default).
- * @param            orderedBlocks
- * @param {Function} onChange      Receives the new value.
- * @param {string}   clientId      The host block's clientId (target fields).
+ * @param {Object}   field           Field definition.
+ * @param {*}        value           Current value (or the field default).
+ * @param {Function} onChange        Receives the new value.
+ * @param {string}   clientId        The host block's clientId (target fields).
+ * @param {Array}    [orderedBlocks] Precomputed flattened block list.
  * @return {Object} Element.
  */
 function renderFieldControl( field, value, onChange, clientId, orderedBlocks ) {

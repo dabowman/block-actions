@@ -106,9 +106,9 @@ export function getTargetShapes() {
  *
  * @since 3.1.0
  *
- * @param          shapes
- * @param {Object} block   Candidate block object.
- * @param {Object} targets Field constraint: { blocks?: string[], shape?: string }.
+ * @param {Object} block    Candidate block object.
+ * @param {Object} targets  Field constraint: { blocks?: string[], shape?: string }.
+ * @param {Object} [shapes] Resolved shape map (candidate-scan callers pass it once).
  * @return {true|string} True when eligible; a reason string otherwise.
  */
 export function matchesTarget( block, targets = {}, shapes ) {
