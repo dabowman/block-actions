@@ -30,6 +30,8 @@ import { subscribe, select, dispatch } from '@wordpress/data';
 const TARGET_KEYS = {
 	'modal-toggle': 'modal',
 	'toggle-visibility': 'target',
+	'query-filter': 'targetQuery',
+	'query-live-search': 'targetQuery',
 };
 
 /**
@@ -206,6 +208,56 @@ export function resolveAnchorCollisions( ordered, newIds, genId ) {
 }
 
 /**
+ * Compute queryId re-keys for just-inserted core/query blocks.
+ *
+ * Patterns hard-code a queryId, so inserting one twice yields two
+ * queries with the SAME id — colliding router regions
+ * (block-actions-query-{id}) and shared bq-{id}-* URL params. Newly
+ * inserted queries whose queryId is already taken get a fresh one;
+ * pre-existing blocks are never touched.
+ *
+ * @since 3.1.0
+ *
+ * @param {Array} ordered Document-ordered blocks.
+ * @param {Set}   newIds  Client ids of just-inserted blocks.
+ * @return {Array<{clientId: string, attributes: Object}>} Updates.
+ */
+export function resolveQueryIdCollisions( ordered, newIds ) {
+	const used = new Set();
+	ordered.forEach( ( block ) => {
+		if (
+			block.name === 'core/query' &&
+			! newIds.has( block.clientId ) &&
+			block.attributes?.queryId !== undefined
+		) {
+			used.add( block.attributes.queryId );
+		}
+	} );
+
+	const updates = [];
+	ordered.forEach( ( block ) => {
+		if ( block.name !== 'core/query' || ! newIds.has( block.clientId ) ) {
+			return;
+		}
+		const id = block.attributes?.queryId;
+		if ( id === undefined || ! used.has( id ) ) {
+			used.add( id );
+			return;
+		}
+		let fresh = id + 1;
+		while ( used.has( fresh ) ) {
+			fresh++;
+		}
+		used.add( fresh );
+		updates.push( {
+			clientId: block.clientId,
+			attributes: { queryId: fresh },
+		} );
+	} );
+	return updates;
+}
+
+/**
  * Wire collision resolution to the block editor.
  *
  * Debounced, and scoped to insertion: the first tick only seeds the set
@@ -247,7 +299,10 @@ export function setupAnchorUniqueness() {
 		}
 
 		const ordered = flattenBlocks( editor.getBlocks() );
-		const updates = resolveAnchorCollisions( ordered, newIds );
+		const updates = [
+			...resolveAnchorCollisions( ordered, newIds ),
+			...resolveQueryIdCollisions( ordered, newIds ),
+		];
 		if ( ! updates.length ) {
 			return;
 		}

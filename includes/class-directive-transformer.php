@@ -64,8 +64,14 @@ class Directive_Transformer {
 		// Fast path: the overwhelming majority of blocks on a page carry
 		// no action. A substring scan is far cheaper than constructing a
 		// tag processor and walking the markup, so bail before that work
-		// when the marker attribute can't be present.
-		if ( false === strpos( $block_content, 'data-action' ) ) {
+		// when the marker can't be present. Dynamic blocks (core/search)
+		// have no saved wrapper for the editor to write data-action into,
+		// so their action arrives via the customAction block attribute
+		// instead — checked here at the same near-zero cost.
+		$attr_action = isset( $block['attrs']['customAction'] ) && is_string( $block['attrs']['customAction'] )
+			? $block['attrs']['customAction']
+			: '';
+		if ( false === strpos( $block_content, 'data-action' ) && '' === $attr_action ) {
 			return $block_content;
 		}
 
@@ -75,13 +81,23 @@ class Directive_Transformer {
 		}
 
 		$action_id = $processor->get_attribute( 'data-action' );
-		if ( ! $action_id || ! isset( $this->renderers[ $action_id ] ) ) {
+		if ( ! is_string( $action_id ) || '' === $action_id ) {
+			// Markup carries no action: fall back to the block attribute
+			// (dynamic blocks) and mirror it into the markup so renderers
+			// and the frontend see one consistent contract.
+			if ( '' === $attr_action || ! isset( $this->renderers[ $attr_action ] ) ) {
+				return $block_content;
+			}
+			$action_id = $attr_action;
+			$processor->set_attribute( 'data-action', $action_id );
+		}
+		if ( ! isset( $this->renderers[ $action_id ] ) ) {
 			return $block_content;
 		}
 
 		try {
 			$renderer  = $this->renderers[ $action_id ];
-			$namespace = 'block-actions/' . $action_id;
+			$namespace = $renderer->get_namespace( $action_id );
 
 			// Set the interactive namespace.
 			$processor->set_attribute( 'data-wp-interactive', $namespace );

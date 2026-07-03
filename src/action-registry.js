@@ -16,16 +16,21 @@
  * @property {boolean}                  [required]    Whether the field must be filled.
  * @property {string|number|boolean}    [default]     Default value.
  *
+ *                                                    Actions may declare a `blocks` array naming the block types they host
+ *                                                    on; the editor only offers them in those blocks' action dropdowns.
+ *                                                    Actions without `blocks` are offered everywhere (theme actions).
+ *
  *                                                    Behavioral actions declare `entry` (the store action a trigger
  *                                                    invokes), `triggers` (supported trigger names), and `defaultTrigger`;
  *                                                    structural actions (carousel) declare `structural: true` instead —
  *                                                    they own their whole lifecycle and get no trigger UI.
  *
- * @type {Array<{id: string, label: string, fields: ActionField[]}>}
+ * @type {Array<{id: string, label: string, fields: ActionField[], blocks?: string[]}>}
  */
 const BUILT_IN_ACTIONS = [
 	{
 		id: 'scroll-to-top',
+		blocks: [ 'core/button', 'core/group' ],
 		entry: 'actions.scrollToTop',
 		triggers: [ 'click', 'hover', 'scroll-into-view', 'load', 'timer' ],
 		defaultTrigger: 'click',
@@ -34,6 +39,7 @@ const BUILT_IN_ACTIONS = [
 	},
 	{
 		id: 'carousel',
+		blocks: [ 'core/button', 'core/group' ],
 		structural: true,
 		label: 'Carousel',
 		fields: [
@@ -51,6 +57,7 @@ const BUILT_IN_ACTIONS = [
 	},
 	{
 		id: 'toggle-visibility',
+		blocks: [ 'core/button', 'core/group' ],
 		entry: 'actions.toggle',
 		triggers: [ 'click', 'hover', 'scroll-into-view', 'load', 'timer' ],
 		defaultTrigger: 'click',
@@ -79,6 +86,7 @@ const BUILT_IN_ACTIONS = [
 	},
 	{
 		id: 'modal-toggle',
+		blocks: [ 'core/button', 'core/group' ],
 		entry: 'actions.toggle',
 		triggers: [ 'click', 'hover', 'scroll-into-view', 'load', 'timer' ],
 		defaultTrigger: 'click',
@@ -98,6 +106,7 @@ const BUILT_IN_ACTIONS = [
 	},
 	{
 		id: 'smooth-scroll',
+		blocks: [ 'core/button', 'core/group' ],
 		entry: 'actions.scrollToTarget',
 		triggers: [ 'click', 'hover', 'scroll-into-view', 'load', 'timer' ],
 		defaultTrigger: 'click',
@@ -127,6 +136,7 @@ const BUILT_IN_ACTIONS = [
 	},
 	{
 		id: 'copy-to-clipboard',
+		blocks: [ 'core/button', 'core/group' ],
 		entry: 'actions.copy',
 		triggers: [ 'click', 'hover', 'scroll-into-view', 'load', 'timer' ],
 		defaultTrigger: 'click',
@@ -140,6 +150,88 @@ const BUILT_IN_ACTIONS = [
 				dataAttribute: 'data-copy-text',
 				required: true,
 				default: '',
+			},
+		],
+	},
+	{
+		id: 'query-paginate',
+		label: 'Query Pagination — Instant',
+		blocks: [ 'core/query' ],
+		fields: [],
+	},
+	{
+		id: 'query-infinite-scroll',
+		label: 'Query Infinite Scroll',
+		blocks: [ 'core/query' ],
+		fields: [],
+	},
+	{
+		id: 'query-filter',
+		label: 'Query Filter',
+		blocks: [ 'core/button' ],
+		fields: [
+			{
+				key: 'targetQuery',
+				type: 'target',
+				label: 'Target Query',
+				help: 'The Query Loop to filter. Leave empty when the page has exactly one actions-enabled Query Loop.',
+				dataAttribute: 'data-query',
+				targets: { blocks: [ 'core/query' ], shape: 'query' },
+				required: false,
+				default: '',
+			},
+			{
+				key: 'taxonomy',
+				type: 'text',
+				label: 'Taxonomy',
+				help: 'Taxonomy to filter by (e.g. category, post_tag).',
+				dataAttribute: 'data-taxonomy',
+				required: true,
+				default: '',
+			},
+			{
+				key: 'term',
+				type: 'text',
+				label: 'Term slug',
+				help: 'Term to toggle. Leave empty for an "All" button that clears this taxonomy\'s filter.',
+				dataAttribute: 'data-term',
+				required: false,
+				default: '',
+			},
+		],
+	},
+	{
+		id: 'query-live-search',
+		label: 'Query Live Search',
+		blocks: [ 'core/search', 'core/group' ],
+		fields: [
+			{
+				key: 'targetQuery',
+				type: 'target',
+				label: 'Target Query',
+				help: 'The Query Loop to search. Leave empty when the page has exactly one actions-enabled Query Loop.',
+				dataAttribute: 'data-query',
+				targets: { blocks: [ 'core/query' ], shape: 'query' },
+				required: false,
+				default: '',
+			},
+			{
+				key: 'debounce',
+				type: 'number',
+				label: 'Debounce (ms)',
+				help: 'Wait this long after typing stops before searching.',
+				dataAttribute: 'data-debounce',
+				required: false,
+				default: 300,
+			},
+			{
+				key: 'minChars',
+				type: 'number',
+				label: 'Minimum characters',
+				help: 'Skip searching below this many characters (clearing always applies).',
+				dataAttribute: 'data-min-chars',
+				required: false,
+				default: 0,
 			},
 		],
 	},

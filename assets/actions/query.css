@@ -1,0 +1,28 @@
+/**
+ * Query Loop actions — minimal functional CSS.
+ *
+ * Loading feedback during region swaps plus infinite-scroll mechanics.
+ * Appearance (spinners, skeletons, active-filter styling) is the
+ * theme's responsibility; `.is-active-filter` and `.is-loading` are the
+ * hooks it styles.
+ *
+ * @since 3.1.0
+ */
+[data-wp-router-region^="block-actions-query-"].is-loading {
+	opacity: 0.5;
+	pointer-events: none;
+	transition: opacity 0.2s ease;
+}
+
+/*
+ * Infinite scroll: once JS takes over (`.ba-infinite-scroll-on` is added
+ * by the store's init), the pagination block becomes the hidden no-JS
+ * fallback + next-URL source. Without JS it stays visible and working.
+ */
+.ba-infinite-scroll-on .wp-block-query-pagination {
+	display: none;
+}
+
+.ba-query-sentinel {
+	height: 1px;
+}
