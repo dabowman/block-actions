@@ -69,6 +69,13 @@ class Query_Params {
 	private static $opted_in = array();
 
 	/**
+	 * Cached anchor→queryId map for the current request.
+	 *
+	 * @var array|null
+	 */
+	private static $query_map = null;
+
+	/**
 	 * Wire the hooks.
 	 *
 	 * @since 3.1.0
@@ -196,6 +203,123 @@ class Query_Params {
 			self::$opted_in[ absint( $parsed_block['attrs']['queryId'] ?? 0 ) ] = true;
 		}
 		return $parsed_block;
+	}
+
+	/**
+	 * Map of anchor → queryId for opted-in queries in the main query's
+	 * content, plus the sole opted-in queryId when exactly one exists.
+	 *
+	 * Powers the no-JS href fallback on filter triggers: links need the
+	 * target queryId at render time, before/regardless of where the
+	 * query block renders. Covers post-content queries (the standard
+	 * case); template-part queries resolve client-side only, so their
+	 * triggers simply skip the href.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @return array{anchors: array<string,int>, sole: int|null} Map.
+	 */
+	private static function content_query_map(): array {
+		if ( null !== self::$query_map ) {
+			return self::$query_map;
+		}
+		$map = array(
+			'anchors' => array(),
+			'sole'    => null,
+		);
+
+		$posts = $GLOBALS['wp_query']->posts ?? array();
+		$ids   = array();
+		$walk  = static function ( array $blocks ) use ( &$walk, &$map, &$ids ): void {
+			foreach ( $blocks as $block ) {
+				if ( 'core/query' === ( $block['blockName'] ?? '' )
+					&& self::is_actions_query( $block['attrs'] ?? array() ) ) {
+					$query_id = absint( $block['attrs']['queryId'] ?? 0 );
+					$ids[]    = $query_id;
+					if ( ! empty( $block['attrs']['anchor'] ) && is_string( $block['attrs']['anchor'] ) ) {
+						$map['anchors'][ $block['attrs']['anchor'] ] = $query_id;
+					}
+				}
+				if ( ! empty( $block['innerBlocks'] ) ) {
+					$walk( $block['innerBlocks'] );
+				}
+			}
+		};
+		foreach ( $posts as $queried_post ) {
+			if ( ! empty( $queried_post->post_content ) ) {
+				$walk( parse_blocks( $queried_post->post_content ) );
+			}
+		}
+
+		$ids = array_unique( $ids );
+		if ( 1 === count( $ids ) ) {
+			$map['sole'] = $ids[0];
+		}
+		self::$query_map = $map;
+		return $map;
+	}
+
+	/**
+	 * Reset the content-query map cache (tests; long-running processes).
+	 *
+	 * @since 3.1.0
+	 *
+	 * @return void
+	 */
+	public static function flush_query_map(): void {
+		self::$query_map = null;
+	}
+
+	/**
+	 * Resolve a filter trigger's target queryId at render time.
+	 *
+	 * Mirrors the client-side rule: explicit anchor wins; otherwise the
+	 * page's sole opted-in query. Null when unresolvable (the trigger
+	 * then works via JavaScript only).
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param string $anchor The trigger's data-query anchor ('' = unset).
+	 * @return int|null The queryId, or null.
+	 */
+	public static function query_id_for_trigger( string $anchor ): ?int {
+		$map = self::content_query_map();
+		if ( '' !== $anchor ) {
+			return $map['anchors'][ $anchor ] ?? null;
+		}
+		return $map['sole'];
+	}
+
+	/**
+	 * Build a filter trigger's no-JS href against the current request.
+	 *
+	 * Same toggle semantics as the store's buildFilterUrl: an active or
+	 * empty term clears the taxonomy's param, anything else sets it, and
+	 * any change drops the page param. Deterministic per URL — no
+	 * per-visitor state (page-cache requirement).
+	 *
+	 * @since 3.1.0
+	 *
+	 * @param int    $query_id Target queryId.
+	 * @param string $taxonomy Taxonomy name.
+	 * @param string $term     Term slug ('' = the All button).
+	 * @return string The href.
+	 */
+	public static function filter_href( int $query_id, string $taxonomy, string $term ): string {
+		$key = "bq-{$query_id}-tax-{$taxonomy}";
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Public read-only state reflection.
+		$current = isset( $_GET[ $key ] ) && is_string( $_GET[ $key ] )
+			? sanitize_title( wp_unslash( $_GET[ $key ] ) )
+			: '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		if ( '' === $term || $current === $term ) {
+			$url = remove_query_arg( $key );
+		} else {
+			$url = add_query_arg( $key, $term );
+		}
+		return remove_query_arg( "query-{$query_id}-page", $url );
 	}
 
 	/**

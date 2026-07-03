@@ -18,16 +18,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 <div class="wp-block-group">
 
 <!-- wp:buttons {"layout":{"type":"flex","justifyContent":"center"}} -->
-<div class="wp-block-buttons"><!-- wp:button {"tagName":"button","customAction":"query-filter","actionData":{"targetQuery":"ba-filterable-grid","taxonomy":"category","term":""},"className":"is-style-outline"} -->
-<div class="wp-block-button is-style-outline" data-action="query-filter" data-query="ba-filterable-grid" data-taxonomy="category"><button type="button" class="wp-block-button__link wp-element-button"><?php esc_html_e( 'All', 'block-actions' ); ?></button></div>
+<div class="wp-block-buttons"><!-- wp:button {"customAction":"query-filter","actionData":{"targetQuery":"ba-filterable-grid","taxonomy":"category","term":""},"className":"is-style-outline"} -->
+<div class="wp-block-button is-style-outline" data-action="query-filter" data-query="ba-filterable-grid" data-taxonomy="category"><a class="wp-block-button__link wp-element-button"><?php esc_html_e( 'All', 'block-actions' ); ?></a></div>
 <!-- /wp:button -->
 
-<!-- wp:button {"tagName":"button","customAction":"query-filter","actionData":{"targetQuery":"ba-filterable-grid","taxonomy":"category","term":"news"},"className":"is-style-outline"} -->
-<div class="wp-block-button is-style-outline" data-action="query-filter" data-query="ba-filterable-grid" data-taxonomy="category" data-term="news"><button type="button" class="wp-block-button__link wp-element-button"><?php esc_html_e( 'News', 'block-actions' ); ?></button></div>
+<!-- wp:button {"customAction":"query-filter","actionData":{"targetQuery":"ba-filterable-grid","taxonomy":"category","term":"news"},"className":"is-style-outline"} -->
+<div class="wp-block-button is-style-outline" data-action="query-filter" data-query="ba-filterable-grid" data-taxonomy="category" data-term="news"><a class="wp-block-button__link wp-element-button"><?php esc_html_e( 'News', 'block-actions' ); ?></a></div>
 <!-- /wp:button -->
 
-<!-- wp:button {"tagName":"button","customAction":"query-filter","actionData":{"targetQuery":"ba-filterable-grid","taxonomy":"category","term":"events"},"className":"is-style-outline"} -->
-<div class="wp-block-button is-style-outline" data-action="query-filter" data-query="ba-filterable-grid" data-taxonomy="category" data-term="events"><button type="button" class="wp-block-button__link wp-element-button"><?php esc_html_e( 'Events', 'block-actions' ); ?></button></div>
+<!-- wp:button {"customAction":"query-filter","actionData":{"targetQuery":"ba-filterable-grid","taxonomy":"category","term":"events"},"className":"is-style-outline"} -->
+<div class="wp-block-button is-style-outline" data-action="query-filter" data-query="ba-filterable-grid" data-taxonomy="category" data-term="events"><a class="wp-block-button__link wp-element-button"><?php esc_html_e( 'Events', 'block-actions' ); ?></a></div>
 <!-- /wp:button --></div>
 <!-- /wp:buttons -->
 

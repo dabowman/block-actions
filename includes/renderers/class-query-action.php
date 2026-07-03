@@ -47,6 +47,16 @@ class Query_Action extends Action_Renderer {
 	private string $current_action = '';
 
 	/**
+	 * The current trigger's target anchor (query-filter only), captured
+	 * alongside current_action for post_process_html.
+	 *
+	 * @since 3.1.0
+	 *
+	 * @var string
+	 */
+	private string $current_target = '';
+
+	/**
 	 * All four actions share one store.
 	 *
 	 * @since 3.1.0
@@ -138,9 +148,10 @@ class Query_Action extends Action_Renderer {
 				);
 
 			case 'query-filter':
+				$this->current_target = $this->sanitize_anchor( $this->config( $processor, $block, 'data-query', 'targetQuery' ) );
 				return array(
 					'action'      => 'query-filter',
-					'targetQuery' => $this->sanitize_anchor( $this->config( $processor, $block, 'data-query', 'targetQuery' ) ),
+					'targetQuery' => $this->current_target,
 					'taxonomy'    => sanitize_key( $this->config( $processor, $block, 'data-taxonomy', 'taxonomy' ) ),
 					'term'        => sanitize_title( $this->config( $processor, $block, 'data-term', 'term' ) ),
 				);
@@ -330,6 +341,21 @@ class Query_Action extends Action_Renderer {
 			'aria-pressed',
 			Query_Params::is_term_active_in_request( $taxonomy, $term ) ? 'true' : 'false'
 		);
+
+		// No-JS fallback: a link-style button gets a real toggle URL, so
+		// filters keep working as ordinary navigation without JavaScript
+		// (the JS click handler preventDefaults over it when active). A
+		// <button> control can't carry an href — JS-only by nature — and
+		// unresolvable targets (template-part queries) skip the href too.
+		if ( 'A' === $p->get_tag() ) {
+			$query_id = Query_Params::query_id_for_trigger( $this->current_target );
+			if ( null !== $query_id ) {
+				$p->set_attribute(
+					'href',
+					esc_url( Query_Params::filter_href( $query_id, $taxonomy, $term ) )
+				);
+			}
+		}
 
 		return $p->get_updated_html();
 	}

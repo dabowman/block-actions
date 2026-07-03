@@ -13,6 +13,7 @@ class Test_Query_Action extends WP_UnitTestCase {
 
 	public function tear_down() {
 		$_GET = array();
+		Query_Params::flush_query_map();
 		parent::tear_down();
 	}
 
@@ -362,6 +363,79 @@ class Test_Query_Action extends WP_UnitTestCase {
 		// Both the author's clause and the URL clause apply, ANDed.
 		$this->assertSame( 'AND', $query['tax_query']['relation'] );
 		$this->assertCount( 2, array_filter( $query['tax_query'], 'is_array' ) );
+	}
+
+	/* ---- No-JS filter hrefs ---- */
+
+	public function test_filter_href_toggle_semantics(): void {
+		$_SERVER['REQUEST_URI'] = '/blog/?query-7-page=3';
+		$_GET                   = array( 'query-7-page' => '3' );
+
+		// Setting a term drops the page param.
+		$href = Query_Params::filter_href( 7, 'category', 'news' );
+		$this->assertStringContainsString( 'bq-7-tax-category=news', $href );
+		$this->assertStringNotContainsString( 'query-7-page', $href );
+
+		// The active term toggles off; the All button always clears.
+		$_SERVER['REQUEST_URI']         = '/blog/?bq-7-tax-category=news';
+		$_GET['bq-7-tax-category']      = 'news';
+		$this->assertStringNotContainsString( 'bq-7-tax-category', Query_Params::filter_href( 7, 'category', 'news' ) );
+		$this->assertStringNotContainsString( 'bq-7-tax-category', Query_Params::filter_href( 7, 'category', '' ) );
+		// A different term replaces the current one.
+		$this->assertStringContainsString( 'bq-7-tax-category=events', Query_Params::filter_href( 7, 'category', 'events' ) );
+	}
+
+	public function test_trigger_query_resolution_from_content(): void {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_content' => '<!-- wp:query {"queryId":21,"anchor":"grid-a","customAction":"query-paginate","query":{"inherit":false}} --><div class="wp-block-query" id="grid-a"></div><!-- /wp:query -->'
+					. '<!-- wp:query {"queryId":22,"anchor":"grid-b","customAction":"query-infinite-scroll","query":{"inherit":false}} --><div class="wp-block-query" id="grid-b"></div><!-- /wp:query -->',
+			)
+		);
+		$this->go_to( get_permalink( $post_id ) );
+		Query_Params::flush_query_map();
+
+		$this->assertSame( 21, Query_Params::query_id_for_trigger( 'grid-a' ) );
+		$this->assertSame( 22, Query_Params::query_id_for_trigger( 'grid-b' ) );
+		// Two opted-in queries: no sole default.
+		$this->assertNull( Query_Params::query_id_for_trigger( '' ) );
+		$this->assertNull( Query_Params::query_id_for_trigger( 'missing' ) );
+	}
+
+	public function test_filter_link_control_gets_nojs_href(): void {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_content' => '<!-- wp:query {"queryId":31,"anchor":"the-grid","customAction":"query-paginate","query":{"inherit":false}} --><div class="wp-block-query" id="the-grid"></div><!-- /wp:query -->',
+			)
+		);
+		$this->go_to( get_permalink( $post_id ) );
+		Query_Params::flush_query_map();
+
+		$renderer = new Query_Action();
+		$html     = '<div class="wp-block-button" data-action="query-filter" data-query="the-grid" data-taxonomy="category" data-term="news">'
+			. '<a class="wp-block-button__link">News</a></div>';
+		$p        = new \WP_HTML_Tag_Processor( $html );
+		$p->next_tag();
+		$block = array(
+			'blockName' => 'core/button',
+			'attrs'     => array(),
+		);
+		$renderer->get_initial_context( $p, $block );
+		$renderer->apply_directives( $p, $block );
+		$out = $renderer->post_process_html( $p->get_updated_html() );
+
+		$this->assertStringContainsString( 'href=', $out );
+		$this->assertStringContainsString( 'bq-31-tax-category=news', $out );
+
+		// A <button> control can't carry an href — JS-only by design.
+		$html2 = '<div class="wp-block-button" data-action="query-filter" data-query="the-grid" data-taxonomy="category" data-term="news">'
+			. '<button class="wp-block-button__link">News</button></div>';
+		$p2    = new \WP_HTML_Tag_Processor( $html2 );
+		$p2->next_tag();
+		$renderer->get_initial_context( $p2, $block );
+		$renderer->apply_directives( $p2, $block );
+		$out2 = $renderer->post_process_html( $p2->get_updated_html() );
+		$this->assertStringNotContainsString( 'href=', $out2 );
 	}
 
 	/* ---- Core interop ---- */
